@@ -1,0 +1,23 @@
+{
+  "name": "biryani",
+  "version": "0.1.0",
+  "description": "Free, self-hosted Minecraft server management panel",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently \"pnpm --filter @biryani/api dev\" \"pnpm --filter @biryani/web dev\"",
+    "build": "pnpm --filter @biryani/api build && pnpm --filter @biryani/web build",
+    "start": "pnpm --filter @biryani/api start",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck",
+    "db:migrate": "pnpm --filter @biryani/api db:migrate"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0",
+    "typescript": "^5.7.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "packageManager": "pnpm@9.15.0"
+}
