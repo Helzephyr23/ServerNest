@@ -1,0 +1,110 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
+import { api } from "@/lib/api";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+
+export default function ServerDetailPage() {
+  const params = useParams();
+  const router = useRouter();
+  const id = params.id as string;
+  const [server, setServer] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  const fetchServer = () => {
+    api.get(`/api/servers/${id}`).then(({ server }) => setServer(server)).catch(() => router.push("/dashboard/servers")).finally(() => setLoading(false));
+  };
+
+  useEffect(() => { fetchServer(); }, [id]);
+
+  const handleAction = async (action: "start" | "stop" | "restart") => {
+    await api.post(`/api/servers/${id}/${action}`);
+    fetchServer();
+  };
+
+  const handleDelete = async () => {
+    if (confirm(`Delete server "${server.name}"? This cannot be undone.`)) {
+      await api.delete(`/api/servers/${id}`);
+      router.push("/dashboard/servers");
+    }
+  };
+
+  if (loading) return <div className="flex justify-center py-12"><div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" /></div>;
+  if (!server) return null;
+
+  const tabs = [
+    { href: `/dashboard/servers/${id}`, label: "Overview", exact: true },
+    { href: `/dashboard/servers/${id}/console`, label: "Console" },
+    { href: `/dashboard/servers/${id}/files`, label: "Files" },
+    { href: `/dashboard/servers/${id}/mods`, label: "Mods" },
+    { href: `/dashboard/servers/${id}/players`, label: "Players" },
+    { href: `/dashboard/servers/${id}/backups`, label: "Backups" },
+    { href: `/dashboard/servers/${id}/settings`, label: "Settings" },
+  ];
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">{server.name}</h1>
+          <p className="text-muted-foreground">{server.software} {server.mc_version}</p>
+        </div>
+        <div className="flex gap-2">
+          {server.status === "running" ? (
+            <>
+              <Button variant="outline" onClick={() => handleAction("restart")}>Restart</Button>
+              <Button variant="destructive" onClick={() => handleAction("stop")}>Stop</Button>
+            </>
+          ) : (
+            <Button onClick={() => handleAction("start")}>Start</Button>
+          )}
+        </div>
+      </div>
+
+      <div className="flex gap-1 overflow-x-auto border-b">
+        {tabs.map((tab) => (
+          <Link
+            key={tab.href}
+            href={tab.href}
+            className={`whitespace-nowrap border-b-2 px-4 py-2 text-sm font-medium transition-colors ${
+              (tab.exact ? `http://localhost:3000${tab.href}` === window.location.href : window.location.href.startsWith(tab.href))
+                ? "border-primary text-primary"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {tab.label}
+          </Link>
+        ))}
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Status</CardTitle></CardHeader>
+          <CardContent>
+            <span className={`text-lg font-bold ${
+              server.status === "running" ? "text-green-500" : "text-zinc-400"
+            }`}>{server.status}</span>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Port</CardTitle></CardHeader>
+          <CardContent><p className="text-lg font-bold">{server.port}</p></CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Memory</CardTitle></CardHeader>
+          <CardContent><p className="text-lg font-bold">{server.ram_mb >= 1024 ? `${server.ram_mb / 1024} GB` : `${server.ram_mb} MB`}</p></CardContent>
+        </Card>
+      </div>
+
+      <Card className="border-destructive/50">
+        <CardHeader><CardTitle className="text-destructive">Danger Zone</CardTitle></CardHeader>
+        <CardContent>
+          <Button variant="destructive" onClick={handleDelete}>Delete Server</Button>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}

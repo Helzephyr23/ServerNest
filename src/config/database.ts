@@ -1,0 +1,90 @@
+import Database from "better-sqlite3";
+import path from "path";
+import fs from "fs";
+import { env } from "./env.js";
+
+const dbDir = path.dirname(path.resolve(env.DATABASE_PATH));
+if (!fs.existsSync(dbDir)) {
+  fs.mkdirSync(dbDir, { recursive: true });
+}
+
+const db = new Database(path.resolve(env.DATABASE_PATH));
+
+db.pragma("journal_mode = WAL");
+db.pragma("foreign_keys = ON");
+
+export function migrate() {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      username TEXT UNIQUE NOT NULL,
+      password_hash TEXT NOT NULL,
+      role TEXT NOT NULL DEFAULT 'admin',
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS nodes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT UNIQUE NOT NULL,
+      hostname TEXT NOT NULL,
+      port INTEGER NOT NULL DEFAULT 50051,
+      status TEXT NOT NULL DEFAULT 'offline',
+      api_key TEXT NOT NULL,
+      max_servers INTEGER NOT NULL DEFAULT 10,
+      current_servers INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS servers (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      node_id INTEGER NOT NULL DEFAULT 1,
+      port INTEGER UNIQUE NOT NULL,
+      status TEXT NOT NULL DEFAULT 'stopped',
+      mc_version TEXT NOT NULL DEFAULT '1.21.4',
+      software TEXT NOT NULL DEFAULT 'vanilla',
+      image TEXT NOT NULL DEFAULT 'itzg/minecraft-server',
+      ram_mb INTEGER NOT NULL DEFAULT 2048,
+      cpu_percent REAL DEFAULT NULL,
+      container_id TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (node_id) REFERENCES nodes(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS server_config (
+      server_id INTEGER NOT NULL,
+      key TEXT NOT NULL,
+      value TEXT NOT NULL,
+      PRIMARY KEY (server_id, key),
+      FOREIGN KEY (server_id) REFERENCES servers(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS backups (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      server_id INTEGER NOT NULL,
+      filename TEXT NOT NULL,
+      size INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (server_id) REFERENCES servers(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS schedules (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      server_id INTEGER NOT NULL,
+      action TEXT NOT NULL,
+      cron TEXT NOT NULL,
+      enabled INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (server_id) REFERENCES servers(id) ON DELETE CASCADE
+    );
+  `);
+
+  const nodeCount = db.prepare("SELECT COUNT(*) as count FROM nodes").get() as { count: number };
+  if (nodeCount.count === 0) {
+    db.prepare(
+      "INSERT INTO nodes (name, hostname, port, status, api_key, max_servers) VALUES (?, ?, ?, ?, ?, ?)"
+    ).run("master", "127.0.0.1", env.GRPC_PORT, "online", env.NODE_API_KEY || "local", 10);
+  }
+}
+
+export default db;
