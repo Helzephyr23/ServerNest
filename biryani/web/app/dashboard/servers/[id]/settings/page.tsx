@@ -57,16 +57,12 @@ export default function ServerSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [needsRestart, setNeedsRestart] = useState(false);
-  const [server, setServer] = useState<any>(null);
 
   const fetchProps = () => {
-    Promise.all([
-      api.get(`/api/servers/${id}/properties`),
-      api.get(`/api/servers/${id}`),
-    ]).then(([{ properties: p }, { server: s }]) => {
-      setProperties(p);
-      setServer(s);
-    }).finally(() => setLoading(false));
+    api.get(`/api/servers/${id}/properties`)
+      .then(({ properties: p }) => setProperties(p || {}))
+      .catch(() => setProperties({}))
+      .finally(() => setLoading(false));
   };
 
   useEffect(() => { fetchProps(); }, [id]);
@@ -102,7 +98,7 @@ export default function ServerSettingsPage() {
     );
   }
 
-  const sortedKeys = Object.keys(properties).sort();
+  const sortedKeys = Object.keys(properties || {}).sort();
 
   return (
     <div className="space-y-4">

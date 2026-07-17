@@ -14,7 +14,10 @@ export default function NodesPage() {
   const [error, setError] = useState("");
 
   const fetchNodes = () => {
-    api.get("/api/nodes").then(({ nodes }) => setNodes(nodes)).finally(() => setLoading(false));
+    api.get("/api/nodes")
+      .then(({ nodes }) => setNodes(Array.isArray(nodes) ? nodes : []))
+      .catch(() => setNodes([]))
+      .finally(() => setLoading(false));
   };
 
   useEffect(() => { fetchNodes(); }, []);

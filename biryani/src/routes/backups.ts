@@ -11,12 +11,14 @@ export default async function backupRoutes(app: FastifyInstance) {
   const opts = { preHandler: [authMiddleware] };
 
   app.get("/api/servers/:id/backups", opts, async (request) => {
-    return { backups: getBackups(Number(request.params.id)) };
+    const { id } = request.params as { id: string };
+    return { backups: getBackups(Number(id)) };
   });
 
   app.post("/api/servers/:id/backups", opts, async (request, reply) => {
     try {
-      const backup = await createBackup(Number(request.params.id));
+      const { id } = request.params as { id: string };
+      const backup = await createBackup(Number(id));
       return reply.status(201).send({ backup });
     } catch (err: any) {
       return reply.status(500).send({ error: err.message });
@@ -25,7 +27,8 @@ export default async function backupRoutes(app: FastifyInstance) {
 
   app.post("/api/servers/:id/backups/:backupId/restore", opts, async (request, reply) => {
     try {
-      await restoreBackup(Number(request.params.id), Number(request.params.backupId));
+      const { id, backupId } = request.params as { id: string; backupId: string };
+      await restoreBackup(Number(id), Number(backupId));
       return { success: true };
     } catch (err: any) {
       return reply.status(500).send({ error: err.message });
@@ -33,7 +36,8 @@ export default async function backupRoutes(app: FastifyInstance) {
   });
 
   app.delete("/api/backups/:backupId", opts, async (request) => {
-    deleteBackup(Number(request.params.backupId));
+    const { backupId } = request.params as { backupId: string };
+    deleteBackup(Number(backupId));
     return { success: true };
   });
 }

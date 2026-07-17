@@ -8,7 +8,7 @@ if (!fs.existsSync(dbDir)) {
   fs.mkdirSync(dbDir, { recursive: true });
 }
 
-const db = new Database(path.resolve(env.DATABASE_PATH));
+const db = new Database(path.resolve(env.DATABASE_PATH)) as Database.Database;
 
 db.pragma("journal_mode = WAL");
 db.pragma("foreign_keys = ON");

@@ -33,4 +33,4 @@ RUN mkdir -p /app/data
 
 EXPOSE 3000 3001
 
-CMD ["sh", "-c", "node src/dist/index.js & npx next start web -p 3000 & wait"]
+CMD ["sh", "-c", "node /app/src/dist/index.js & (cd /app/web && pnpm exec next start --hostname 0.0.0.0 --port 3000) & wait"]
