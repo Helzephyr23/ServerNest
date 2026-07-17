@@ -124,6 +124,11 @@ export function migrate() {
       "INSERT INTO nodes (name, hostname, port, status, api_key, max_servers) VALUES (?, ?, ?, ?, ?, ?)"
     ).run("master", "127.0.0.1", env.GRPC_PORT, "online", env.NODE_API_KEY || "local", 10);
   }
+
+  const serverColumns = db.prepare("PRAGMA table_info(servers)").all() as { name: string }[];
+  if (!serverColumns.some((c) => c.name === "image")) {
+    db.exec("ALTER TABLE servers ADD COLUMN image TEXT NOT NULL DEFAULT 'itzg/minecraft-server'");
+  }
 }
 
 export default db;

@@ -38,9 +38,12 @@ export default function ServerDetailPage() {
   };
 
   const handleDelete = async () => {
-    if (confirm(`Delete server "${server.name}"? This cannot be undone.`)) {
+    if (!confirm(`Delete server "${server.name}"? This will remove all data and cannot be undone.`)) return;
+    try {
       await api.delete(`/api/servers/${id}`);
       router.push("/dashboard/servers");
+    } catch (err: any) {
+      alert(`Failed to delete server: ${err.message}`);
     }
   };
 
@@ -71,7 +74,7 @@ export default function ServerDetailPage() {
           <p className="text-muted-foreground">{server.software} {server.mc_version}</p>
         </div>
         <div className="flex gap-2">
-          {server.status === "running" ? (
+          {server.status === "running" || server.status === "error" ? (
             <>
               <Button variant="outline" onClick={() => handleAction("restart")}>Restart</Button>
               <Button variant="destructive" onClick={() => handleAction("stop")}>Stop</Button>
@@ -113,11 +116,13 @@ export default function ServerDetailPage() {
               <span className={`h-2 w-2 rounded-full ${
                 server.status === "running" ? "bg-green-500 animate-pulse" :
                 server.status === "starting" ? "bg-yellow-500 animate-pulse" :
+                server.status === "error" ? "bg-red-500 animate-pulse" :
                 "bg-zinc-500"
               }`} />
               <span className={`text-lg font-bold ${
                 server.status === "running" ? "text-green-500" :
                 server.status === "starting" ? "text-yellow-500" :
+                server.status === "error" ? "text-red-500" :
                 "text-zinc-400"
               }`}>{server.status}</span>
             </div>

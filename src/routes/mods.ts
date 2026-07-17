@@ -2,6 +2,8 @@ import { FastifyInstance } from "fastify";
 import { authMiddleware } from "../middleware/auth.js";
 import { searchMods, searchPlugins, getProject, getProjectVersions, downloadMod } from "../services/modrinth.service.js";
 import { getServerById } from "../services/server.service.js";
+import { readdirSync, statSync, unlinkSync } from "fs";
+import { join } from "path";
 
 export default async function modsRoutes(app: FastifyInstance) {
   const opts = { preHandler: [authMiddleware] };
@@ -35,6 +37,27 @@ export default async function modsRoutes(app: FastifyInstance) {
     return { versions };
   });
 
+  app.get("/api/servers/:id/mods", opts, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const server = getServerById(Number(id));
+    if (!server) return reply.status(404).send({ error: "Server not found" });
+
+    const modsDir = join(`${process.cwd()}/data/server-${server.id}`, "mods");
+    try {
+      const files = readdirSync(modsDir);
+      const mods = files
+        .filter((f) => f.endsWith(".jar"))
+        .map((f) => {
+          const stat = statSync(join(modsDir, f));
+          return { filename: f, size: stat.size, modified: stat.mtime.toISOString() };
+        })
+        .sort((a, b) => a.filename.localeCompare(b.filename));
+      return { mods };
+    } catch {
+      return { mods: [] };
+    }
+  });
+
   app.post("/api/servers/:id/mods/install", opts, async (request, reply) => {
     const { id } = request.params as { id: string };
     const { versionId } = request.body as { versionId: string };
@@ -58,8 +81,6 @@ export default async function modsRoutes(app: FastifyInstance) {
     if (!server) return reply.status(404).send({ error: "Server not found" });
 
     try {
-      const { unlinkSync } = await import("fs");
-      const { join } = await import("path");
       const filePath = join(`${process.cwd()}/data/server-${server.id}/mods`, filename);
       unlinkSync(filePath);
       return { success: true };

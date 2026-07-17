@@ -83,6 +83,31 @@ setInterval(() => {
   rotateAllBackups(10);
 }, 3600000);
 
+setInterval(async () => {
+  try {
+    const servers = db.prepare("SELECT id, container_id, status FROM servers WHERE status IN ('running', 'starting')").all() as any[];
+    for (const server of servers) {
+      if (!server.container_id) {
+        db.prepare("UPDATE servers SET status = 'stopped' WHERE id = ?").run(server.id);
+        continue;
+      }
+      try {
+        const container = docker.getContainer(server.container_id);
+        const inspect = await container.inspect();
+        if (!inspect.State.Running) {
+          const exitCode = inspect.State.ExitCode;
+          const newStatus = exitCode === 0 ? "stopped" : "error";
+          db.prepare("UPDATE servers SET status = ?, container_id = NULL WHERE id = ?").run(newStatus, server.id);
+          if (io) io.to(`server-${server.id}`).emit("server:status", { serverId: server.id, status: newStatus });
+        }
+      } catch {
+        db.prepare("UPDATE servers SET status = 'stopped', container_id = NULL WHERE id = ?").run(server.id);
+        if (io) io.to(`server-${server.id}`).emit("server:status", { serverId: server.id, status: "stopped" });
+      }
+    }
+  } catch {}
+}, 15000);
+
 const io = new SocketIOServer(app.server as any, { cors: { origin: "*", credentials: true } });
 setSocketIO(io);
 
