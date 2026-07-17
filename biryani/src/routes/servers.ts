@@ -1,5 +1,6 @@
 import { FastifyInstance } from "fastify";
 import { authMiddleware } from "../middleware/auth.js";
+import { validate, schemas } from "../middleware/validate.js";
 import {
   getAllServers,
   getServerById,
@@ -37,11 +38,8 @@ export default async function serverRoutes(app: FastifyInstance) {
     return { server };
   });
 
-  app.post("/api/servers", opts, async (request, reply) => {
+  app.post("/api/servers", { preHandler: [authMiddleware, validate(schemas.createServer)] }, async (request, reply) => {
     const { name, mc_version, software, ram_mb } = request.body as any;
-    if (!name || !mc_version) {
-      return reply.status(400).send({ error: "name and mc_version are required" });
-    }
     const port = findAvailablePort();
     const server = createServer({
       name,
@@ -110,10 +108,11 @@ export default async function serverRoutes(app: FastifyInstance) {
     return { logs };
   });
 
-  app.post("/api/servers/:id/command", opts, async (request, reply) => {
+  app.post("/api/servers/:id/command", {
+    preHandler: [authMiddleware, validate(schemas.sendCommand)],
+  }, async (request, reply) => {
     const { id } = request.params as { id: string };
-    const { command } = request.body as { command: string };
-    if (!command) return reply.status(400).send({ error: "command is required" });
+    const { command } = request.body as any;
     try {
       await sendCommand(Number(id), command);
       return { success: true };
