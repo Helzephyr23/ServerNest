@@ -20,6 +20,8 @@ WORKDIR /app/web
 COPY web/ ./
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
+ARG NEXT_PUBLIC_API_URL=http://127.0.0.1:3001
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 RUN pnpm build
 
 # Stage 4: Production runtime
@@ -35,9 +37,9 @@ COPY web/package.json ./web/
 RUN pnpm install --frozen-lockfile --prod
 
 COPY --from=build-api /app/src/dist ./src/dist
-COPY --from=build-web /app/web/.next/standalone ./
-COPY --from=build-web /app/web/.next/static ./web/.next/static
-COPY --from=build-web /app/web/public ./web/public
+COPY --from=build-web /app/web/.next/standalone ./web-standalone/
+COPY --from=build-web /app/web/.next/static ./web-standalone/.next/static
+COPY --from=build-web /app/web/public ./web-standalone/public
 
 RUN mkdir -p /app/data
 
@@ -46,4 +48,4 @@ EXPOSE 3000 3001 25565-25665
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD curl -f http://localhost:3001/api/health || exit 1
 
-CMD ["sh", "-c", "node src/dist/index.js & node server.js & wait"]
+CMD ["sh", "-c", "node src/dist/index.js & node web-standalone/server.js & wait"]

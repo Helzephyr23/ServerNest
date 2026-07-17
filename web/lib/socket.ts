@@ -7,11 +7,8 @@ let socket: Socket | null = null;
 export function getSocket(): Socket {
   if (!socket) {
     const token = localStorage.getItem("biryani_token");
-    socket = io(window.location.hostname === "localhost"
-      ? "http://localhost:3001"
-      : window.location.origin, {
-      auth: { token },
-    });
+    const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:3001";
+    socket = io(API_URL, { auth: { token } });
   }
   return socket;
 }
