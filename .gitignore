@@ -5,6 +5,10 @@ dist/
 .env.local
 *.db
 *.db-journal
+*.db-shm
+*.db-wal
 *.log
 .DS_Store
 Thumbs.db
+data/
+pnpm-lock.yaml

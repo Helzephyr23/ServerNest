@@ -10,6 +10,8 @@ import serverRoutes from "./routes/servers.js";
 import modsRoutes from "./routes/mods.js";
 import backupRoutes from "./routes/backups.js";
 import nodeRoutes from "./routes/nodes.js";
+import filesRoutes from "./routes/files.js";
+import playersRoutes from "./routes/players.js";
 import docker from "./config/docker.js";
 
 const app = Fastify({
@@ -25,6 +27,8 @@ await app.register(serverRoutes);
 await app.register(modsRoutes);
 await app.register(backupRoutes);
 await app.register(nodeRoutes);
+await app.register(filesRoutes);
+await app.register(playersRoutes);
 
 app.get("/api/health", async () => {
   let dockerOk = false;
