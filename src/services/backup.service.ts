@@ -86,3 +86,20 @@ export function deleteBackup(backupId: number) {
   }
   db.prepare("DELETE FROM backups WHERE id = ?").run(backupId);
 }
+
+export function rotateBackups(serverId: number, maxBackups: number = 10) {
+  const backups = getBackups(serverId);
+  if (backups.length > maxBackups) {
+    const toDelete = backups.slice(maxBackups);
+    for (const backup of toDelete) {
+      deleteBackup(backup.id);
+    }
+  }
+}
+
+export function rotateAllBackups(maxBackups: number = 10) {
+  const servers = db.prepare("SELECT id FROM servers").all() as { id: number }[];
+  for (const server of servers) {
+    rotateBackups(server.id, maxBackups);
+  }
+}

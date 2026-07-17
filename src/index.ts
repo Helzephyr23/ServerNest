@@ -14,7 +14,14 @@ import backupRoutes from "./routes/backups.js";
 import nodeRoutes from "./routes/nodes.js";
 import filesRoutes from "./routes/files.js";
 import playersRoutes from "./routes/players.js";
+import scheduleRoutes from "./routes/schedule.js";
+import templateRoutes from "./routes/templates.js";
+import notificationRoutes from "./routes/notifications.js";
 import { setSocketIO } from "./routes/servers.js";
+import { startAllTasks } from "./services/schedule.service.js";
+import { notify } from "./services/notification.service.js";
+import { markStaleNodesOffline } from "./services/node.service.js";
+import { rotateAllBackups } from "./services/backup.service.js";
 import docker from "./config/docker.js";
 
 const app = Fastify({
@@ -33,6 +40,9 @@ await app.register(backupRoutes);
 await app.register(nodeRoutes);
 await app.register(filesRoutes);
 await app.register(playersRoutes);
+await app.register(scheduleRoutes);
+await app.register(templateRoutes);
+await app.register(notificationRoutes);
 
 app.get("/api/health", async () => {
   let dockerOk = false;
@@ -45,6 +55,33 @@ app.log.info("Database migrated");
 
 await app.listen({ port: env.API_PORT, host: "0.0.0.0" });
 app.log.info(`Biryani API running on port ${env.API_PORT}`);
+
+startAllTasks(async (task) => {
+  app.log.info(`[Scheduler] Running task: ${task.name}`);
+  const { startServer, stopServer, restartServer, sendCommand } = await import("./services/server.service.js");
+  const { createBackup } = await import("./services/backup.service.js");
+  try {
+    switch (task.type) {
+      case "backup": await createBackup(task.server_id); break;
+      case "restart": await restartServer(task.server_id); break;
+      case "stop": await stopServer(task.server_id); break;
+      case "start": await startServer(task.server_id); break;
+      case "command": if (task.command) await sendCommand(task.server_id, task.command); break;
+    }
+    await notify("task_complete", "Task Complete", `Scheduled task "${task.name}" completed successfully`, 0x00ff00);
+  } catch (err: any) {
+    app.log.error(`[Scheduler] Task ${task.name} failed: ${err.message}`);
+    await notify("task_failed", "Task Failed", `Scheduled task "${task.name}" failed: ${err.message}`, 0xff0000);
+  }
+});
+
+setInterval(() => {
+  markStaleNodesOffline();
+}, 60000);
+
+setInterval(() => {
+  rotateAllBackups(10);
+}, 3600000);
 
 const io = new SocketIOServer(app.server as any, { cors: { origin: "*", credentials: true } });
 setSocketIO(io);

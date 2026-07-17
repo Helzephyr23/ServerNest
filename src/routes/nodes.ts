@@ -1,6 +1,14 @@
 import { FastifyInstance } from "fastify";
 import { authMiddleware } from "../middleware/auth.js";
-import { getAllNodes, getNodeById, createNode, deleteNode, updateNodeStatus } from "../services/node.service.js";
+import {
+  getAllNodes,
+  getNodeById,
+  createNode,
+  deleteNode,
+  updateNodeHeartbeat,
+  getServersForNode,
+  findNodeForNewServer,
+} from "../services/node.service.js";
 import { getNodeMetrics } from "../services/metrics.service.js";
 
 export default async function nodeRoutes(app: FastifyInstance) {
@@ -15,6 +23,13 @@ export default async function nodeRoutes(app: FastifyInstance) {
     const node = getNodeById(Number(id));
     if (!node) return reply.status(404).send({ error: "Node not found" });
     return { node };
+  });
+
+  app.get("/api/nodes/:id/servers", opts, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const node = getNodeById(Number(id));
+    if (!node) return reply.status(404).send({ error: "Node not found" });
+    return { servers: getServersForNode(Number(id)) };
   });
 
   app.post("/api/nodes", opts, async (request, reply) => {
@@ -35,6 +50,27 @@ export default async function nodeRoutes(app: FastifyInstance) {
     return { success: true };
   });
 
+  app.post("/api/nodes/:id/heartbeat", opts, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const { metrics } = request.body as { metrics?: { cpu_percent?: number; memory_percent?: number; disk_percent?: number } };
+    const node = getNodeById(Number(id));
+    if (!node) return reply.status(404).send({ error: "Node not found" });
+    updateNodeHeartbeat(Number(id), metrics);
+    return { success: true };
+  });
+
+  app.post("/api/nodes/heartbeat", opts, async (request, reply) => {
+    const { name, api_key, metrics } = request.body as {
+      name?: string;
+      api_key: string;
+      metrics?: { cpu_percent?: number; memory_percent?: number; disk_percent?: number };
+    };
+    const node = name ? getNodeById(Number(name)) : undefined;
+    if (!node) return reply.status(404).send({ error: "Node not found" });
+    updateNodeHeartbeat(node.id, metrics);
+    return { success: true };
+  });
+
   app.get("/api/nodes/metrics", opts, async () => {
     return { metrics: await getNodeMetrics() };
   });
@@ -43,5 +79,10 @@ export default async function nodeRoutes(app: FastifyInstance) {
     const nodes = getAllNodes();
     const metrics = await getNodeMetrics();
     return { nodes, metrics };
+  });
+
+  app.post("/api/nodes/find-for-server", opts, async () => {
+    const node = findNodeForNewServer();
+    return { node: node || null };
   });
 }

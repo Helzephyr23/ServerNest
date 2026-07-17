@@ -32,6 +32,10 @@ export function migrate() {
       api_key TEXT NOT NULL,
       max_servers INTEGER NOT NULL DEFAULT 10,
       current_servers INTEGER NOT NULL DEFAULT 0,
+      last_heartbeat TEXT,
+      cpu_percent REAL DEFAULT 0,
+      memory_percent REAL DEFAULT 0,
+      disk_percent REAL DEFAULT 0,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
@@ -75,6 +79,41 @@ export function migrate() {
       cron TEXT NOT NULL,
       enabled INTEGER NOT NULL DEFAULT 1,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (server_id) REFERENCES servers(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS scheduled_tasks (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      server_id INTEGER NOT NULL,
+      name TEXT NOT NULL,
+      type TEXT NOT NULL,
+      schedule TEXT NOT NULL,
+      command TEXT,
+      enabled INTEGER NOT NULL DEFAULT 1,
+      last_run TEXT,
+      next_run TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (server_id) REFERENCES servers(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS notifications (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      type TEXT NOT NULL,
+      webhook_url TEXT,
+      email TEXT,
+      enabled INTEGER NOT NULL DEFAULT 1,
+      events TEXT NOT NULL DEFAULT '[]',
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS installed_mods (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      server_id INTEGER NOT NULL,
+      mod_name TEXT NOT NULL,
+      filename TEXT NOT NULL,
+      version TEXT,
+      source TEXT NOT NULL DEFAULT 'modrinth',
+      installed_at TEXT NOT NULL DEFAULT (datetime('now')),
       FOREIGN KEY (server_id) REFERENCES servers(id) ON DELETE CASCADE
     );
   `);

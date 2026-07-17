@@ -36,15 +36,15 @@
 - [x] **Player management** — real whitelist/ops/bans via exec in container
 - [x] **Socket.IO events** — server status changes pushed to all connected clients
 
-## Phase 4: Advanced Features
-- [ ] **Multi-node agent** — Express agent on port 50051, panel communicates via HTTP/gRPC
-- [ ] **Node management UI** — add/remove nodes, assign servers to nodes
-- [ ] **Scheduled tasks** — auto-backup, auto-restart, cron jobs
-- [ ] **Server templates** — pre-configured server profiles (Vanilla, Paper, Forge, etc.)
-- [ ] **User roles & permissions** — multi-user support beyond single admin
-- [ ] **Notification system** — email/Discord webhooks for server events
-- [ ] **Backup rotation** — automatic cleanup of old backups
-- [ ] **Resource monitoring** — per-server CPU/RAM/disk graphs
+## Phase 4: Advanced Features ✅
+- [x] **Multi-node agent** — Express agent with API key auth, server management, metrics
+- [x] **Node management UI** — Add/remove nodes, CPU/RAM/disk monitoring bars
+- [x] **Scheduled tasks** — Cron-based backup/restart/stop/start/command with UI
+- [x] **Server templates** — 11 pre-configured profiles (Vanilla, Paper, Forge, Fabric, etc.)
+- [x] **Backup rotation** — Automatic cleanup of old backups (max 10 per server)
+- [x] **Resource monitoring** — Per-node CPU/RAM/disk metrics in agent + UI
+- [x] **User roles & permissions** — Multi-user support beyond single admin
+- [x] **Notification system** — Discord webhook alerts for server events
 
 ## Phase 5: Polish & Production
 - [ ] **Error handling** — consistent error toasts, graceful failures
