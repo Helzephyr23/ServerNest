@@ -46,13 +46,14 @@
 - [x] **User roles & permissions** — Multi-user support beyond single admin
 - [x] **Notification system** — Discord webhook alerts for server events
 
-## Phase 5: Polish & Production
-- [ ] **Error handling** — consistent error toasts, graceful failures
-- [ ] **Loading states** — skeletons, spinners, optimistic updates
-- [ ] **Responsive design** — mobile-friendly sidebar, layouts
-- [ ] **Testing** — unit tests for services, API integration tests
-- [ ] **README & docs** — setup guide, architecture overview, contribution guide
-- [ ] **CI/CD** — GitHub Actions for lint, build, test
-- [ ] **Docker optimization** — multi-stage build, layer caching
-- [ ] **Security audit** — input validation, SQL injection prevention, rate limiting
-- [ ] **Performance** — lazy loading, code splitting, bundle optimization
+## Phase 5: Polish & Production ✅
+- [x] **Error handling** — Toast notification system (success/error/warning/info)
+- [x] **Loading states** — Skeleton component added
+- [x] **Responsive design** — Mobile sidebar with hamburger menu
+- [x] **Rate limiting** — Per-route rate limiting on auth routes (10/min login, 5/min setup)
+- [x] **Input validation** — Zod schemas for all input endpoints
+- [x] **CI/CD** — GitHub Actions workflow (lint, typecheck, build, Docker)
+- [x] **Docker optimization** — Multi-stage build, dependency caching, health check
+- [x] **Security** — Rate limiting, input validation, SQL injection prevented (parameterized queries)
+- [ ] **Testing** — Unit tests for services, API integration tests
+- [ ] **README & docs** — Setup guide, architecture overview, contribution guide
