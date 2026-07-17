@@ -9,9 +9,11 @@ import { Button } from "@/components/ui/button";
 const navItems = [
   { href: "/dashboard", label: "Overview", icon: "📊" },
   { href: "/dashboard/servers", label: "Servers", icon: "🖥️" },
+  { href: "/dashboard/templates", label: "Templates", icon: "📋" },
   { href: "/dashboard/marketplace", label: "Marketplace", icon: "📦" },
   { href: "/dashboard/nodes", label: "Nodes", icon: "🌐" },
-  { href: "/dashboard/settings", label: "Settings", icon: "⚙️" },
+  { href: "/dashboard/tasks", label: "Tasks", icon: "⏰" },
+  { href: "/dashboard/notifications", label: "Notifications", icon: "🔔" },
 ];
 
 export default function Sidebar() {
