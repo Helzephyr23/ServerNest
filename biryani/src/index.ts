@@ -56,6 +56,9 @@ app.log.info("Database migrated");
 await app.listen({ port: env.API_PORT, host: "0.0.0.0" });
 app.log.info(`Biryani API running on port ${env.API_PORT}`);
 
+const io = new SocketIOServer(app.server as any, { cors: { origin: "*", credentials: true } });
+setSocketIO(io);
+
 startAllTasks(async (task) => {
   app.log.info(`[Scheduler] Running task: ${task.name}`);
   const { startServer, stopServer, restartServer, sendCommand } = await import("./services/server.service.js");
@@ -107,9 +110,6 @@ setInterval(async () => {
     }
   } catch {}
 }, 15000);
-
-const io = new SocketIOServer(app.server as any, { cors: { origin: "*", credentials: true } });
-setSocketIO(io);
 
 io.use(async (socket, next) => {
   try {
