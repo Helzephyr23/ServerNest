@@ -1,6 +1,7 @@
 import { FastifyInstance } from "fastify";
 import { authMiddleware } from "../middleware/auth.js";
-import { searchMods, searchPlugins, getProject, getProjectVersions } from "../services/modrinth.service.js";
+import { searchMods, searchPlugins, getProject, getProjectVersions, downloadMod } from "../services/modrinth.service.js";
+import { getServerById } from "../services/server.service.js";
 
 export default async function modsRoutes(app: FastifyInstance) {
   const opts = { preHandler: [authMiddleware] };
@@ -32,5 +33,38 @@ export default async function modsRoutes(app: FastifyInstance) {
     const { slug } = request.params as { slug: string };
     const versions = await getProjectVersions(slug, version, loader);
     return { versions };
+  });
+
+  app.post("/api/servers/:id/mods/install", opts, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const { versionId } = request.body as { versionId: string };
+    if (!versionId) return reply.status(400).send({ error: "versionId is required" });
+
+    const server = getServerById(Number(id));
+    if (!server) return reply.status(404).send({ error: "Server not found" });
+
+    const dataDir = `${process.cwd()}/data/server-${server.id}`;
+    const result = await downloadMod(versionId, dataDir);
+    if (!result.success) {
+      return reply.status(500).send({ error: result.error });
+    }
+
+    return { success: true, filename: result.filename };
+  });
+
+  app.delete("/api/servers/:id/mods/:filename", opts, async (request, reply) => {
+    const { id, filename } = request.params as { id: string; filename: string };
+    const server = getServerById(Number(id));
+    if (!server) return reply.status(404).send({ error: "Server not found" });
+
+    try {
+      const { unlinkSync } = await import("fs");
+      const { join } = await import("path");
+      const filePath = join(`${process.cwd()}/data/server-${server.id}/mods`, filename);
+      unlinkSync(filePath);
+      return { success: true };
+    } catch (err: any) {
+      return reply.status(500).send({ error: err.message });
+    }
   });
 }

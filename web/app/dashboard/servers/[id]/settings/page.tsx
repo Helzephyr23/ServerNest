@@ -57,12 +57,19 @@ export default function ServerSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [needsRestart, setNeedsRestart] = useState(false);
+  const [server, setServer] = useState<any>(null);
 
   const fetchProps = () => {
-    api.get(`/api/servers/${id}/properties`)
-      .then(({ properties: p }) => setProperties(p || {}))
-      .catch(() => setProperties({}))
-      .finally(() => setLoading(false));
+    Promise.all([
+      api.get(`/api/servers/${id}/properties`),
+      api.get(`/api/servers/${id}`),
+    ]).then(([{ properties: p }, { server: s }]) => {
+      setProperties(p || {});
+      setServer(s || null);
+    }).catch(() => {
+      setProperties({});
+      setServer(null);
+    }).finally(() => setLoading(false));
   };
 
   useEffect(() => { fetchProps(); }, [id]);
@@ -77,12 +84,12 @@ export default function ServerSettingsPage() {
     handleChange(key, current === "true" ? "false" : "true");
   };
 
-  const handleSave = async () => {
+  const handleSave = async (applyNow: boolean = false) => {
     setSaving(true);
     try {
-      await api.put(`/api/servers/${id}/properties`, { properties });
+      await api.put(`/api/servers/${id}/properties`, { properties, reload: applyNow });
       setNeedsRestart(false);
-      alert("Settings saved. Restart the server to apply changes.");
+      alert(applyNow ? "Settings saved and reloaded." : "Settings saved. Restart the server to apply changes.");
     } catch (err: any) {
       alert("Failed to save: " + err.message);
     } finally {
@@ -108,9 +115,14 @@ export default function ServerSettingsPage() {
           {needsRestart && (
             <span className="text-sm text-yellow-500">Unsaved changes</span>
           )}
-          <Button onClick={handleSave} disabled={saving || !needsRestart}>
-            {saving ? "Saving..." : "Save Settings"}
+          <Button variant="outline" onClick={() => handleSave(false)} disabled={saving || !needsRestart}>
+            {saving ? "Saving..." : "Save"}
           </Button>
+          {server?.status === "running" && (
+            <Button onClick={() => handleSave(true)} disabled={saving || !needsRestart}>
+              {saving ? "Saving..." : "Save & Reload"}
+            </Button>
+          )}
         </div>
       </div>
 
