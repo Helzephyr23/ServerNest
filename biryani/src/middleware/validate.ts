@@ -42,6 +42,7 @@ export const schemas = {
     software: z.string().optional().default("vanilla"),
     ram_mb: z.number().int().min(512).max(32768).optional().default(2048),
     template: z.string().optional(),
+    image: z.string().optional(),
   }),
 
   createNode: z.object({

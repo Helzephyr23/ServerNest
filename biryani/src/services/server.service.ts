@@ -39,11 +39,13 @@ export function createServer(data: {
   ram_mb: number;
   port: number;
   node_id?: number;
+  image?: string;
 }): Server {
   const nodeId = data.node_id || 1;
+  const image = data.image || "itzg/minecraft-server";
   const result = db.prepare(
-    "INSERT INTO servers (name, node_id, port, mc_version, software, ram_mb) VALUES (?, ?, ?, ?, ?, ?)"
-  ).run(data.name, nodeId, data.port, data.mc_version, data.software, data.ram_mb);
+    "INSERT INTO servers (name, node_id, port, mc_version, software, ram_mb, image) VALUES (?, ?, ?, ?, ?, ?, ?)"
+  ).run(data.name, nodeId, data.port, data.mc_version, data.software, data.ram_mb, image);
 
   db.prepare("INSERT INTO server_config (server_id, key, value) VALUES (?, ?, ?)")
     .run(result.lastInsertRowid, "EULA", "TRUE");
@@ -68,6 +70,10 @@ export function updateServer(id: number, data: Partial<{ name: string; ram_mb: n
 }
 
 export function deleteServer(id: number) {
+  db.prepare("DELETE FROM server_config WHERE server_id = ?").run(id);
+  db.prepare("DELETE FROM backups WHERE server_id = ?").run(id);
+  db.prepare("DELETE FROM scheduled_tasks WHERE server_id = ?").run(id);
+  db.prepare("DELETE FROM installed_mods WHERE server_id = ?").run(id);
   db.prepare("DELETE FROM servers WHERE id = ?").run(id);
 }
 
