@@ -36,7 +36,7 @@ export default async function filesRoutes(app: FastifyInstance) {
         const parts = line.trim().split(/\s+/);
         const isDir = parts[0].startsWith("d");
         const size = parts[4] || "0";
-        const name = parts.slice(8).join(" ");
+        const name = parts.slice(7).join(" ");
         const dateStr = `${parts[5]} ${parts[6]}`;
         return { name, isDir, size: parseInt(size) || 0, date: dateStr, path: reqPath ? `${reqPath}/${name}` : name };
       }).filter((e) => e.name && e.name !== "." && e.name !== "..");

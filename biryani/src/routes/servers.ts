@@ -18,6 +18,7 @@ import {
 } from "../services/server.service.js";
 import { getServerMetrics } from "../services/metrics.service.js";
 import { getImageName } from "../config/docker.js";
+import docker from "../config/docker.js";
 import { rmSync, existsSync } from "fs";
 
 let ioRef: any = null;
@@ -66,9 +67,14 @@ export default async function serverRoutes(app: FastifyInstance) {
     const { id } = request.params as { id: string };
     const server = getServerById(Number(id));
     if (!server) return reply.status(404).send({ error: "Server not found" });
+
+    const containerName = `biryani-mc-${server.id}`;
     try {
-      await stopServer(Number(id));
+      const container = docker.getContainer(containerName);
+      await container.stop({ t: 30 }).catch(() => {});
+      await container.remove({ force: true }).catch(() => {});
     } catch {}
+
     deleteServer(Number(id));
     const dataDir = `${process.cwd()}/data/server-${server.id}`;
     try { if (existsSync(dataDir)) rmSync(dataDir, { recursive: true, force: true }); } catch {}

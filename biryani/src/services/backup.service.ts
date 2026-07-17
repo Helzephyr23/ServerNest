@@ -1,11 +1,13 @@
 import db from "../config/database.js";
 import docker from "../config/docker.js";
+import { env } from "../config/env.js";
 import fs from "fs";
 import path from "path";
 import { createGzip, createGunzip } from "zlib";
 import { pipeline } from "stream/promises";
 import { createReadStream, createWriteStream } from "fs";
 import { Readable } from "stream";
+import { mkdirSync, existsSync } from "fs";
 
 interface Backup {
   id: number;
@@ -64,16 +66,58 @@ export async function restoreBackup(serverId: number, backupId: number): Promise
   if (!server) throw new Error("Server not found");
 
   const containerName = `biryani-mc-${server.id}`;
+  const dataDir = `${process.cwd()}/data/server-${server.id}`;
+
+  // Stop and remove existing container
   try {
     const existing = docker.getContainer(containerName);
     await existing.stop({ t: 30 }).catch(() => {});
     await existing.remove({ force: true }).catch(() => {});
   } catch {}
 
-  const container = await docker.getContainer(containerName);
+  // Ensure data directory exists
+  if (!existsSync(dataDir)) {
+    mkdirSync(dataDir, { recursive: true });
+  }
+
+  // Create a new container (without starting)
+  const image = server.image || "itzg/minecraft-server";
+  await docker.pull(image);
+
+  const configs = db.prepare("SELECT key, value FROM server_config WHERE server_id = ?").all(serverId) as { key: string; value: string }[];
+  const envVars: Record<string, string> = {
+    EULA: "TRUE",
+    TYPE: "VANILLA",
+    VERSION: server.mc_version,
+    MEMORY: `${Math.floor(server.ram_mb / 1024)}G`,
+    SERVER_PORT: "25565",
+    TZ: "UTC",
+  };
+  for (const cfg of configs) {
+    if (cfg.key !== "EULA" && cfg.key !== "TYPE" && cfg.key !== "VERSION") {
+      envVars[cfg.key] = cfg.value;
+    }
+  }
+
+  const container = await docker.createContainer({
+    Image: image,
+    name: containerName,
+    Env: Object.entries(envVars).map(([k, v]) => `${k}=${v}`),
+    HostConfig: {
+      PortBindings: { "25565/tcp": [{ HostPort: server.port.toString() }] },
+      Memory: server.ram_mb * 1024 * 1024,
+      Binds: [`${dataDir}:/data`],
+      RestartPolicy: { Name: "unless-stopped" },
+    },
+    WorkingDir: "/data",
+    Labels: { "biryani.managed": "true", "biryani.server_id": server.id.toString() },
+  });
+
+  // Restore archive into the new container
   const restoreStream = createReadStream(backupPath).pipe(createGunzip());
   await container.putArchive(restoreStream, { path: "/data" });
 
+  // Now start the container
   await container.start();
   db.prepare("UPDATE servers SET status = 'running', container_id = ? WHERE id = ?").run(container.id, serverId);
 }

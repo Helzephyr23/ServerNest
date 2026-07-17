@@ -116,8 +116,11 @@ export async function startServer(id: number): Promise<string | null> {
     await existing.remove({ force: true });
   } catch {}
 
+  const image = server.image || "itzg/minecraft-server";
+  await docker.pull(image);
+
   const container = await docker.createContainer({
-    Image: server.image || "itzg/minecraft-server",
+    Image: image,
     name: containerName,
     Env: Object.entries(envVars).map(([k, v]) => `${k}=${v}`),
     HostConfig: {
@@ -138,13 +141,11 @@ export async function startServer(id: number): Promise<string | null> {
 export async function stopServer(id: number): Promise<void> {
   const server = getServerById(id);
   if (!server) throw new Error("Server not found");
-  if (!server.container_id) {
-    db.prepare("UPDATE servers SET status = 'stopped' WHERE id = ?").run(id);
-    return;
-  }
+
+  const containerName = `biryani-mc-${server.id}`;
 
   try {
-    const container = docker.getContainer(server.container_id);
+    const container = docker.getContainer(containerName);
     await container.stop({ t: 30 });
     await container.remove({ force: true });
   } catch {}
