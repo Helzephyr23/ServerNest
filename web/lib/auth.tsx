@@ -30,9 +30,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const token = localStorage.getItem("biryani_token");
     if (token) {
-      api.get("/api/auth/me").then(({ user }) => setUser(user)).catch(() => {
-        localStorage.removeItem("biryani_token");
-      }).finally(() => setLoading(false));
+      api.get("/api/auth/me")
+        .then((response: any) => {
+          setUser(response?.user || null);
+        })
+        .catch(() => {
+          localStorage.removeItem("biryani_token");
+          setUser(null);
+        })
+        .finally(() => setLoading(false));
     } else {
       setLoading(false);
     }

@@ -15,6 +15,7 @@ services:
       - API_PORT=3001
       - JWT_SECRET=${JWT_SECRET:-change-me-in-production}
       - DATABASE_PATH=/app/data/biryani.db
+      - NEXT_PUBLIC_API_URL=http://127.0.0.1:3001
       - DOCKER_IMAGE=itzg/minecraft-server
       - SERVER_PORT_RANGE_START=25565
       - SERVER_PORT_RANGE_END=25665

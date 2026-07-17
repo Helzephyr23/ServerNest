@@ -21,7 +21,7 @@ export default function MarketplacePage() {
     try {
       const endpoint = type === "mods" ? "/api/mods/search" : "/api/mods/plugins";
       const { mods, plugins } = await api.get(`${endpoint}?q=${encodeURIComponent(query.trim())}`);
-      setResults(mods || plugins || []);
+      setResults(Array.isArray(mods) ? mods : Array.isArray(plugins) ? plugins : []);
     } catch {
       setResults([]);
     } finally {

@@ -19,7 +19,8 @@ export default async function modsRoutes(app: FastifyInstance) {
 
   app.get("/api/mods/:slug", opts, async (request, reply) => {
     try {
-      const project = await getProject(request.params.slug as string);
+      const { slug } = request.params as { slug: string };
+      const project = await getProject(slug);
       return { project };
     } catch {
       return reply.status(404).send({ error: "Project not found" });
@@ -28,7 +29,8 @@ export default async function modsRoutes(app: FastifyInstance) {
 
   app.get("/api/mods/:slug/versions", opts, async (request) => {
     const { version, loader } = request.query as any;
-    const versions = await getProjectVersions(request.params.slug as string, version, loader);
+    const { slug } = request.params as { slug: string };
+    const versions = await getProjectVersions(slug, version, loader);
     return { versions };
   });
 }
