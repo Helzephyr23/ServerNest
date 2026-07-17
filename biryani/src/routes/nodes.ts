@@ -11,7 +11,8 @@ export default async function nodeRoutes(app: FastifyInstance) {
   });
 
   app.get("/api/nodes/:id", opts, async (request, reply) => {
-    const node = getNodeById(Number(request.params.id));
+    const { id } = request.params as { id: string };
+    const node = getNodeById(Number(id));
     if (!node) return reply.status(404).send({ error: "Node not found" });
     return { node };
   });
@@ -26,10 +27,11 @@ export default async function nodeRoutes(app: FastifyInstance) {
   });
 
   app.delete("/api/nodes/:id", opts, async (request, reply) => {
-    const node = getNodeById(Number(request.params.id));
+    const { id } = request.params as { id: string };
+    const node = getNodeById(Number(id));
     if (!node) return reply.status(404).send({ error: "Node not found" });
     if (node.name === "master") return reply.status(400).send({ error: "Cannot delete master node" });
-    deleteNode(Number(request.params.id));
+    deleteNode(Number(id));
     return { success: true };
   });
 

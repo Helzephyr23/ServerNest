@@ -25,7 +25,8 @@ export default async function serverRoutes(app: FastifyInstance) {
   });
 
   app.get("/api/servers/:id", opts, async (request, reply) => {
-    const server = getServerById(Number(request.params.id));
+    const { id } = request.params as { id: string };
+    const server = getServerById(Number(id));
     if (!server) return reply.status(404).send({ error: "Server not found" });
     return { server };
   });
@@ -47,23 +48,26 @@ export default async function serverRoutes(app: FastifyInstance) {
   });
 
   app.put("/api/servers/:id", opts, async (request, reply) => {
-    const server = getServerById(Number(request.params.id));
+    const { id } = request.params as { id: string };
+    const server = getServerById(Number(id));
     if (!server) return reply.status(404).send({ error: "Server not found" });
-    updateServer(Number(request.params.id), request.body as any);
-    return { server: getServerById(Number(request.params.id)) };
+    updateServer(Number(id), request.body as any);
+    return { server: getServerById(Number(id)) };
   });
 
   app.delete("/api/servers/:id", opts, async (request, reply) => {
-    const server = getServerById(Number(request.params.id));
+    const { id } = request.params as { id: string };
+    const server = getServerById(Number(id));
     if (!server) return reply.status(404).send({ error: "Server not found" });
-    await stopServer(Number(request.params.id)).catch(() => {});
-    deleteServer(Number(request.params.id));
+    await stopServer(Number(id)).catch(() => {});
+    deleteServer(Number(id));
     return { success: true };
   });
 
   app.post("/api/servers/:id/start", opts, async (request, reply) => {
     try {
-      await startServer(Number(request.params.id));
+      const { id } = request.params as { id: string };
+      await startServer(Number(id));
       return { success: true, status: "running" };
     } catch (err: any) {
       return reply.status(500).send({ error: err.message });
@@ -72,7 +76,8 @@ export default async function serverRoutes(app: FastifyInstance) {
 
   app.post("/api/servers/:id/stop", opts, async (request, reply) => {
     try {
-      await stopServer(Number(request.params.id));
+      const { id } = request.params as { id: string };
+      await stopServer(Number(id));
       return { success: true, status: "stopped" };
     } catch (err: any) {
       return reply.status(500).send({ error: err.message });
@@ -81,7 +86,8 @@ export default async function serverRoutes(app: FastifyInstance) {
 
   app.post("/api/servers/:id/restart", opts, async (request, reply) => {
     try {
-      await restartServer(Number(request.params.id));
+      const { id } = request.params as { id: string };
+      await restartServer(Number(id));
       return { success: true, status: "running" };
     } catch (err: any) {
       return reply.status(500).send({ error: err.message });
@@ -89,16 +95,18 @@ export default async function serverRoutes(app: FastifyInstance) {
   });
 
   app.get("/api/servers/:id/logs", opts, async (request) => {
+    const { id } = request.params as { id: string };
     const tail = Number((request.query as any).tail) || 100;
-    const logs = await getServerLogs(Number(request.params.id), tail);
+    const logs = await getServerLogs(Number(id), tail);
     return { logs };
   });
 
   app.post("/api/servers/:id/command", opts, async (request, reply) => {
+    const { id } = request.params as { id: string };
     const { command } = request.body as { command: string };
     if (!command) return reply.status(400).send({ error: "command is required" });
     try {
-      await sendCommand(Number(request.params.id), command);
+      await sendCommand(Number(id), command);
       return { success: true };
     } catch (err: any) {
       return reply.status(500).send({ error: err.message });
@@ -106,17 +114,20 @@ export default async function serverRoutes(app: FastifyInstance) {
   });
 
   app.get("/api/servers/:id/config", opts, async (request) => {
-    return { config: getServerConfig(Number(request.params.id)) };
+    const { id } = request.params as { id: string };
+    return { config: getServerConfig(Number(id)) };
   });
 
   app.put("/api/servers/:id/config", opts, async (request) => {
+    const { id } = request.params as { id: string };
     const { key, value } = request.body as { key: string; value: string };
-    setServerConfig(Number(request.params.id), key, value);
+    setServerConfig(Number(id), key, value);
     return { success: true };
   });
 
   app.get("/api/servers/:id/metrics", opts, async (request, reply) => {
-    const metrics = await getServerMetrics(Number(request.params.id));
+    const { id } = request.params as { id: string };
+    const metrics = await getServerMetrics(Number(id));
     if (!metrics) return reply.status(404).send({ error: "No metrics available" });
     return { metrics };
   });

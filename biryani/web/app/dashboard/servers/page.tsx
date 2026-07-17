@@ -11,7 +11,10 @@ export default function ServersPage() {
   const [loading, setLoading] = useState(true);
 
   const fetchServers = () => {
-    api.get("/api/servers").then(({ servers }) => setServers(servers)).finally(() => setLoading(false));
+    api.get("/api/servers")
+      .then(({ servers }) => setServers(Array.isArray(servers) ? servers : []))
+      .catch(() => setServers([]))
+      .finally(() => setLoading(false));
   };
 
   useEffect(() => { fetchServers(); }, []);

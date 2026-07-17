@@ -18,7 +18,31 @@ export default function DashboardPage() {
   const [data, setData] = useState<OverviewData | null>(null);
 
   useEffect(() => {
-    api.get("/api/overview").then(setData).catch(console.error);
+    api.get("/api/overview")
+      .then((response: any) => {
+        const safeData: OverviewData = {
+          nodes: Array.isArray(response?.nodes) ? response.nodes : [],
+          metrics: response?.metrics || {
+            total_servers: 0,
+            running_servers: 0,
+            total_memory_mb: 0,
+            used_memory_mb: 0,
+          },
+        };
+        setData(safeData);
+      })
+      .catch((err) => {
+        console.error(err);
+        setData({
+          nodes: [],
+          metrics: {
+            total_servers: 0,
+            running_servers: 0,
+            total_memory_mb: 0,
+            used_memory_mb: 0,
+          },
+        });
+      });
   }, []);
 
   const stats = data?.metrics;

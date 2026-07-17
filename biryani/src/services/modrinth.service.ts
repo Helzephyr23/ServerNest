@@ -39,7 +39,7 @@ export async function searchMods(
   const params = new URLSearchParams({
     query,
     limit: limit.toString(),
-    facets: JSON.stringify(facits),
+    facets: JSON.stringify(facets),
   });
 
   const res = await fetch(`${MODRINTH_API}/search?${params}`);
