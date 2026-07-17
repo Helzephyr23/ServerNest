@@ -1,3 +1,4 @@
+import http from "node:http";
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import jwt from "@fastify/jwt";
@@ -11,7 +12,10 @@ import backupRoutes from "./routes/backups.js";
 import nodeRoutes from "./routes/nodes.js";
 import docker from "./config/docker.js";
 
-const app = Fastify({ logger: true });
+const app = Fastify({
+  logger: true,
+  serverFactory: (handler) => http.createServer((req, res) => handler(req, res)),
+});
 
 await app.register(cors, { origin: true, credentials: true });
 await app.register(jwt, { secret: env.JWT_SECRET, sign: { expiresIn: env.JWT_EXPIRES_IN } });
@@ -31,10 +35,10 @@ app.get("/api/health", async () => {
 migrate();
 app.log.info("Database migrated");
 
-const server = await app.listen({ port: env.API_PORT, host: "0.0.0.0" });
+await app.listen({ port: env.API_PORT, host: "0.0.0.0" });
 app.log.info(`Biryani API running on port ${env.API_PORT}`);
 
-const io = new SocketIOServer(server as any, { cors: { origin: "*", credentials: true } });
+const io = new SocketIOServer(app.server as any, { cors: { origin: "*", credentials: true } });
 
 io.use(async (socket, next) => {
   try {
