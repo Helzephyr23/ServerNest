@@ -9,17 +9,11 @@ async function execInContainer(serverId: number, cmd: string[]): Promise<string>
 
   const container = docker.getContainer(server.container_id);
   const exec = await container.exec({
-    Cmd: ["mc-router", "--help"],
-    AttachStdout: true,
-    AttachStderr: true,
-  });
-
-  const exec2 = await container.exec({
     Cmd: cmd,
     AttachStdout: true,
     AttachStderr: true,
   });
-  const stream = await exec2.start({ Detach: false });
+  const stream = await exec.start({ Detach: false });
   return new Promise((resolve, reject) => {
     let output = "";
     stream.on("data", (chunk: Buffer) => {
@@ -34,8 +28,9 @@ export default async function playersRoutes(app: FastifyInstance) {
   const opts = { preHandler: [authMiddleware] };
 
   app.get("/api/servers/:id/players/whitelist", opts, async (request, reply) => {
+    const { id } = request.params as { id: string };
     try {
-      const output = await execInContainer(Number(request.params.id), ["cat", "/data/whitelist.json"]);
+      const output = await execInContainer(Number(id), ["cat", "/data/whitelist.json"]);
       try {
         const list = JSON.parse(output);
         return { players: list.map((e: any) => e.name || e.UUID || JSON.stringify(e)) };
@@ -50,10 +45,11 @@ export default async function playersRoutes(app: FastifyInstance) {
   app.post("/api/servers/:id/players/whitelist", opts, async (request, reply) => {
     const { name } = request.body as { name: string };
     if (!name) return reply.status(400).send({ error: "name is required" });
+    const { id } = request.params as { id: string };
     try {
-      await execInContainer(Number(request.params.id), ["/data/whitelist.json"]);
-      const output = await execInContainer(Number(request.params.id), [
-        "bash", "-c", `echo '${JSON.stringify({ name })}' >> /data/whitelist.json`,
+      const entry = JSON.stringify({ name });
+      await execInContainer(Number(id), [
+        "bash", "-c", `echo '${entry}' >> /data/whitelist.json`,
       ]);
       return { success: true };
     } catch (err: any) {
@@ -62,9 +58,10 @@ export default async function playersRoutes(app: FastifyInstance) {
   });
 
   app.delete("/api/servers/:id/players/whitelist/:name", opts, async (request, reply) => {
-    const name = (request.params as any).name;
+    const { id, name: paramName } = request.params as { id: string; name: string };
+    const name = paramName;
     try {
-      await execInContainer(Number(request.params.id), [
+      await execInContainer(Number(id), [
         "bash", "-c",
         `python3 -c "import json; f=open('/data/whitelist.json','r'); d=json.load(f); f.close(); d=[x for x in d if x.get('name','').lower()!='${name.toLowerCase()}']; f=open('/data/whitelist.json','w'); json.dump(d,f); f.close()"`,
       ]);
@@ -75,8 +72,9 @@ export default async function playersRoutes(app: FastifyInstance) {
   });
 
   app.get("/api/servers/:id/players/ops", opts, async (request, reply) => {
+    const { id } = request.params as { id: string };
     try {
-      const output = await execInContainer(Number(request.params.id), ["cat", "/data/ops.json"]);
+      const output = await execInContainer(Number(id), ["cat", "/data/ops.json"]);
       try {
         const list = JSON.parse(output);
         return { players: list.map((e: any) => e.name || JSON.stringify(e)) };
@@ -89,11 +87,13 @@ export default async function playersRoutes(app: FastifyInstance) {
   });
 
   app.post("/api/servers/:id/players/ops", opts, async (request, reply) => {
+    const { id } = request.params as { id: string };
     const { name } = request.body as { name: string };
     if (!name) return reply.status(400).send({ error: "name is required" });
     try {
-      await execInContainer(Number(request.params.id), [
-        "bash", "-c", `echo '${JSON.stringify({ name, level: 4, bypassesPlayerLimit: false })}' >> /data/ops.json`,
+      const entry = JSON.stringify({ name, level: 4, bypassesPlayerLimit: false });
+      await execInContainer(Number(id), [
+        "bash", "-c", `echo '${entry}' >> /data/ops.json`,
       ]);
       return { success: true };
     } catch (err: any) {
@@ -102,9 +102,10 @@ export default async function playersRoutes(app: FastifyInstance) {
   });
 
   app.delete("/api/servers/:id/players/ops/:name", opts, async (request, reply) => {
-    const name = (request.params as any).name;
+    const { id, name: paramName } = request.params as { id: string; name: string };
+    const name = paramName;
     try {
-      await execInContainer(Number(request.params.id), [
+      await execInContainer(Number(id), [
         "bash", "-c",
         `python3 -c "import json; f=open('/data/ops.json','r'); d=json.load(f); f.close(); d=[x for x in d if x.get('name','').lower()!='${name.toLowerCase()}']; f=open('/data/ops.json','w'); json.dump(d,f); f.close()"`,
       ]);
@@ -115,8 +116,9 @@ export default async function playersRoutes(app: FastifyInstance) {
   });
 
   app.get("/api/servers/:id/players/bans", opts, async (request, reply) => {
+    const { id } = request.params as { id: string };
     try {
-      const output = await execInContainer(Number(request.params.id), ["cat", "/data/banned-players.json"]);
+      const output = await execInContainer(Number(id), ["cat", "/data/banned-players.json"]);
       try {
         const list = JSON.parse(output);
         return { players: list.map((e: any) => ({ name: e.name, reason: e.reason, created: e.created })) };
@@ -129,11 +131,12 @@ export default async function playersRoutes(app: FastifyInstance) {
   });
 
   app.post("/api/servers/:id/players/bans", opts, async (request, reply) => {
+    const { id } = request.params as { id: string };
     const { name, reason } = request.body as { name: string; reason?: string };
     if (!name) return reply.status(400).send({ error: "name is required" });
     try {
       const entry = { name, reason: reason || "Banned by operator", created: new Date().toISOString(), source: "Biryani" };
-      await execInContainer(Number(request.params.id), [
+      await execInContainer(Number(id), [
         "bash", "-c", `echo '${JSON.stringify(entry)}' >> /data/banned-players.json`,
       ]);
       return { success: true };
@@ -143,9 +146,10 @@ export default async function playersRoutes(app: FastifyInstance) {
   });
 
   app.delete("/api/servers/:id/players/bans/:name", opts, async (request, reply) => {
-    const name = (request.params as any).name;
+    const { id, name: paramName } = request.params as { id: string; name: string };
+    const name = paramName;
     try {
-      await execInContainer(Number(request.params.id), [
+      await execInContainer(Number(id), [
         "bash", "-c",
         `python3 -c "import json; f=open('/data/banned-players.json','r'); d=json.load(f); f.close(); d=[x for x in d if x.get('name','').lower()!='${name.toLowerCase()}']; f=open('/data/banned-players.json','w'); json.dump(d,f); f.close()"`,
       ]);

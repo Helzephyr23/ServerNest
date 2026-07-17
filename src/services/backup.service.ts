@@ -5,6 +5,7 @@ import path from "path";
 import { createGzip, createGunzip } from "zlib";
 import { pipeline } from "stream/promises";
 import { createReadStream, createWriteStream } from "fs";
+import { Readable } from "stream";
 
 interface Backup {
   id: number;

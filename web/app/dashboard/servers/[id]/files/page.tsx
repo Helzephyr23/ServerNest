@@ -30,8 +30,11 @@ export default function FilesPage() {
   const fetchFiles = (path: string = "") => {
     setLoading(true);
     api.get(`/api/servers/${id}/files?path=${encodeURIComponent(path)}`)
-      .then(({ entries: e, currentPath: cp }) => { setEntries(e); setCurrentPath(cp); })
-      .catch(() => { setEntries([]); })
+      .then(({ entries: e, currentPath: cp }) => {
+        setEntries(Array.isArray(e) ? e : []);
+        setCurrentPath(typeof cp === "string" ? cp : "");
+      })
+      .catch(() => { setEntries([]); setCurrentPath(""); })
       .finally(() => setLoading(false));
   };
 

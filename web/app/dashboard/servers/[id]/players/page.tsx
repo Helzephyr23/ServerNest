@@ -30,9 +30,12 @@ export default function PlayersPage() {
       api.get(`/api/servers/${id}/players/${tab}`),
       api.get(`/api/servers/${id}`),
     ]).then(([{ players: p }, { server: s }]) => {
-      setPlayers(p || []);
-      setServer(s);
-    }).catch(() => setPlayers([])).finally(() => setLoading(false));
+      setPlayers(Array.isArray(p) ? p : []);
+      setServer(s || null);
+    }).catch(() => {
+      setPlayers([]);
+      setServer(null);
+    }).finally(() => setLoading(false));
   };
 
   useEffect(() => { fetchPlayers(); }, [id, tab]);

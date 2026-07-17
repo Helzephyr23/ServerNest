@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { formatBytes, formatDate } from "@/lib/utils";
 
 export default function BackupsPage() {
@@ -20,8 +20,11 @@ export default function BackupsPage() {
       api.get(`/api/servers/${id}/backups`),
       api.get(`/api/servers/${id}`),
     ]).then(([{ backups: b }, { server: s }]) => {
-      setBackups(b);
-      setServer(s);
+      setBackups(Array.isArray(b) ? b : []);
+      setServer(s || null);
+    }).catch(() => {
+      setBackups([]);
+      setServer(null);
     }).finally(() => setLoading(false));
   };
 

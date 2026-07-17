@@ -1,4 +1,4 @@
-const API_BASE = "";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:3001";
 
 function getToken(): string | null {
   if (typeof window === "undefined") return null;

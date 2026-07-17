@@ -2,13 +2,6 @@ import { FastifyInstance } from "fastify";
 import { authMiddleware } from "../middleware/auth.js";
 import docker from "../config/docker.js";
 import db from "../config/database.js";
-import path from "path";
-
-async function getServerDir(serverId: number): Promise<string> {
-  const server = db.prepare("SELECT * FROM servers WHERE id = ?").get(serverId) as any;
-  if (!server) throw new Error("Server not found");
-  return `/data`;
-}
 
 async function execInContainer(serverId: number, cmd: string[]): Promise<string> {
   const server = db.prepare("SELECT * FROM servers WHERE id = ?").get(serverId) as any;
@@ -29,7 +22,8 @@ export default async function filesRoutes(app: FastifyInstance) {
   const opts = { preHandler: [authMiddleware] };
 
   app.get("/api/servers/:id/files", opts, async (request, reply) => {
-    const serverId = Number(request.params.id);
+    const { id } = request.params as { id: string };
+    const serverId = Number(id);
     const reqPath = (request.query as any).path || "";
     try {
       const output = await execInContainer(serverId, [
@@ -51,7 +45,8 @@ export default async function filesRoutes(app: FastifyInstance) {
   });
 
   app.get("/api/servers/:id/files/content", opts, async (request, reply) => {
-    const serverId = Number(request.params.id);
+    const { id } = request.params as { id: string };
+    const serverId = Number(id);
     const filePath = (request.query as any).path;
     if (!filePath) return reply.status(400).send({ error: "path is required" });
     try {
@@ -63,11 +58,11 @@ export default async function filesRoutes(app: FastifyInstance) {
   });
 
   app.put("/api/servers/:id/files/content", opts, async (request, reply) => {
-    const serverId = Number(request.params.id);
+    const { id } = request.params as { id: string };
+    const serverId = Number(id);
     const { path: filePath, content } = request.body as { path: string; content: string };
     if (!filePath || content === undefined) return reply.status(400).send({ error: "path and content are required" });
     try {
-      const escapedContent = content.replace(/'/g, "'\\''");
       await execInContainer(serverId, [
         "bash", "-c", `cat > /data/${filePath} << 'BIRYANI_EOF'\n${content}\nBIRYANI_EOF`,
       ]);
@@ -78,7 +73,8 @@ export default async function filesRoutes(app: FastifyInstance) {
   });
 
   app.post("/api/servers/:id/files/mkdir", opts, async (request, reply) => {
-    const serverId = Number(request.params.id);
+    const { id } = request.params as { id: string };
+    const serverId = Number(id);
     const { path: dirPath } = request.body as { path: string };
     if (!dirPath) return reply.status(400).send({ error: "path is required" });
     try {
@@ -90,7 +86,8 @@ export default async function filesRoutes(app: FastifyInstance) {
   });
 
   app.delete("/api/servers/:id/files", opts, async (request, reply) => {
-    const serverId = Number(request.params.id);
+    const { id } = request.params as { id: string };
+    const serverId = Number(id);
     const filePath = (request.query as any).path;
     if (!filePath) return reply.status(400).send({ error: "path is required" });
     try {
@@ -102,7 +99,8 @@ export default async function filesRoutes(app: FastifyInstance) {
   });
 
   app.get("/api/servers/:id/properties", opts, async (request, reply) => {
-    const serverId = Number(request.params.id);
+    const { id } = request.params as { id: string };
+    const serverId = Number(id);
     try {
       const output = await execInContainer(serverId, ["cat", "/data/server.properties"]);
       const props: Record<string, string> = {};
@@ -122,7 +120,8 @@ export default async function filesRoutes(app: FastifyInstance) {
   });
 
   app.put("/api/servers/:id/properties", opts, async (request, reply) => {
-    const serverId = Number(request.params.id);
+    const { id } = request.params as { id: string };
+    const serverId = Number(id);
     const { properties } = request.body as { properties: Record<string, string> };
     if (!properties) return reply.status(400).send({ error: "properties are required" });
     try {
