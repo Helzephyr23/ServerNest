@@ -2,6 +2,8 @@ import { FastifyInstance } from "fastify";
 import { authMiddleware } from "../middleware/auth.js";
 import docker from "../config/docker.js";
 import db from "../config/database.js";
+import { join } from "path";
+import { existsSync, mkdirSync, writeFileSync, readFileSync } from "fs";
 
 async function execInContainer(serverId: number, cmd: string[]): Promise<string> {
   const server = db.prepare("SELECT * FROM servers WHERE id = ?").get(serverId) as any;
@@ -122,7 +124,7 @@ export default async function filesRoutes(app: FastifyInstance) {
   app.put("/api/servers/:id/properties", opts, async (request, reply) => {
     const { id } = request.params as { id: string };
     const serverId = Number(id);
-    const { properties } = request.body as { properties: Record<string, string> };
+    const { properties, reload } = request.body as { properties: Record<string, string>; reload?: boolean };
     if (!properties) return reply.status(400).send({ error: "properties are required" });
     try {
       const lines = Object.entries(properties).map(([k, v]) => `${k}=${v}`);
@@ -130,7 +132,68 @@ export default async function filesRoutes(app: FastifyInstance) {
       await execInContainer(serverId, [
         "bash", "-c", `cat > /data/server.properties << 'BIRYANI_EOF'\n${content}\nBIRYANI_EOF`,
       ]);
+      if (reload) {
+        try {
+          await execInContainer(serverId, ["rcon-cli", "reload"]);
+        } catch {}
+      }
       return { success: true };
+    } catch (err: any) {
+      return reply.status(500).send({ error: err.message });
+    }
+  });
+
+  app.post("/api/servers/:id/files/upload", opts, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const serverId = Number(id);
+    const server = db.prepare("SELECT * FROM servers WHERE id = ?").get(serverId) as any;
+    if (!server) return reply.status(404).send({ error: "Server not found" });
+
+    try {
+      const data = await request.file();
+      if (!data) return reply.status(400).send({ error: "No file provided" });
+
+      const filePath = data.filename;
+      const chunks: Buffer[] = [];
+      for await (const chunk of data.file) {
+        chunks.push(chunk);
+      }
+      const buffer = Buffer.concat(chunks);
+
+      const serverDataDir = `${process.cwd()}/data/server-${serverId}`;
+      const fullPath = join(serverDataDir, filePath);
+      const dir = fullPath.substring(0, fullPath.lastIndexOf("/"));
+      if (!existsSync(dir)) {
+        mkdirSync(dir, { recursive: true });
+      }
+      writeFileSync(fullPath, buffer);
+
+      return { success: true, filename: filePath, size: buffer.length };
+    } catch (err: any) {
+      return reply.status(500).send({ error: err.message });
+    }
+  });
+
+  app.get("/api/servers/:id/files/download", opts, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const serverId = Number(id);
+    const filePath = (request.query as any).path;
+    if (!filePath) return reply.status(400).send({ error: "path is required" });
+
+    const server = db.prepare("SELECT * FROM servers WHERE id = ?").get(serverId) as any;
+    if (!server) return reply.status(404).send({ error: "Server not found" });
+
+    try {
+      const serverDataDir = `${process.cwd()}/data/server-${serverId}`;
+      const fullPath = join(serverDataDir, filePath);
+      if (!existsSync(fullPath)) return reply.status(404).send({ error: "File not found" });
+
+      const content = readFileSync(fullPath);
+      const filename = filePath.split("/").pop() || "download";
+      return reply
+        .header("Content-Type", "application/octet-stream")
+        .header("Content-Disposition", `attachment; filename="${filename}"`)
+        .send(content);
     } catch (err: any) {
       return reply.status(500).send({ error: err.message });
     }

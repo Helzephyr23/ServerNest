@@ -2,6 +2,7 @@ import db from "../config/database.js";
 import docker, { isDockerAvailable } from "../config/docker.js";
 import { env } from "../config/env.js";
 import { Readable } from "stream";
+import { mkdirSync, existsSync } from "fs";
 
 interface Server {
   id: number;
@@ -98,18 +99,25 @@ export async function startServer(id: number): Promise<string | null> {
   }
 
   const containerName = `biryani-mc-${server.id}`;
+  const dataDir = `${process.cwd()}/data/server-${server.id}`;
+
+  if (!existsSync(dataDir)) {
+    mkdirSync(dataDir, { recursive: true });
+  }
+
   try {
     const existing = docker.getContainer(containerName);
     await existing.remove({ force: true });
   } catch {}
 
   const container = await docker.createContainer({
-    Image: server.image,
+    Image: server.image || "itzg/minecraft-server",
     name: containerName,
     Env: Object.entries(envVars).map(([k, v]) => `${k}=${v}`),
     HostConfig: {
       PortBindings: { "25565/tcp": [{ HostPort: server.port.toString() }] },
       Memory: server.ram_mb * 1024 * 1024,
+      Binds: [`${dataDir}:/data`],
       RestartPolicy: { Name: "unless-stopped" },
     },
     WorkingDir: "/data",
@@ -149,22 +157,48 @@ export async function getServerLogs(id: number, tail: number = 100): Promise<str
 
   try {
     const container = docker.getContainer(server.container_id);
-    const logs = await container.logs({ stdout: true, stderr: true, tail, follow: false });
-    return logs.toString("utf-8");
+    const logStream = await container.logs({ stdout: true, stderr: true, tail, follow: false });
+    const chunks: string[] = [];
+    let buffer = Buffer.alloc(0);
+
+    const raw = logStream as unknown as Buffer;
+    if (Buffer.isBuffer(raw)) {
+      let pos = 0;
+      while (pos < raw.length) {
+        if (pos + 8 > raw.length) break;
+        const type = raw[pos];
+        const size = raw.readUInt32BE(pos + 4);
+        if (pos + 8 + size > raw.length) break;
+        const data = raw.subarray(pos + 8, pos + 8 + size).toString("utf-8").replace(/[^\x20-\x7E\n]/g, "");
+        chunks.push(data);
+        pos += 8 + size;
+      }
+    }
+
+    return chunks.join("").trim();
   } catch {
     return "";
   }
 }
 
-export async function sendCommand(id: number, command: string): Promise<void> {
+export async function sendCommand(id: number, command: string): Promise<string> {
   const server = getServerById(id);
   if (!server || !server.container_id) throw new Error("Server not running");
 
   const container = docker.getContainer(server.container_id);
-  await container.exec({
+  const exec = await container.exec({
     Cmd: ["rcon-cli", command],
     AttachStdout: true,
     AttachStderr: true,
+  });
+  const stream = await exec.start({ Detach: false });
+  return new Promise((resolve, reject) => {
+    let output = "";
+    stream.on("data", (chunk: Buffer) => {
+      output += chunk.toString("utf-8").replace(/[^\x20-\x7E\n]/g, "");
+    });
+    stream.on("end", () => resolve(output.trim()));
+    stream.on("error", reject);
   });
 }
 

@@ -17,6 +17,12 @@ import {
 } from "../services/server.service.js";
 import { getServerMetrics } from "../services/metrics.service.js";
 
+let ioRef: any = null;
+
+export function setSocketIO(io: any) {
+  ioRef = io;
+}
+
 export default async function serverRoutes(app: FastifyInstance) {
   const opts = { preHandler: [authMiddleware] };
 
@@ -68,6 +74,7 @@ export default async function serverRoutes(app: FastifyInstance) {
     try {
       const { id } = request.params as { id: string };
       await startServer(Number(id));
+      if (ioRef) ioRef.to("server-" + id).emit("server:status", { serverId: Number(id), status: "running" });
       return { success: true, status: "running" };
     } catch (err: any) {
       return reply.status(500).send({ error: err.message });
@@ -78,6 +85,7 @@ export default async function serverRoutes(app: FastifyInstance) {
     try {
       const { id } = request.params as { id: string };
       await stopServer(Number(id));
+      if (ioRef) ioRef.to("server-" + id).emit("server:status", { serverId: Number(id), status: "stopped" });
       return { success: true, status: "stopped" };
     } catch (err: any) {
       return reply.status(500).send({ error: err.message });
@@ -88,6 +96,7 @@ export default async function serverRoutes(app: FastifyInstance) {
     try {
       const { id } = request.params as { id: string };
       await restartServer(Number(id));
+      if (ioRef) ioRef.to("server-" + id).emit("server:status", { serverId: Number(id), status: "running" });
       return { success: true, status: "running" };
     } catch (err: any) {
       return reply.status(500).send({ error: err.message });

@@ -1,3 +1,6 @@
+import { existsSync, mkdirSync, writeFileSync } from "fs";
+import { join } from "path";
+
 const MODRINTH_API = "https://api.modrinth.com/v2";
 
 export interface ModrinthProject {
@@ -84,4 +87,36 @@ export async function getProjectVersions(
   const res = await fetch(`${MODRINTH_API}/project/${slug}/version?${params}`);
   const data = await res.json();
   return data || [];
+}
+
+export async function downloadMod(
+  versionId: string,
+  serverDataDir: string
+): Promise<{ filename: string; success: boolean; error?: string }> {
+  try {
+    const res = await fetch(`${MODRINTH_API}/version/${versionId}`);
+    if (!res.ok) throw new Error("Version not found");
+    const version: ModrinthVersion = await res.json();
+
+    if (!version.files || version.files.length === 0) {
+      throw new Error("No files available for this version");
+    }
+
+    const file = version.files[0];
+    const modsDir = join(serverDataDir, "mods");
+    if (!existsSync(modsDir)) {
+      mkdirSync(modsDir, { recursive: true });
+    }
+
+    const fileRes = await fetch(file.url);
+    if (!fileRes.ok) throw new Error("Failed to download file");
+
+    const buffer = Buffer.from(await fileRes.arrayBuffer());
+    const filePath = join(modsDir, file.filename);
+    writeFileSync(filePath, buffer);
+
+    return { filename: file.filename, success: true };
+  } catch (err: any) {
+    return { filename: "", success: false, error: err.message };
+  }
 }

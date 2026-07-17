@@ -2,9 +2,11 @@ import http from "node:http";
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import jwt from "@fastify/jwt";
+import multipart from "@fastify/multipart";
 import { Server as SocketIOServer } from "socket.io";
 import { env } from "./config/env.js";
 import { migrate } from "./config/database.js";
+import db from "./config/database.js";
 import authRoutes from "./routes/auth.js";
 import serverRoutes from "./routes/servers.js";
 import modsRoutes from "./routes/mods.js";
@@ -12,6 +14,7 @@ import backupRoutes from "./routes/backups.js";
 import nodeRoutes from "./routes/nodes.js";
 import filesRoutes from "./routes/files.js";
 import playersRoutes from "./routes/players.js";
+import { setSocketIO } from "./routes/servers.js";
 import docker from "./config/docker.js";
 
 const app = Fastify({
@@ -21,6 +24,7 @@ const app = Fastify({
 
 await app.register(cors, { origin: true, credentials: true });
 await app.register(jwt, { secret: env.JWT_SECRET, sign: { expiresIn: env.JWT_EXPIRES_IN } });
+await app.register(multipart);
 
 await app.register(authRoutes);
 await app.register(serverRoutes);
@@ -43,6 +47,7 @@ await app.listen({ port: env.API_PORT, host: "0.0.0.0" });
 app.log.info(`Biryani API running on port ${env.API_PORT}`);
 
 const io = new SocketIOServer(app.server as any, { cors: { origin: "*", credentials: true } });
+setSocketIO(io);
 
 io.use(async (socket, next) => {
   try {
@@ -56,6 +61,26 @@ io.use(async (socket, next) => {
   }
 });
 
+// Track active container attachments per socket
+const activeAttachments = new Map<string, { stream: any; outputInterval: NodeJS.Timeout }>();
+
+function dockerStreamDemux(stream: any, onStdout: (data: string) => void, onStderr: (data: string) => void) {
+  let buffer = Buffer.alloc(0);
+  stream.on("data", (chunk: Buffer) => {
+    buffer = Buffer.concat([buffer, chunk]);
+    while (buffer.length >= 8) {
+      const type = buffer[0];
+      const size = buffer.readUInt32BE(4);
+      if (buffer.length < 8 + size) break;
+      const data = buffer.subarray(8, 8 + size).toString("utf-8");
+      buffer = buffer.subarray(8 + size);
+      if (type === 1) onStdout(data);
+      else if (type === 2) onStderr(data);
+      else onStdout(data);
+    }
+  });
+}
+
 io.on("connection", (socket) => {
   app.log.info(`Client connected: ${(socket as any).user.username}`);
 
@@ -63,29 +88,99 @@ io.on("connection", (socket) => {
     socket.join(`server-${serverId}`);
   });
 
+  socket.on("console:attach", async (serverId: number) => {
+    const key = `${(socket as any).user.id}-${serverId}`;
+    try {
+      const server = db.prepare("SELECT * FROM servers WHERE id = ?").get(serverId) as any;
+      if (!server || !server.container_id) {
+        socket.emit("console:error", { serverId, error: "Server not running" });
+        return;
+      }
+
+      const container = docker.getContainer(server.container_id);
+      const inspect = await container.inspect();
+      if (!inspect.State.Running) {
+        socket.emit("console:error", { serverId, error: "Container is not running" });
+        return;
+      }
+
+      const logStream = await container.logs({
+        follow: true, stdout: true, stderr: true, tail: 100, timestamps: false,
+      });
+
+      dockerStreamDemux(logStream,
+        (data) => socket.emit("console:output", { serverId, data }),
+        (data) => socket.emit("console:output", { serverId, data }),
+      );
+
+      logStream.on("end", () => {
+        socket.emit("console:detached", { serverId });
+      });
+
+      activeAttachments.set(key, { stream: logStream, outputInterval: null as any });
+      socket.emit("console:attached", { serverId });
+    } catch (err: any) {
+      socket.emit("console:error", { serverId, error: err.message });
+    }
+  });
+
   socket.on("console:command", async ({ serverId, command }: { serverId: number; command: string }) => {
     try {
-      const containerName = `biryani-mc-${serverId}`;
-      const container = docker.getContainer(containerName);
+      const server = db.prepare("SELECT * FROM servers WHERE id = ?").get(serverId) as any;
+      if (!server || !server.container_id) {
+        socket.emit("console:error", { serverId, error: "Server not running" });
+        return;
+      }
+
+      const container = docker.getContainer(server.container_id);
       const exec = await container.exec({
         Cmd: ["rcon-cli", command],
         AttachStdout: true,
         AttachStderr: true,
       });
       const stream = await exec.start({ Detach: false });
+      let output = "";
       stream.on("data", (chunk: Buffer) => {
-        socket.emit("console:output", { serverId, output: chunk.toString() });
+        const text = chunk.toString("utf-8").replace(/[^\x20-\x7E\n]/g, "");
+        output += text;
+      });
+      stream.on("end", () => {
+        if (output.trim()) {
+          socket.emit("console:output", { serverId, data: output });
+        }
       });
     } catch (err: any) {
       socket.emit("console:error", { serverId, error: err.message });
     }
   });
 
+  socket.on("console:detach", (serverId: number) => {
+    const key = `${(socket as any).user.id}-${serverId}`;
+    const attachment = activeAttachments.get(key);
+    if (attachment) {
+      attachment.stream?.destroy();
+      activeAttachments.delete(key);
+      socket.emit("console:detached", { serverId });
+    }
+  });
+
   socket.on("console:unsubscribe", (serverId: number) => {
     socket.leave(`server-${serverId}`);
+    const key = `${(socket as any).user.id}-${serverId}`;
+    const attachment = activeAttachments.get(key);
+    if (attachment) {
+      attachment.stream?.destroy();
+      activeAttachments.delete(key);
+    }
   });
 
   socket.on("disconnect", () => {
+    for (const [key, attachment] of activeAttachments) {
+      if (key.startsWith(`${(socket as any).user.id}-`)) {
+        attachment.stream?.destroy();
+        activeAttachments.delete(key);
+      }
+    }
     app.log.info(`Client disconnected: ${(socket as any).user.username}`);
   });
 });
