@@ -5,8 +5,12 @@ import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useToast } from "@/components/toast";
+import { useConfirm } from "@/components/confirm-dialog";
 
 export default function NodesPage() {
+  const { error: toastError } = useToast();
+  const { confirm: showConfirm } = useConfirm();
   const [nodes, setNodes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
@@ -36,9 +40,13 @@ export default function NodesPage() {
   };
 
   const handleDelete = async (id: number, name: string) => {
-    if (confirm(`Remove node "${name}"?`)) {
-      await api.delete(`/api/nodes/${id}`);
-      fetchNodes();
+    if (await showConfirm({ title: "Remove Node", message: `Remove node "${name}"?` })) {
+      try {
+        await api.delete(`/api/nodes/${id}`);
+        fetchNodes();
+      } catch (err: any) {
+        toastError("Failed to remove node", err.message);
+      }
     }
   };
 

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/components/toast";
+import { useConfirm } from "@/components/confirm-dialog";
 
 type Tab = "whitelist" | "ops" | "bans";
 const TABS: { id: Tab; label: string; icon: string }[] = [
@@ -17,6 +18,7 @@ const TABS: { id: Tab; label: string; icon: string }[] = [
 
 export default function PlayersPage() {
   const { success, error: toastError } = useToast();
+  const { confirm: showConfirm } = useConfirm();
   const params = useParams();
   const id = params.id as string;
   const [tab, setTab] = useState<Tab>("whitelist");
@@ -59,7 +61,7 @@ export default function PlayersPage() {
   };
 
   const handleRemove = async (name: string) => {
-    if (!confirm(`Remove ${name}?`)) return;
+    if (!(await showConfirm({ title: "Remove Player", message: `Remove ${name}?` }))) return;
     try {
       await api.delete(`/api/servers/${id}/players/${tab}/${name}`);
       success(`Removed ${name}`);

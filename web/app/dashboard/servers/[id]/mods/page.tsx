@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Link from "next/link";
 import { useToast } from "@/components/toast";
+import { useConfirm } from "@/components/confirm-dialog";
 
 function formatBytes(bytes: number) {
   if (bytes === 0) return "0 B";
@@ -18,6 +19,7 @@ function formatBytes(bytes: number) {
 
 export default function ModsPage() {
   const { error: toastError } = useToast();
+  const { confirm: showConfirm } = useConfirm();
   const params = useParams();
   const id = params.id as string;
   const [server, setServer] = useState<any>(null);
@@ -43,7 +45,7 @@ export default function ModsPage() {
   useEffect(() => { fetchMods(); }, [id]);
 
   const handleDelete = async (filename: string) => {
-    if (!confirm(`Delete ${filename}?`)) return;
+    if (!(await showConfirm({ title: "Delete Mod", message: `Delete ${filename}?` }))) return;
     setDeleting(filename);
     try {
       await api.delete(`/api/servers/${id}/mods/${encodeURIComponent(filename)}`);

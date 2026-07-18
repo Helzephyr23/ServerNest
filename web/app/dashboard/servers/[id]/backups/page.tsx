@@ -7,9 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { formatBytes, formatDate } from "@/lib/utils";
 import { useToast } from "@/components/toast";
+import { useConfirm } from "@/components/confirm-dialog";
 
 export default function BackupsPage() {
   const { success, error: toastError } = useToast();
+  const { confirm: showConfirm } = useConfirm();
   const params = useParams();
   const id = params.id as string;
   const [backups, setBackups] = useState<any[]>([]);
@@ -45,7 +47,7 @@ export default function BackupsPage() {
   };
 
   const handleRestore = async (backupId: number) => {
-    if (!confirm("Restore this backup? The server will restart.")) return;
+    if (!(await showConfirm({ title: "Restore Backup", message: "Restore this backup? The server will restart." }))) return;
     try {
       await api.post(`/api/servers/${id}/backups/${backupId}/restore`);
       success("Backup restored! Server is restarting.");
@@ -55,7 +57,7 @@ export default function BackupsPage() {
   };
 
   const handleDelete = async (backupId: number) => {
-    if (!confirm("Delete this backup permanently?")) return;
+    if (!(await showConfirm({ title: "Delete Backup", message: "Delete this backup permanently?" }))) return;
     try {
       await api.delete(`/api/backups/${backupId}`);
       fetchBackups();

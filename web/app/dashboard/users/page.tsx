@@ -6,9 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/components/toast";
+import { useConfirm } from "@/components/confirm-dialog";
 
 export default function UsersPage() {
   const { success, error: toastError } = useToast();
+  const { confirm: showConfirm } = useConfirm();
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
@@ -50,7 +52,7 @@ export default function UsersPage() {
   };
 
   const handleDelete = async (id: number, username: string) => {
-    if (confirm(`Delete user "${username}"? This cannot be undone.`)) {
+    if (await showConfirm({ title: "Delete User", message: `Delete user "${username}"? This cannot be undone.` })) {
       try {
         await api.delete(`/api/users/${id}`);
         success(`User "${username}" deleted`);
