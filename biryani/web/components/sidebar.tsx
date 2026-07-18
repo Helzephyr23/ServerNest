@@ -16,6 +16,7 @@ const navItems = [
   { href: "/dashboard/nodes", label: "Nodes", icon: "🌐" },
   { href: "/dashboard/tasks", label: "Tasks", icon: "⏰" },
   { href: "/dashboard/notifications", label: "Notifications", icon: "🔔" },
+  { href: "/dashboard/users", label: "Users", icon: "👤" },
 ];
 
 export default function Sidebar() {
