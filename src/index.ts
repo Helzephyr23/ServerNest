@@ -22,7 +22,7 @@ import { startAllTasks } from "./services/schedule.service.js";
 import { notify } from "./services/notification.service.js";
 import { markStaleNodesOffline } from "./services/node.service.js";
 import { rotateAllBackups } from "./services/backup.service.js";
-import docker from "./config/docker.js";
+import docker, { dockerStreamDemux } from "./config/docker.js";
 
 const app = Fastify({
   logger: true,
@@ -126,23 +126,6 @@ io.use(async (socket, next) => {
 // Track active container attachments per socket
 const activeAttachments = new Map<string, { stream: any; outputInterval: NodeJS.Timeout }>();
 
-function dockerStreamDemux(stream: any, onStdout: (data: string) => void, onStderr: (data: string) => void) {
-  let buffer = Buffer.alloc(0);
-  stream.on("data", (chunk: Buffer) => {
-    buffer = Buffer.concat([buffer, chunk]);
-    while (buffer.length >= 8) {
-      const type = buffer[0];
-      const size = buffer.readUInt32BE(4);
-      if (buffer.length < 8 + size) break;
-      const data = buffer.subarray(8, 8 + size).toString("utf-8");
-      buffer = buffer.subarray(8 + size);
-      if (type === 1) onStdout(data);
-      else if (type === 2) onStderr(data);
-      else onStdout(data);
-    }
-  });
-}
-
 io.on("connection", (socket) => {
   app.log.info(`Client connected: ${(socket as any).user.username}`);
 
@@ -201,16 +184,10 @@ io.on("connection", (socket) => {
         AttachStderr: true,
       });
       const stream = await exec.start({ Detach: false });
-      let output = "";
-      stream.on("data", (chunk: Buffer) => {
-        const text = chunk.toString("utf-8").replace(/[^\x20-\x7E\n]/g, "");
-        output += text;
-      });
-      stream.on("end", () => {
-        if (output.trim()) {
-          socket.emit("console:output", { serverId, data: output });
-        }
-      });
+      dockerStreamDemux(stream,
+        (data) => socket.emit("console:output", { serverId, data }),
+        (data) => socket.emit("console:output", { serverId, data }),
+      );
     } catch (err: any) {
       socket.emit("console:error", { serverId, error: err.message });
     }
