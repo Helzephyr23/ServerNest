@@ -2,7 +2,7 @@
   "name": "biryani",
   "version": "0.1.0",
   "description": "Free, self-hosted Minecraft server management panel",
-  "license": "MIT",
+  "license": "GPL-3.0-only",
   "private": true,
   "scripts": {
     "dev": "concurrently \"pnpm --filter @biryani/api dev\" \"pnpm --filter @biryani/web dev\"",
