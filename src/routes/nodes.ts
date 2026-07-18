@@ -10,7 +10,6 @@ import {
   findNodeForNewServer,
 } from "../services/node.service.js";
 import { getNodeMetrics } from "../services/metrics.service.js";
-
 export default async function nodeRoutes(app: FastifyInstance) {
   const opts = { preHandler: [authMiddleware] };
   const adminOpts = { preHandler: [authMiddleware, adminMiddleware] };
@@ -74,12 +73,6 @@ export default async function nodeRoutes(app: FastifyInstance) {
 
   app.get("/api/nodes/metrics", opts, async () => {
     return { metrics: await getNodeMetrics() };
-  });
-
-  app.get("/api/overview", opts, async () => {
-    const nodes = getAllNodes();
-    const metrics = await getNodeMetrics();
-    return { nodes, metrics };
   });
 
   app.post("/api/nodes/find-for-server", opts, async () => {
