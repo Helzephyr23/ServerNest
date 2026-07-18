@@ -1,7 +1,7 @@
 # AGENTS.md - Biryani Project Context
 
 ## Project Overview
-**Biryani** is an open-source, self-hosted Minecraft server management panel (like Aternos/Crafty Controller but free and advanced).
+**Biryani** is an open-source, self-hosted Minecraft server management panel (a free, self-hosted alternative to proprietary panels).
 
 ## Tech Stack
 - **Backend**: Node.js + TypeScript + Fastify (port 3001)

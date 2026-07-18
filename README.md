@@ -12,7 +12,7 @@
 
 ---
 
-Biryani is a **free, open-source, self-hosted** panel for managing Minecraft servers. Think Aternos, but you run it on your own machine. Think Crafty Controller, but with a modern UI, built-in mod marketplace, and multi-node clustering.
+Biryani is a **free, open-source, self-hosted** Minecraft server management panel with a modern UI, built-in mod marketplace, and multi-node clustering.
 
 ### Features
 
