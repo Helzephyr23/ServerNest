@@ -31,7 +31,7 @@
 ## Phase 9 — Polish & Ecosystem
 
 - [ ] **E2E tests** — Playwright or Cypress tests covering core user flows
-- [ ] **Import tool** — Migrate servers from Crafty Controller, Pterodactyl, AMP
+- [ ] **Import tool** — Migrate servers from other panels (Pterodactyl, AMP, etc.)
 - [ ] **World management** — Pre-generate chunks, prune unused regions, download world
 - [ ] **Dedicated documentation site** — Separate from README (Docusaurus or VitePress)
 - [ ] **Plugin/mod auto-update** — Check Modrinth for updates and notify/install
