@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/components/toast";
+import { useConfirm } from "@/components/confirm-dialog";
 
 const TASK_TYPES = [
   { id: "backup", label: "Backup", icon: "💾" },
@@ -27,6 +28,7 @@ const SCHEDULE_PRESETS = [
 
 export default function TasksPage() {
   const { success, error: toastError } = useToast();
+  const { confirm: showConfirm } = useConfirm();
   const [tasks, setTasks] = useState<any[]>([]);
   const [servers, setServers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -77,7 +79,7 @@ export default function TasksPage() {
   };
 
   const handleDelete = async (id: number) => {
-    if (confirm("Delete this task?")) {
+    if (await showConfirm({ title: "Delete Task", message: "Delete this task?" })) {
       await api.delete(`/api/tasks/${id}`);
       fetchData();
     }

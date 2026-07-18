@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/components/toast";
+import { useConfirm } from "@/components/confirm-dialog";
 
 const EVENT_OPTIONS = [
   { id: "server_start", label: "Server Start" },
@@ -20,6 +21,7 @@ const EVENT_OPTIONS = [
 
 export default function NotificationsPage() {
   const { success, error: toastError } = useToast();
+  const { confirm: showConfirm } = useConfirm();
   const [notifications, setNotifications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
@@ -48,7 +50,7 @@ export default function NotificationsPage() {
   };
 
   const handleDelete = async (id: number) => {
-    if (confirm("Delete this notification?")) {
+    if (await showConfirm({ title: "Delete Notification", message: "Delete this notification?" })) {
       await api.delete(`/api/notifications/${id}`);
       fetchNotifications();
     }
