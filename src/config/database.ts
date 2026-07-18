@@ -180,6 +180,19 @@ export function migrate() {
   if (!backupColumns.some((c) => c.name === "checksum")) {
     db.exec("ALTER TABLE backups ADD COLUMN checksum TEXT");
   }
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS rate_limits (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      route       TEXT NOT NULL,
+      method      TEXT NOT NULL DEFAULT 'POST',
+      max_requests INTEGER NOT NULL DEFAULT 10,
+      window_ms   INTEGER NOT NULL DEFAULT 60000,
+      enabled     INTEGER NOT NULL DEFAULT 1,
+      description TEXT,
+      created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
 }
 
 export default db;
