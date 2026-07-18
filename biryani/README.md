@@ -21,11 +21,13 @@ Biryani is a **free, open-source, self-hosted** panel for managing Minecraft ser
 - **🌐 Multi-Node Cluster** — Manage servers across multiple machines from one dashboard
 - **📊 Live Metrics** — CPU, RAM, and player count monitoring per server
 - **💾 Backups** — Create, restore, and download server backups
-- **🔧 Live Console** — Real-time console output and command input
+- **🔧 Live Console** — Real-time console output and command input via xterm.js + Socket.IO
 - **👥 Player Management** — Whitelist, OP, and ban management
+- **📁 File Manager** — Browse, edit, upload, and download files inside your server container
+- **⏰ Scheduled Tasks** — Cron-based backup, restart, stop, start, and command tasks
 - **🐳 Docker Isolation** — Each server runs in its own Docker container
-- **🔒 Secure** — JWT authentication with Argon2 password hashing
-- **🎨 Modern UI** — Built with Next.js, Tailwind CSS, and shadcn/ui
+- **🔒 Secure** — JWT authentication with Argon2 password hashing, rate limiting, input validation
+- **🎨 Modern UI** — Built with Next.js 15, Tailwind CSS, and shadcn/ui
 
 ### Supported Software
 
@@ -49,68 +51,247 @@ Biryani is a **free, open-source, self-hosted** panel for managing Minecraft ser
 git clone https://github.com/yourusername/biryani.git
 cd biryani
 cp .env.example .env
-# Edit .env and set a secure JWT_SECRET
+# Edit .env — set a secure JWT_SECRET
 docker compose up -d
 ```
 
-Open **http://localhost:3000** and follow the setup wizard.
+Open **http://localhost:3000** and follow the setup wizard to create your admin account.
 
 ### Manual Setup
 
-**Requirements:** Node.js 20+, pnpm, Docker
+**Requirements:** Node.js 20+, [pnpm](https://pnpm.io), Docker
 
 ```bash
 git clone https://github.com/yourusername/biryani.git
 cd biryani
 pnpm install
 cp .env.example .env
-# Edit .env
+# Edit .env — set a secure JWT_SECRET
 pnpm dev
 ```
 
-Open **http://localhost:3000**.
+Open **http://localhost:3000** for the frontend and **http://localhost:3001** for the API.
+
+---
+
+## Development
+
+### Prerequisites
+
+- Node.js >= 20
+- pnpm 9.x
+- Docker (for running Minecraft servers)
+
+### Setup
+
+```bash
+pnpm install
+cp .env.example .env
+```
+
+### Available Scripts
+
+| Command | Description |
+|---------|-------------|
+| `pnpm dev` | Start API + frontend in development mode |
+| `pnpm build` | Build both API and frontend for production |
+| `pnpm start` | Start production server |
+| `pnpm test` | Run all tests |
+| `pnpm test:watch` | Run tests in watch mode |
+| `pnpm lint` | Lint all packages |
+| `pnpm typecheck` | Type-check all packages |
+
+### Testing
+
+Tests use [Vitest](https://vitest.dev/) and run against in-memory SQLite databases with mocked Docker/external services.
+
+```bash
+pnpm test           # Run all tests
+pnpm test:watch     # Watch mode
+```
+
+**Test structure:**
+
+```
+src/__tests__/
+├── helpers.ts                    # Shared test utilities (createTestDb, seedServer, mockDocker)
+├── services/
+│   ├── auth.service.test.ts      # User creation, login, password verification
+│   ├── server.service.test.ts    # Server CRUD, config, port allocation
+│   ├── backup.service.test.ts    # Backup create, restore, delete
+│   ├── node.service.test.ts      # Node CRUD, heartbeat, stale detection
+│   ├── schedule.service.test.ts  # Task scheduling, cron parsing
+│   ├── template.service.test.ts  # Server template lookup
+│   ├── notification.service.test.ts  # Discord/email notifications
+│   └── validate.test.ts          # Input validation (Zod schemas)
+└── routes/
+    └── api.integration.test.ts   # Full API integration tests (auth + server routes)
+```
+
+---
+
+## Project Structure
+
+```
+biryani/
+├── src/                          # Fastify API backend
+│   ├── index.ts                  # Entry point, route registration, Socket.IO setup
+│   ├── config/
+│   │   ├── database.ts           # SQLite setup + migrations
+│   │   ├── docker.ts             # Dockerode client + helpers
+│   │   └── env.ts                # Environment variable loading
+│   ├── middleware/
+│   │   ├── auth.ts               # JWT authentication middleware
+│   │   ├── validate.ts           # Zod schema validation
+│   │   └── rate-limit.ts         # Per-route rate limiting
+│   ├── routes/
+│   │   ├── auth.ts               # Login, setup, token refresh
+│   │   ├── servers.ts            # Server CRUD + lifecycle (start/stop/restart)
+│   │   ├── backups.ts            # Backup CRUD + restore
+│   │   ├── files.ts              # In-container file browser (ls/cat/write/mkdir/rm)
+│   │   ├── mods.ts               # Modrinth search + install
+│   │   ├── nodes.ts              # Multi-node agent management
+│   │   ├── players.ts            # Whitelist/ops/bans management
+│   │   ├── schedule.ts           # Cron-based scheduled tasks
+│   │   ├── templates.ts          # Pre-configured server profiles
+│   │   └── notifications.ts      # Discord/email notification config
+│   ├── services/
+│   │   ├── auth.service.ts       # User creation, JWT signing, password hashing
+│   │   ├── server.service.ts     # Server lifecycle, config, port allocation
+│   │   ├── backup.service.ts     # Backup create/restore/delete with rotation
+│   │   ├── modrinth.service.ts   # Modrinth API client
+│   │   ├── node.service.ts       # Node agent communication + status tracking
+│   │   ├── schedule.service.ts   # Cron scheduling engine
+│   │   ├── template.service.ts   # Server template definitions
+│   │   ├── notification.service.ts   # Discord webhook + email alerts
+│   │   └── metrics.service.ts    # System metrics collection
+│   ├── agent/
+│   │   └── index.ts              # Express agent for remote nodes (port 50051)
+│   └── __tests__/                # Test suite (Vitest)
+├── web/                          # Next.js frontend
+│   ├── app/
+│   │   ├── page.tsx              # Landing/redirect
+│   │   ├── login/page.tsx        # Login form
+│   │   ├── setup/page.tsx        # First-time admin setup
+│   │   └── dashboard/
+│   │       ├── layout.tsx        # Sidebar + auth guard
+│   │       ├── page.tsx          # Dashboard overview
+│   │       ├── servers/          # Server list, create, detail pages
+│   │       ├── marketplace/      # Modrinth mod browser
+│   │       └── nodes/            # Multi-node management
+│   ├── components/ui/            # shadcn/ui components
+│   └── lib/
+│       ├── api.ts                # API client wrapper
+│       └── auth.tsx              # Auth context provider
+├── Dockerfile                    # Multi-stage production build
+├── docker-compose.yml            # Single-service deployment
+├── .env.example                  # Environment variable template
+└── package.json                  # Root workspace scripts
+```
 
 ---
 
 ## Architecture
 
 ```
-┌─────────────────────────────────┐
-│         Biryani Panel           │
-│  ┌───────────┐  ┌────────────┐  │
-│  │  Next.js   │  │   Fastify  │  │
-│  │  Frontend  │◄─┤    API     │  │
-│  │  :3000     │  │   :3001    │  │
-│  └───────────┘  └─────┬──────┘  │
-│                        │         │
-│                ┌───────┴──────┐  │
-│                │ Docker Mgmt  │  │
-│                │ (dockerode)  │  │
-│                └───────┬──────┘  │
-└────────────────────────┼────────┘
-                         │
-            ┌────────────┼────────────┐
-            ▼            ▼            ▼
-     ┌────────────┐ ┌────────────┐ ┌────────────┐
-     │   Agent    │ │   Agent    │ │   Agent    │
-     │  Node 1    │ │  Node 2    │ │  Node 3    │
-     └────────────┘ └────────────┘ └────────────┘
+┌──────────────────────────────────────────┐
+│              Biryani Panel                │
+│  ┌──────────────┐  ┌──────────────────┐  │
+│  │   Next.js    │  │     Fastify      │  │
+│  │   Frontend   │◄─┤      API         │  │
+│  │   :3000      │  │     :3001        │  │
+│  └──────────────┘  └────────┬─────────┘  │
+│                             │             │
+│                    ┌────────┴─────────┐   │
+│                    │   Docker Mgmt    │   │
+│                    │   (dockerode)    │   │
+│                    └────────┬─────────┘   │
+│                             │             │
+│                    ┌────────┴─────────┐   │
+│                    │  SQLite (better-  │   │
+│                    │   sqlite3)        │   │
+│                    └──────────────────┘   │
+└─────────────────────────────┼────────────┘
+                              │
+             ┌────────────────┼────────────────┐
+             ▼                ▼                ▼
+      ┌────────────┐  ┌────────────┐   ┌────────────┐
+      │   Agent    │  │   Agent    │   │   Agent    │
+      │  Node 1    │  │  Node 2    │   │  Node 3    │
+      │ (Express)  │  │ (Express)  │   │ (Express)  │
+      └────────────┘  └────────────┘   └────────────┘
 ```
+
+### How It Works
+
+1. **Frontend** communicates with the **Fastify API** via REST endpoints
+2. The API manages **Minecraft server containers** through Docker (using `dockerode`)
+3. Each server runs in an isolated Docker container using the `itzg/minecraft-server` image
+4. File operations, player management, and console access run via `docker exec` inside the container
+5. **Socket.IO** provides real-time updates (console output, server status changes)
+6. **Multi-node support** allows managing servers across multiple machines via Express agents
+7. Data is stored in **SQLite** (better-sqlite3) with the database file persisted on disk
 
 ---
 
-## Tech Stack
+## API Overview
 
-| Layer | Technology |
-|-------|-----------|
-| Backend | Node.js + TypeScript + Fastify |
-| Frontend | Next.js 15 + Tailwind CSS + shadcn/ui |
-| Database | SQLite |
-| Auth | JWT + Argon2 |
-| Containers | Docker (itzg/minecraft-server) |
-| Real-time | Socket.IO |
-| Mods | Modrinth API |
-| Agent | Express + dockerode |
+All API endpoints are prefixed with `/api` and require JWT authentication (via `Authorization: Bearer <token>` header) unless noted.
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/api/auth/setup` | Create first admin account |
+| `POST` | `/api/auth/login` | Login (returns JWT) |
+| `GET` | `/api/auth/me` | Get current user |
+| `GET` | `/api/auth/status` | Check if setup needed |
+| `GET` | `/api/servers` | List all servers |
+| `POST` | `/api/servers` | Create a server |
+| `GET` | `/api/servers/:id` | Get server details |
+| `PUT` | `/api/servers/:id` | Update server |
+| `DELETE` | `/api/servers/:id` | Delete server |
+| `POST` | `/api/servers/:id/start` | Start server |
+| `POST` | `/api/servers/:id/stop` | Stop server |
+| `POST` | `/api/servers/:id/restart` | Restart server |
+| `GET` | `/api/servers/:id/properties` | Read server.properties |
+| `PUT` | `/api/servers/:id/properties` | Update server.properties |
+| `GET` | `/api/servers/:id/files?path=` | List files in container |
+| `GET` | `/api/servers/:id/files/content?path=` | Read file content |
+| `PUT` | `/api/servers/:id/files/content` | Write file content |
+| `POST` | `/api/servers/:id/files/mkdir` | Create directory |
+| `DELETE` | `/api/servers/:id/files?path=` | Delete file/directory |
+| `GET` | `/api/servers/:id/backups` | List backups |
+| `POST` | `/api/servers/:id/backups` | Create backup |
+| `POST` | `/api/servers/:id/backups/:id/restore` | Restore backup |
+| `DELETE` | `/api/backups/:id` | Delete backup |
+| `GET` | `/api/servers/:id/mods/search?q=&facets=` | Search Modrinth |
+| `POST` | `/api/servers/:id/mods/install` | Install mod |
+| `GET/POST/DELETE` | `/api/servers/:id/players/whitelist` | Whitelist management |
+| `GET/POST/DELETE` | `/api/servers/:id/players/ops` | Ops management |
+| `GET/POST/DELETE` | `/api/servers/:id/players/bans` | Ban management |
+| `GET` | `/api/nodes` | List nodes |
+| `POST` | `/api/nodes` | Add node |
+| `POST` | `/api/nodes/heartbeat` | Agent heartbeat |
+| `GET` | `/api/metrics` | System metrics |
+| `GET` | `/api/health` | Health check (no auth) |
+
+---
+
+## Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PANEL_HOST` | `127.0.0.1` | Panel bind address (`0.0.0.0` for Docker) |
+| `PANEL_PORT` | `3000` | Frontend port |
+| `API_PORT` | `3001` | API port |
+| `JWT_SECRET` | - | **Required.** Secret for JWT tokens (change in production!) |
+| `JWT_EXPIRES_IN` | `1d` | Token expiration time |
+| `DATABASE_PATH` | `./data/biryani.db` | SQLite database file path |
+| `DOCKER_IMAGE` | `itzg/minecraft-server` | Default Docker image for servers |
+| `SERVER_PORT_RANGE_START` | `25565` | Start of Minecraft server port range |
+| `SERVER_PORT_RANGE_END` | `25665` | End of Minecraft server port range |
+| `NODE_NAME` | `master` | Name for this node |
+| `NODE_API_KEY` | - | API key for agent authentication |
+| `GRPC_PORT` | `50051` | Agent gRPC/Express port |
 
 ---
 
@@ -125,36 +306,69 @@ cp .env.example .env
 pnpm install && pnpm start
 ```
 
-2. Register the node in the panel under **Nodes → Add Node**
+2. Register the node in the panel under **Nodes > Add Node**
 
 3. Assign servers to specific nodes when creating them
 
 ---
 
-## Environment Variables
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `PANEL_HOST` | `127.0.0.1` | Panel bind address |
-| `PANEL_PORT` | `3000` | Panel port |
-| `API_PORT` | `3001` | API port |
-| `JWT_SECRET` | - | Secret for JWT tokens (change this!) |
-| `DATABASE_PATH` | `./data/biryani.db` | SQLite database path |
-| `DOCKER_IMAGE` | `itzg/minecraft-server` | Default Docker image |
-| `SERVER_PORT_RANGE_START` | `25565` | Start of MC server port range |
-| `SERVER_PORT_RANGE_END` | `25665` | End of MC server port range |
-
----
-
 ## Contributing
 
-Contributions are welcome! Please read our contributing guidelines before submitting a PR.
+Contributions are welcome! Here's how to get started:
+
+### Getting Started
 
 1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing`)
-5. Open a Pull Request
+2. Clone your fork:
+   ```bash
+   git clone https://github.com/yourusername/biryani.git
+   cd biryani
+   ```
+3. Install dependencies:
+   ```bash
+   pnpm install
+   ```
+4. Copy and configure environment:
+   ```bash
+   cp .env.example .env
+   ```
+5. Start the development server:
+   ```bash
+   pnpm dev
+   ```
+
+### Making Changes
+
+1. Create a feature branch:
+   ```bash
+   git checkout -b feature/amazing-feature
+   ```
+2. Make your changes
+3. Run linting and type checking:
+   ```bash
+   pnpm lint
+   pnpm typecheck
+   ```
+4. Run the test suite:
+   ```bash
+   pnpm test
+   ```
+5. Commit your changes with a clear message:
+   ```bash
+   git commit -m 'Add amazing feature'
+   ```
+6. Push to the branch:
+   ```bash
+   git push origin feature/amazing-feature
+   ```
+7. Open a Pull Request
+
+### Guidelines
+
+- Follow existing code conventions (TypeScript, ESLint rules, existing patterns)
+- Write tests for new service functions when possible
+- Keep commits focused and messages descriptive
+- Update documentation if your change affects the public API or setup process
 
 ---
 
@@ -166,6 +380,6 @@ This project is licensed under the MIT License — see the [LICENSE](LICENSE) fi
 
 <div align="center">
 
-**Built with ❤️ for the Minecraft community**
+**Built with love for the Minecraft community**
 
 </div>
