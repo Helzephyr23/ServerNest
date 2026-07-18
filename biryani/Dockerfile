@@ -16,13 +16,14 @@ RUN pnpm build
 
 # Stage 3: Build Frontend
 FROM deps AS build-web
+ARG CACHEBUST=1
 WORKDIR /app/web
 COPY web/ ./
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 ARG NEXT_PUBLIC_API_URL=http://127.0.0.1:3001
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
-RUN pnpm build
+RUN npx next build && ls -la .next/standalone/
 
 # Stage 4: Production runtime
 FROM node:20-alpine AS runtime
@@ -39,8 +40,6 @@ RUN pnpm install --frozen-lockfile --prod
 COPY --from=build-api /app/src/dist ./src/dist
 COPY --from=build-web /app/web/.next/standalone ./web-standalone/
 COPY --from=build-web /app/web/.next/static ./web-standalone/.next/static
-COPY --from=build-web /app/web/public ./web-standalone/public
-
 RUN mkdir -p /app/data
 
 EXPOSE 3000 3001 25565-25665

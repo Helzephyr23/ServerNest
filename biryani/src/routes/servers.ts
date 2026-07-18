@@ -88,6 +88,8 @@ export default async function serverRoutes(app: FastifyInstance) {
       if (ioRef) ioRef.to("server-" + id).emit("server:status", { serverId: Number(id), status: "running" });
       return { success: true, status: "running" };
     } catch (err: any) {
+      const { id } = request.params as { id: string };
+      if (ioRef) ioRef.to("server-" + id).emit("server:status", { serverId: Number(id), status: "error" });
       return reply.status(500).send({ error: err.message });
     }
   });

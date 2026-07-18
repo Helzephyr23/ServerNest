@@ -91,7 +91,7 @@ export default function NewServerPage() {
               <select
                 value={version}
                 onChange={(e) => setVersion(e.target.value)}
-                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
               >
                 {VERSIONS.map((v) => <option key={v} value={v}>{v}</option>)}
               </select>
@@ -102,7 +102,7 @@ export default function NewServerPage() {
               <select
                 value={ram}
                 onChange={(e) => setRam(Number(e.target.value))}
-                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
               >
                 {RAM_OPTIONS.map((r) => <option key={r} value={r}>{r >= 1024 ? `${r / 1024} GB` : `${r} MB`}</option>)}
               </select>
