@@ -5,8 +5,10 @@ import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useToast } from "@/components/toast";
 
 export default function MarketplacePage() {
+  const { success, error: toastError } = useToast();
   const [query, setQuery] = useState("");
   const [type, setType] = useState<"mods" | "plugins">("mods");
   const [results, setResults] = useState<any[]>([]);
@@ -19,6 +21,8 @@ export default function MarketplacePage() {
   const [versions, setVersions] = useState<any[]>([]);
   const [loadingVersions, setLoadingVersions] = useState(false);
   const [installStatus, setInstallStatus] = useState<string>("");
+  const [selectedMods, setSelectedMods] = useState<Set<string>>(new Set());
+  const [batchInstalling, setBatchInstalling] = useState(false);
 
   useEffect(() => {
     api.get("/api/servers").then(({ servers }) => setServers(servers || []));
@@ -29,6 +33,7 @@ export default function MarketplacePage() {
     if (!query.trim()) return;
     setLoading(true);
     setSearched(true);
+    setSelectedMods(new Set());
     try {
       const endpoint = type === "mods" ? "/api/mods/search" : "/api/mods/plugins";
       const { mods, plugins } = await api.get(`${endpoint}?q=${encodeURIComponent(query.trim())}`);
@@ -38,6 +43,15 @@ export default function MarketplacePage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const toggleMod = (slug: string) => {
+    setSelectedMods((prev) => {
+      const next = new Set(prev);
+      if (next.has(slug)) next.delete(slug);
+      else next.add(slug);
+      return next;
+    });
   };
 
   const openVersions = async (mod: any) => {
@@ -79,6 +93,56 @@ export default function MarketplacePage() {
     }
   };
 
+  const batchInstall = async () => {
+    if (!selectedServer) {
+      setInstallStatus("Please select a server first");
+      return;
+    }
+    if (selectedMods.size === 0) return;
+    setBatchInstalling(true);
+    setInstallStatus(`Preparing ${selectedMods.size} mods...`);
+
+    const server = servers.find((s: any) => s.id === Number(selectedServer));
+    const versionIds: { slug: string; versionId: string }[] = [];
+
+    for (const slug of selectedMods) {
+      try {
+        const params = new URLSearchParams();
+        if (server?.mc_version) params.set("version", server.mc_version);
+        if (type === "mods" && server?.software) {
+          const loader = server.software === "forge" ? "forge" : server.software === "fabric" ? "fabric" : undefined;
+          if (loader) params.set("loader", loader);
+        }
+        const { versions: v } = await api.get(`/api/mods/${slug}/versions?${params}`);
+        if (v && v.length > 0) {
+          versionIds.push({ slug, versionId: v[0].id });
+        }
+      } catch {}
+    }
+
+    if (versionIds.length === 0) {
+      setInstallStatus("No compatible versions found for selected mods");
+      setBatchInstalling(false);
+      return;
+    }
+
+    setInstallStatus(`Installing ${versionIds.length} mods...`);
+    try {
+      const { results } = await api.post(`/api/servers/${selectedServer}/mods/install-batch`, {
+        versionIds: versionIds.map((v) => v.versionId),
+      });
+      const succeeded = results.filter((r: any) => r.success).length;
+      const failed = results.filter((r: any) => !r.success).length;
+      success(`Installed ${succeeded} mod(s)` + (failed ? `, ${failed} failed` : ""));
+      setSelectedMods(new Set());
+    } catch (err: any) {
+      toastError("Batch install failed", err.message);
+    } finally {
+      setBatchInstalling(false);
+      setInstallStatus("");
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -87,7 +151,13 @@ export default function MarketplacePage() {
       </div>
 
       {installStatus && (
-        <div className={`rounded-md px-4 py-3 text-sm ${installStatus.startsWith("Error") || installStatus === "Please select a server first" ? "bg-destructive/10 text-destructive" : installStatus.startsWith("Installing") ? "bg-yellow-500/10 text-yellow-600" : "bg-green-500/10 text-green-600"}`}>
+        <div className={`rounded-md px-4 py-3 text-sm ${
+          installStatus.startsWith("Error") || installStatus === "Please select a server first"
+            ? "bg-destructive/10 text-destructive"
+            : installStatus.startsWith("Preparing") || installStatus.startsWith("Installing")
+              ? "bg-yellow-500/10 text-yellow-600"
+              : "bg-green-500/10 text-green-600"
+        }`}>
           {installStatus}
         </div>
       )}
@@ -109,14 +179,14 @@ export default function MarketplacePage() {
         <div className="flex gap-1 rounded-lg border p-1">
           <button
             type="button"
-            onClick={() => setType("mods")}
+            onClick={() => { setType("mods"); setSelectedMods(new Set()); }}
             className={`rounded-md px-3 py-1 text-sm ${type === "mods" ? "bg-primary text-primary-foreground" : ""}`}
           >
             Mods
           </button>
           <button
             type="button"
-            onClick={() => setType("plugins")}
+            onClick={() => { setType("plugins"); setSelectedMods(new Set()); }}
             className={`rounded-md px-3 py-1 text-sm ${type === "plugins" ? "bg-primary text-primary-foreground" : ""}`}
           >
             Plugins
@@ -133,6 +203,18 @@ export default function MarketplacePage() {
         </Button>
       </form>
 
+      {selectedMods.size > 0 && results.length > 0 && (
+        <div className="sticky top-0 z-10 -mx-6 flex items-center justify-between border-b bg-background/95 px-6 py-3 backdrop-blur">
+          <p className="text-sm font-medium">{selectedMods.size} selected</p>
+          <div className="flex gap-2">
+            <Button variant="ghost" size="sm" onClick={() => setSelectedMods(new Set())}>Clear</Button>
+            <Button size="sm" onClick={batchInstall} disabled={batchInstalling || !selectedServer}>
+              {batchInstalling ? "Installing..." : `Install Selected (${selectedMods.size})`}
+            </Button>
+          </div>
+        </div>
+      )}
+
       {loading ? (
         <div className="flex justify-center py-12">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
@@ -144,6 +226,12 @@ export default function MarketplacePage() {
           {results.map((mod) => (
             <Card key={mod.slug} className="flex flex-col">
               <CardHeader className="flex flex-row items-start gap-3 pb-3">
+                <input
+                  type="checkbox"
+                  checked={selectedMods.has(mod.slug)}
+                  onChange={() => toggleMod(mod.slug)}
+                  className="mt-1 h-4 w-4 shrink-0 rounded border-gray-300 text-primary focus:ring-primary"
+                />
                 {mod.icon_url && (
                   <img src={mod.icon_url} alt="" className="h-12 w-12 rounded-lg object-cover" />
                 )}
@@ -181,7 +269,7 @@ export default function MarketplacePage() {
           <h2 className="text-xl font-bold">Discover Mods & Plugins</h2>
           <p className="mt-2 max-w-md text-muted-foreground">
             Search for mods and plugins to enhance your Minecraft server.
-            Select a server above, then click Install on any result.
+            Select a server above, check multiple mods for batch install, or click Install on any result for version selection.
           </p>
         </div>
       )}
