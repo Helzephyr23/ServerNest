@@ -57,3 +57,10 @@
 - [x] **Security** — Rate limiting, input validation, SQL injection prevented (parameterized queries)
 - [x] **Testing** — Unit tests for services, API integration tests
 - [x] **README & docs** — Setup guide, architecture overview, contribution guide
+
+---
+
+## Beyond Phase 5
+All 5 development phases are complete. See:
+- **[ROADMAP.md](./ROADMAP.md)** — Future features, enhancements, and upcoming work
+- **[ISSUES.md](./ISSUES.md)** — Known bugs, technical debt, and items to fix
