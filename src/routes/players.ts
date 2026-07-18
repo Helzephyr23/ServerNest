@@ -35,7 +35,7 @@ async function execWithStdin(serverId: number, cmd: string[], stdin: string): Pr
     AttachStdout: true,
     AttachStderr: true,
   });
-  const stream = await exec.start({ Detach: false, Tty: false });
+  const stream = await exec.start({ Detach: false, Tty: false, hijack: true });
   stream.write(stdin);
   stream.end();
   return new Promise((resolve, reject) => {
