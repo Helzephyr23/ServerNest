@@ -32,3 +32,20 @@ export function isFirstRun(): boolean {
   const count = db.prepare("SELECT COUNT(*) as count FROM users").get() as { count: number };
   return count.count === 0;
 }
+
+export function listUsers() {
+  return db.prepare("SELECT id, username, role, created_at FROM users ORDER BY created_at ASC").all();
+}
+
+export function updateUserRole(id: number, role: string) {
+  return db.prepare("UPDATE users SET role = ? WHERE id = ?").run(role, id);
+}
+
+export async function updateUserPassword(id: number, password: string) {
+  const password_hash = await argon2.hash(password);
+  return db.prepare("UPDATE users SET password_hash = ? WHERE id = ?").run(password_hash, id);
+}
+
+export function deleteUser(id: number) {
+  return db.prepare("DELETE FROM users WHERE id = ?").run(id);
+}
