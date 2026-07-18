@@ -5,6 +5,7 @@ import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useToast } from "@/components/toast";
 
 const EVENT_OPTIONS = [
   { id: "server_start", label: "Server Start" },
@@ -18,6 +19,7 @@ const EVENT_OPTIONS = [
 ];
 
 export default function NotificationsPage() {
+  const { success, error: toastError } = useToast();
   const [notifications, setNotifications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
@@ -41,7 +43,7 @@ export default function NotificationsPage() {
       setShowAdd(false);
       fetchNotifications();
     } catch (err: any) {
-      alert(err.message);
+      toastError("Failed to create notification", err.message);
     }
   };
 
@@ -56,9 +58,9 @@ export default function NotificationsPage() {
     if (!testUrl) return;
     try {
       await api.post("/api/notifications/test", { webhook_url: testUrl });
-      alert("Test notification sent!");
+      success("Test notification sent!");
     } catch (err: any) {
-      alert(err.message);
+      toastError("Failed to send test", err.message);
     }
   };
 
