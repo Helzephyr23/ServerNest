@@ -45,7 +45,7 @@ describe("server.service", () => {
   describe("createServer", () => {
     it("should create a server and return it", () => {
       const server = createServer({
-        name: "Test Server", mc_version: "1.21.4", software: "vanilla", ram_mb: 2048, port: 25565,
+        name: "Test Server", mc_version: "1.21.4", software: "vanilla", ram_mb: 2048, port: 25565, eula_accepted: true,
       });
       expect(server).toHaveProperty("id");
       expect(server.name).toBe("Test Server");
@@ -58,19 +58,18 @@ describe("server.service", () => {
 
     it("should create default server_config entries", () => {
       const server = createServer({
-        name: "Test", mc_version: "1.21.4", software: "paper", ram_mb: 2048, port: 25565,
+        name: "Test", mc_version: "1.21.4", software: "paper", ram_mb: 2048, port: 25565, eula_accepted: true,
       });
       const configs = getServerConfig(server.id);
-      expect(configs.length).toBe(3);
+      expect(configs.length).toBe(2);
       const keys = configs.map((c) => c.key);
-      expect(keys).toContain("EULA");
       expect(keys).toContain("TYPE");
       expect(keys).toContain("VERSION");
     });
 
     it("should set TYPE to software name", () => {
       const server = createServer({
-        name: "Test", mc_version: "1.21.4", software: "fabric", ram_mb: 2048, port: 25565,
+        name: "Test", mc_version: "1.21.4", software: "fabric", ram_mb: 2048, port: 25565, eula_accepted: true,
       });
       const configs = getServerConfig(server.id);
       const typeConfig = configs.find((c) => c.key === "TYPE");
@@ -79,7 +78,7 @@ describe("server.service", () => {
 
     it("should default to VANILLA for vanilla software", () => {
       const server = createServer({
-        name: "Test", mc_version: "1.21.4", software: "vanilla", ram_mb: 2048, port: 25565,
+        name: "Test", mc_version: "1.21.4", software: "vanilla", ram_mb: 2048, port: 25565, eula_accepted: true,
       });
       const configs = getServerConfig(server.id);
       const typeConfig = configs.find((c) => c.key === "TYPE");
@@ -93,8 +92,8 @@ describe("server.service", () => {
     });
 
     it("should return all servers", () => {
-      createServer({ name: "S1", mc_version: "1.21.4", software: "vanilla", ram_mb: 2048, port: 25565 });
-      createServer({ name: "S2", mc_version: "1.21.4", software: "paper", ram_mb: 4096, port: 25566 });
+      createServer({ name: "S1", mc_version: "1.21.4", software: "vanilla", ram_mb: 2048,       port: 25565, eula_accepted: true });
+      createServer({ name: "S2", mc_version: "1.21.4", software: "paper", ram_mb: 4096, port: 25566, eula_accepted: true });
       expect(getAllServers().length).toBe(2);
     });
   });
@@ -105,7 +104,7 @@ describe("server.service", () => {
     });
 
     it("should return the server", () => {
-      const created = createServer({ name: "Test", mc_version: "1.21.4", software: "vanilla", ram_mb: 2048, port: 25565 });
+      const created = createServer({ name: "Test", mc_version: "1.21.4", software: "vanilla", ram_mb: 2048,       port: 25565, eula_accepted: true });
       const server = getServerById(created.id);
       expect(server).toBeDefined();
       expect(server!.name).toBe("Test");
@@ -114,7 +113,7 @@ describe("server.service", () => {
 
   describe("updateServer", () => {
     it("should update server fields", () => {
-      const server = createServer({ name: "Test", mc_version: "1.21.4", software: "vanilla", ram_mb: 2048, port: 25565 });
+      const server = createServer({ name: "Test", mc_version: "1.21.4", software: "vanilla", ram_mb: 2048,       port: 25565, eula_accepted: true });
       updateServer(server.id, { name: "Updated", ram_mb: 4096 });
       const updated = getServerById(server.id)!;
       expect(updated.name).toBe("Updated");
@@ -122,7 +121,7 @@ describe("server.service", () => {
     });
 
     it("should not change fields not provided", () => {
-      const server = createServer({ name: "Test", mc_version: "1.21.4", software: "vanilla", ram_mb: 2048, port: 25565 });
+      const server = createServer({ name: "Test", mc_version: "1.21.4", software: "vanilla", ram_mb: 2048,       port: 25565, eula_accepted: true });
       updateServer(server.id, { name: "Updated" });
       const updated = getServerById(server.id)!;
       expect(updated.mc_version).toBe("1.21.4");
@@ -132,14 +131,14 @@ describe("server.service", () => {
 
   describe("deleteServer", () => {
     it("should delete the server and related data", () => {
-      const server = createServer({ name: "Test", mc_version: "1.21.4", software: "vanilla", ram_mb: 2048, port: 25565 });
+      const server = createServer({ name: "Test", mc_version: "1.21.4", software: "vanilla", ram_mb: 2048,       port: 25565, eula_accepted: true });
       deleteServer(server.id);
       expect(getServerById(server.id)).toBeUndefined();
     });
 
     it("should cascade delete server_config", () => {
-      const server = createServer({ name: "Test", mc_version: "1.21.4", software: "vanilla", ram_mb: 2048, port: 25565 });
-      expect(getServerConfig(server.id).length).toBe(3);
+      const server = createServer({ name: "Test", mc_version: "1.21.4", software: "vanilla", ram_mb: 2048,       port: 25565, eula_accepted: true });
+      expect(getServerConfig(server.id).length).toBe(2);
       deleteServer(server.id);
       expect(getServerConfig(server.id).length).toBe(0);
     });
@@ -147,14 +146,14 @@ describe("server.service", () => {
 
   describe("server config", () => {
     it("should set and get config", () => {
-      const server = createServer({ name: "Test", mc_version: "1.21.4", software: "vanilla", ram_mb: 2048, port: 25565 });
+      const server = createServer({ name: "Test", mc_version: "1.21.4", software: "vanilla", ram_mb: 2048,       port: 25565, eula_accepted: true });
       setServerConfig(server.id, "DIFFICULTY", "hard");
       const configs = getServerConfig(server.id);
       expect(configs.find((c) => c.key === "DIFFICULTY")?.value).toBe("hard");
     });
 
     it("should update existing config", () => {
-      const server = createServer({ name: "Test", mc_version: "1.21.4", software: "vanilla", ram_mb: 2048, port: 25565 });
+      const server = createServer({ name: "Test", mc_version: "1.21.4", software: "vanilla", ram_mb: 2048,       port: 25565, eula_accepted: true });
       setServerConfig(server.id, "DIFFICULTY", "easy");
       setServerConfig(server.id, "DIFFICULTY", "hard");
       const configs = getServerConfig(server.id).filter((c) => c.key === "DIFFICULTY");
@@ -163,7 +162,7 @@ describe("server.service", () => {
     });
 
     it("should delete config", () => {
-      const server = createServer({ name: "Test", mc_version: "1.21.4", software: "vanilla", ram_mb: 2048, port: 25565 });
+      const server = createServer({ name: "Test", mc_version: "1.21.4", software: "vanilla", ram_mb: 2048,       port: 25565, eula_accepted: true });
       setServerConfig(server.id, "CUSTOM", "value");
       deleteServerConfig(server.id, "CUSTOM");
       expect(getServerConfig(server.id).find((c) => c.key === "CUSTOM")).toBeUndefined();
@@ -176,7 +175,7 @@ describe("server.service", () => {
     });
 
     it("should skip used ports", () => {
-      createServer({ name: "S1", mc_version: "1.21.4", software: "vanilla", ram_mb: 2048, port: 25565 });
+      createServer({ name: "S1", mc_version: "1.21.4", software: "vanilla", ram_mb: 2048,       port: 25565, eula_accepted: true });
       expect(findAvailablePort()).toBe(25566);
     });
   });

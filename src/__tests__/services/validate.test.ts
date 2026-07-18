@@ -42,17 +42,18 @@ describe("middleware/validate", () => {
       const result = schemas.createServer.safeParse({
         name: "My Server",
         mc_version: "1.21.4",
+        eula_accepted: true,
       });
       expect(result.success).toBe(true);
     });
 
     it("should reject missing name", () => {
-      const result = schemas.createServer.safeParse({ mc_version: "1.21.4" });
+      const result = schemas.createServer.safeParse({ mc_version: "1.21.4", eula_accepted: true });
       expect(result.success).toBe(false);
     });
 
     it("should reject missing mc_version", () => {
-      const result = schemas.createServer.safeParse({ name: "My Server" });
+      const result = schemas.createServer.safeParse({ name: "My Server", eula_accepted: true });
       expect(result.success).toBe(false);
     });
 
@@ -60,6 +61,7 @@ describe("middleware/validate", () => {
       const result = schemas.createServer.safeParse({
         name: "My Server",
         mc_version: "1.21.4",
+        eula_accepted: true,
       });
       expect(result.success).toBe(true);
       if (result.success) {
@@ -73,6 +75,24 @@ describe("middleware/validate", () => {
         name: "Test",
         mc_version: "1.21.4",
         ram_mb: 256,
+        eula_accepted: true,
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it("should reject missing eula_accepted", () => {
+      const result = schemas.createServer.safeParse({
+        name: "Test",
+        mc_version: "1.21.4",
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it("should reject false eula_accepted", () => {
+      const result = schemas.createServer.safeParse({
+        name: "Test",
+        mc_version: "1.21.4",
+        eula_accepted: false,
       });
       expect(result.success).toBe(false);
     });
