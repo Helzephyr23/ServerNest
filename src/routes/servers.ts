@@ -20,6 +20,7 @@ import { getServerMetrics } from "../services/metrics.service.js";
 import { getImageName } from "../config/docker.js";
 import docker from "../config/docker.js";
 import { rmSync, existsSync } from "fs";
+import db from "../config/database.js";
 
 let ioRef: any = null;
 
@@ -154,5 +155,57 @@ export default async function serverRoutes(app: FastifyInstance) {
     const metrics = await getServerMetrics(Number(id));
     if (!metrics) return reply.status(404).send({ error: "No metrics available" });
     return { metrics };
+  });
+
+  app.get("/api/mc-versions", opts, async (_request, reply) => {
+    try {
+      const res = await fetch("https://launchermeta.mojang.com/mc/game/version_manifest.json");
+      const data = await res.json() as any;
+      const versions = (data.versions || []).map((v: any) => ({
+        id: v.id,
+        type: v.type,
+        releaseDate: v.releaseTime,
+      }));
+      const latest = data.latest || {};
+      return { versions, latest };
+    } catch {
+      return reply.status(502).send({ error: "Failed to fetch Minecraft versions" });
+    }
+  });
+
+  app.post("/api/servers/:id/update-version", opts, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const { version } = request.body as { version: string };
+    if (!version) return reply.status(400).send({ error: "version is required" });
+
+    const server = getServerById(Number(id));
+    if (!server) return reply.status(404).send({ error: "Server not found" });
+
+    try {
+      const res = await fetch("https://launchermeta.mojang.com/mc/game/version_manifest.json");
+      const data = await res.json() as any;
+      const exists = (data.versions || []).some((v: any) => v.id === version);
+      if (!exists) return reply.status(400).send({ error: `Version "${version}" not found` });
+    } catch {
+      return reply.status(502).send({ error: "Failed to validate version" });
+    }
+
+    if (server.status === "running") {
+      await stopServer(Number(id));
+    }
+
+    db.prepare("UPDATE servers SET mc_version = ? WHERE id = ?").run(version, Number(id));
+    const existing = db.prepare("SELECT 1 FROM server_config WHERE server_id = ? AND key = 'VERSION'").get(Number(id));
+    if (existing) {
+      db.prepare("UPDATE server_config SET value = ? WHERE server_id = ? AND key = 'VERSION'").run(version, Number(id));
+    } else {
+      db.prepare("INSERT INTO server_config (server_id, key, value) VALUES (?, ?, ?)").run(Number(id), "VERSION", version);
+    }
+
+    if (server.status === "running") {
+      await startServer(Number(id));
+    }
+
+    return { success: true, version };
   });
 }

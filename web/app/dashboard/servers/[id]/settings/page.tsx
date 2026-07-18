@@ -100,7 +100,29 @@ export default function ServerSettingsPage() {
     }
   };
 
-  if (loading) {
+  const [mcVersions, setMcVersions] = useState<any[]>([]);
+const [updatingVersion, setUpdatingVersion] = useState(false);
+
+useEffect(() => {
+  api.get("/api/mc-versions").then(({ versions }) => {
+    setMcVersions(Array.isArray(versions) ? versions.filter((v: any) => v.type === "release") : []);
+  }).catch(() => {});
+}, []);
+
+const handleVersionUpdate = async (version: string) => {
+  setUpdatingVersion(true);
+  try {
+    await api.post(`/api/servers/${id}/update-version`, { version });
+    success(`Server version updated to ${version}`);
+    window.location.reload();
+  } catch (err: any) {
+    toastError("Failed to update version", err.message);
+  } finally {
+    setUpdatingVersion(false);
+  }
+};
+
+if (loading) {
     return (
       <div className="flex justify-center py-12">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
@@ -140,6 +162,36 @@ export default function ServerSettingsPage() {
           Restart the server after saving to apply changes
         </div>
       )}
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Minecraft Version</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="mb-3 text-sm text-muted-foreground">
+            Current: <span className="font-medium text-foreground">{server?.mc_version}</span>
+          </p>
+          <div className="flex gap-2">
+            <select
+              id="version-select"
+              className="flex h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              defaultValue=""
+              onChange={(e) => {
+                if (e.target.value) handleVersionUpdate(e.target.value);
+                e.target.value = "";
+              }}
+            >
+              <option value="" disabled>Select version to update...</option>
+              {mcVersions.map((v: any) => (
+                <option key={v.id} value={v.id}>
+                  {v.id} {v.id === mcVersions[0]?.id ? "(latest)" : ""}
+                </option>
+              ))}
+            </select>
+            {updatingVersion && <p className="text-sm text-yellow-500">Updating...</p>}
+          </div>
+        </CardContent>
+      </Card>
 
       <Input
         value={search}
