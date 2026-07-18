@@ -4,7 +4,7 @@
 
 **Free, self-hosted Minecraft server management panel**
 
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)](LICENSE)
+[![License: GPLv3](https://img.shields.io/badge/license-GPLv3-blue.svg?style=flat-square)](LICENSE)
 [![Docker](https://img.shields.io/badge/docker-ready-2496ED?style=flat-square&logo=docker&logoColor=white)](#quick-start)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D20-339933?style=flat-square&logo=node.js&logoColor=white)](#quick-start)
 
@@ -324,6 +324,71 @@ pnpm install && pnpm start
 
 ---
 
+## Cloud Storage Setup
+
+Backups can be synced to S3-compatible storage, Google Drive, or Dropbox. Configure under **Server → Cloud Storage** tab after adding a server.
+
+### S3-Compatible (AWS, Backblaze B2, MinIO, DigitalOcean Spaces, etc.)
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| Endpoint | No | Custom S3 endpoint (blank for AWS default) |
+| Region | Yes | e.g. `us-east-1` |
+| Bucket | Yes | Bucket name |
+| Access Key ID | Yes | IAM access key or equivalent |
+| Secret Access Key | Yes | IAM secret key or equivalent |
+| Prefix | No | Path prefix inside bucket (e.g. `biryani/servers/`) |
+
+### Google Drive
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com/) → Create a project → **APIs & Services** → **OAuth consent screen**
+2. Set app type to **External** (or Internal if using Google Workspace), add the `.../auth/drive.file` scope
+3. Go to **Credentials** → **Create Credentials** → **OAuth client ID** → **Desktop app**
+4. Copy the **Client ID** and **Client Secret**
+5. Generate a refresh token:
+
+```
+https://accounts.google.com/o/oauth2/v2/auth?
+  client_id=YOUR_CLIENT_ID&
+  redirect_uri=urn:ietf:wg:oauth:2.0:oob&
+  response_type=code&
+  scope=https://www.googleapis.com/auth/drive.file
+```
+
+Visit the URL, authorize, copy the code, then exchange it:
+
+```
+POST https://oauth2.googleapis.com/token
+  client_id=...
+  client_secret=...
+  code=THE_CODE
+  grant_type=authorization_code
+  redirect_uri=urn:ietf:wg:oauth:2.0:oob
+```
+
+The response includes a `refresh_token` — use that in the config.
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| Client ID | Yes | OAuth 2.0 client ID |
+| Client Secret | Yes | OAuth 2.0 client secret |
+| Refresh Token | Yes | Long-lived token (use once) |
+| Folder ID | No | Parent folder ID; leave blank to auto-create `BiryaniBackups` |
+
+### Dropbox
+
+1. Go to [Dropbox Developer Console](https://www.dropbox.com/developers/apps) → **Create app**
+2. Choose **Scoped access** → **Full Dropbox** or **App folder**
+3. Under **Permissions**, enable `files.content.write` and `files.content.read`
+4. Generate an **Access token** (short-lived) or use OAuth for a long-lived refresh token
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| Access Token | Yes | Dropbox API access token |
+| Path | No | Folder path inside Dropbox (default `/BiryaniBackups`) |
+
+---
+
 ## Contributing
 
 Contributions are welcome! Here's how to get started:
@@ -390,7 +455,7 @@ Check **[ROADMAP.md](./ROADMAP.md)** for upcoming features and **[ISSUES.md](./I
 
 ## License
 
-This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
+This project is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version. See the [LICENSE](LICENSE) file for details.
 
 ---
 
