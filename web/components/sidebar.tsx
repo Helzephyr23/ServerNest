@@ -6,6 +6,7 @@ import { useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 const navItems = [
   { href: "/dashboard", label: "Overview", icon: "📊" },
@@ -63,6 +64,7 @@ export default function Sidebar() {
             <p className="text-sm font-medium">{user?.username}</p>
             <p className="text-xs text-muted-foreground">{user?.role}</p>
           </div>
+          <ThemeToggle />
         </div>
         <Button variant="ghost" className="w-full justify-start text-muted-foreground" onClick={logout}>
           Sign Out
