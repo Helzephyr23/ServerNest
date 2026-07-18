@@ -17,7 +17,7 @@ async function request<T>(method: string, path: string, body?: any): Promise<T> 
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
 
-  if (res.status === 401 && typeof window !== "undefined") {
+  if (res.status === 401 && typeof window !== "undefined" && window.location.pathname !== "/login") {
     localStorage.removeItem("biryani_token");
     window.location.href = "/login";
     throw new Error("Unauthorized");
