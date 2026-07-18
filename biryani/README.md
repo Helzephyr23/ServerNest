@@ -27,6 +27,8 @@ Biryani is a **free, open-source, self-hosted** panel for managing Minecraft ser
 - **⏰ Scheduled Tasks** — Cron-based backup, restart, stop, start, and command tasks
 - **🐳 Docker Isolation** — Each server runs in its own Docker container
 - **🔒 Secure** — JWT authentication with Argon2 password hashing, rate limiting, input validation
+- **🌓 Dark Mode** — System-aware theme with manual light/dark toggle
+- **👤 User Management** — Multi-user support with admin/user roles and permission control
 - **🎨 Modern UI** — Built with Next.js 15, Tailwind CSS, and shadcn/ui
 
 ### Supported Software
@@ -154,7 +156,8 @@ biryani/
 │   │   ├── players.ts            # Whitelist/ops/bans management
 │   │   ├── schedule.ts           # Cron-based scheduled tasks
 │   │   ├── templates.ts          # Pre-configured server profiles
-│   │   └── notifications.ts      # Discord/email notification config
+│   │   ├── notifications.ts      # Discord/email notification config
+│   │   └── users.ts              # User CRUD + role management
 │   ├── services/
 │   │   ├── auth.service.ts       # User creation, JWT signing, password hashing
 │   │   ├── server.service.ts     # Server lifecycle, config, port allocation
@@ -178,8 +181,12 @@ biryani/
 │   │       ├── page.tsx          # Dashboard overview
 │   │       ├── servers/          # Server list, create, detail pages
 │   │       ├── marketplace/      # Modrinth mod browser
-│   │       └── nodes/            # Multi-node management
-│   ├── components/ui/            # shadcn/ui components
+│   │       ├── nodes/            # Multi-node management
+│   │       └── users/            # User management panel
+│   ├── components/
+│   │   ├── ui/                   # shadcn/ui components
+│   │   ├── theme-provider.tsx    # next-themes provider wrapper
+│   │   └── theme-toggle.tsx      # Light/dark toggle button
 │   └── lib/
 │       ├── api.ts                # API client wrapper
 │       └── auth.tsx              # Auth context provider
@@ -244,6 +251,11 @@ All API endpoints are prefixed with `/api` and require JWT authentication (via `
 | `POST` | `/api/auth/login` | Login (returns JWT) |
 | `GET` | `/api/auth/me` | Get current user |
 | `GET` | `/api/auth/status` | Check if setup needed |
+| `GET` | `/api/users` | List all users |
+| `POST` | `/api/users` | Create a user |
+| `PUT` | `/api/users/:id/role` | Update user role |
+| `PUT` | `/api/users/:id/password` | Reset user password |
+| `DELETE` | `/api/users/:id` | Delete a user |
 | `GET` | `/api/servers` | List all servers |
 | `POST` | `/api/servers` | Create a server |
 | `GET` | `/api/servers/:id` | Get server details |
@@ -315,6 +327,10 @@ pnpm install && pnpm start
 ## Contributing
 
 Contributions are welcome! Here's how to get started:
+
+### Project Roadmap
+
+Check **[ROADMAP.md](./ROADMAP.md)** for upcoming features and **[ISSUES.md](./ISSUES.md)** for known bugs and technical debt.
 
 ### Getting Started
 
