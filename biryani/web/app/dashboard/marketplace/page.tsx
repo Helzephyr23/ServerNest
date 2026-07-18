@@ -96,7 +96,7 @@ export default function MarketplacePage() {
         <select
           value={selectedServer}
           onChange={(e) => setSelectedServer(e.target.value)}
-          className="flex h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          className="flex h-9 rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
         >
           <option value="">Select server to install to</option>
           {servers.map((s: any) => (

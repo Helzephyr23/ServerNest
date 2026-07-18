@@ -80,7 +80,7 @@ export default function ConsolePage() {
   useEffect(() => {
     api.get(`/api/servers/${id}`).then(({ server: s }) => setServer(s));
 
-    const token = localStorage.getItem("token");
+    const token = localStorage.getItem("biryani_token");
     const socket = io(typeof window !== "undefined" && window.location.hostname !== "localhost"
       ? `${window.location.protocol}//${window.location.hostname}:3001`
       : "http://localhost:3001",
@@ -149,7 +149,7 @@ export default function ConsolePage() {
   useEffect(() => {
     const cleanup = initTerminal();
     return cleanup;
-  }, [initTerminal]);
+  }, [initTerminal, server?.status]);
 
   useEffect(() => {
     const term = termRef.current;

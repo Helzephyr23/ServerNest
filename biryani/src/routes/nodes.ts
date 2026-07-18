@@ -1,5 +1,5 @@
 import { FastifyInstance } from "fastify";
-import { authMiddleware } from "../middleware/auth.js";
+import { authMiddleware, adminMiddleware } from "../middleware/auth.js";
 import {
   getAllNodes,
   getNodeById,
@@ -13,6 +13,7 @@ import { getNodeMetrics } from "../services/metrics.service.js";
 
 export default async function nodeRoutes(app: FastifyInstance) {
   const opts = { preHandler: [authMiddleware] };
+  const adminOpts = { preHandler: [authMiddleware, adminMiddleware] };
 
   app.get("/api/nodes", opts, async () => {
     return { nodes: getAllNodes() };
@@ -32,7 +33,7 @@ export default async function nodeRoutes(app: FastifyInstance) {
     return { servers: getServersForNode(Number(id)) };
   });
 
-  app.post("/api/nodes", opts, async (request, reply) => {
+  app.post("/api/nodes", adminOpts, async (request, reply) => {
     const { name, hostname, port, api_key, max_servers } = request.body as any;
     if (!name || !hostname || !api_key) {
       return reply.status(400).send({ error: "name, hostname, and api_key are required" });
@@ -41,7 +42,7 @@ export default async function nodeRoutes(app: FastifyInstance) {
     return reply.status(201).send({ node });
   });
 
-  app.delete("/api/nodes/:id", opts, async (request, reply) => {
+  app.delete("/api/nodes/:id", adminOpts, async (request, reply) => {
     const { id } = request.params as { id: string };
     const node = getNodeById(Number(id));
     if (!node) return reply.status(404).send({ error: "Node not found" });

@@ -1,6 +1,7 @@
 import db from "../config/database.js";
 import docker, { isDockerAvailable } from "../config/docker.js";
 import { env } from "../config/env.js";
+import { notify } from "./notification.service.js";
 import { Readable } from "stream";
 import { mkdirSync, existsSync } from "fs";
 
@@ -86,6 +87,7 @@ export async function startServer(id: number): Promise<string | null> {
   const available = await isDockerAvailable();
   if (!available) {
     db.prepare("UPDATE servers SET status = 'error' WHERE id = ?").run(id);
+    notify("server_error", "Server Start Failed", `Server "${server.name}" failed: Docker is not available`, 0xff0000);
     throw new Error("Docker is not available");
   }
 
@@ -141,9 +143,11 @@ export async function startServer(id: number): Promise<string | null> {
 
     await container.start();
     db.prepare("UPDATE servers SET status = 'running', container_id = ? WHERE id = ?").run(container.id, id);
+    notify("server_started", "Server Started", `Server "${server.name}" is now running`, 0x00ff00);
     return container.id;
   } catch (err) {
     db.prepare("UPDATE servers SET status = 'error' WHERE id = ?").run(id);
+    notify("server_error", "Server Start Failed", `Server "${server.name}" failed to start: ${(err as Error).message}`, 0xff0000);
     throw err;
   }
 }
@@ -161,6 +165,7 @@ export async function stopServer(id: number): Promise<void> {
   } catch {}
 
   db.prepare("UPDATE servers SET status = 'stopped', container_id = NULL WHERE id = ?").run(id);
+  notify("server_stopped", "Server Stopped", `Server "${server.name}" has been stopped`, 0xffaa00);
 }
 
 export async function restartServer(id: number): Promise<void> {

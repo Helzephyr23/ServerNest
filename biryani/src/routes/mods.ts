@@ -2,6 +2,7 @@ import { FastifyInstance } from "fastify";
 import { authMiddleware } from "../middleware/auth.js";
 import { searchMods, searchPlugins, getProject, getProjectVersions, downloadMod } from "../services/modrinth.service.js";
 import { getServerById } from "../services/server.service.js";
+import db from "../config/database.js";
 import { readdirSync, statSync, unlinkSync } from "fs";
 import { join } from "path";
 
@@ -71,6 +72,11 @@ export default async function modsRoutes(app: FastifyInstance) {
     if (!result.success) {
       return reply.status(500).send({ error: result.error });
     }
+
+    try {
+      db.prepare("INSERT INTO installed_mods (server_id, mod_slug, version_id, filename) VALUES (?, ?, ?, ?)")
+        .run(Number(id), "", versionId, result.filename);
+    } catch {}
 
     return { success: true, filename: result.filename };
   });
