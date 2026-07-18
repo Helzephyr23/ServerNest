@@ -92,6 +92,16 @@ export function createTestDb(): Database.Database {
       installed_at TEXT NOT NULL DEFAULT (datetime('now')),
       FOREIGN KEY (server_id) REFERENCES servers(id) ON DELETE CASCADE
     );
+    CREATE TABLE IF NOT EXISTS rate_limits (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      route       TEXT NOT NULL,
+      method      TEXT NOT NULL DEFAULT 'POST',
+      max_requests INTEGER NOT NULL DEFAULT 10,
+      window_ms   INTEGER NOT NULL DEFAULT 60000,
+      enabled     INTEGER NOT NULL DEFAULT 1,
+      description TEXT,
+      created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+    );
     CREATE TABLE IF NOT EXISTS cloud_storage_configs (
       id          INTEGER PRIMARY KEY AUTOINCREMENT,
       server_id   INTEGER NOT NULL,
