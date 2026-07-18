@@ -16,12 +16,14 @@ const testDb = vi.hoisted(() => {
     CREATE TABLE IF NOT EXISTS scheduled_tasks (id INTEGER PRIMARY KEY AUTOINCREMENT, server_id INTEGER NOT NULL, name TEXT NOT NULL, type TEXT NOT NULL, schedule TEXT NOT NULL, command TEXT, enabled INTEGER NOT NULL DEFAULT 1, last_run TEXT, next_run TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')), FOREIGN KEY (server_id) REFERENCES servers(id) ON DELETE CASCADE);
     CREATE TABLE IF NOT EXISTS notifications (id INTEGER PRIMARY KEY AUTOINCREMENT, type TEXT NOT NULL, webhook_url TEXT, email TEXT, enabled INTEGER NOT NULL DEFAULT 1, events TEXT NOT NULL DEFAULT '[]', created_at TEXT NOT NULL DEFAULT (datetime('now')));
     CREATE TABLE IF NOT EXISTS installed_mods (id INTEGER PRIMARY KEY AUTOINCREMENT, server_id INTEGER NOT NULL, mod_name TEXT NOT NULL, filename TEXT NOT NULL, version TEXT, source TEXT NOT NULL DEFAULT 'modrinth', installed_at TEXT NOT NULL DEFAULT (datetime('now')), FOREIGN KEY (server_id) REFERENCES servers(id) ON DELETE CASCADE);
+    CREATE TABLE IF NOT EXISTS rate_limits (id INTEGER PRIMARY KEY AUTOINCREMENT, route TEXT NOT NULL, method TEXT NOT NULL DEFAULT 'POST', max_requests INTEGER NOT NULL DEFAULT 10, window_ms INTEGER NOT NULL DEFAULT 60000, enabled INTEGER NOT NULL DEFAULT 1, description TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')));
   `);
   return db;
 });
 
 vi.mock("../../middleware/rate-limit.js", () => ({
   rateLimit: () => async () => {},
+  loadRateLimits: vi.fn(),
 }));
 vi.mock("../../config/database.js", () => ({ default: testDb, migrate: vi.fn() }));
 vi.mock("../../config/docker.js", () => ({
