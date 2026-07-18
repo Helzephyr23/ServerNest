@@ -13,6 +13,7 @@ const TABS = [
   { href: "/mods", label: "Mods" },
   { href: "/players", label: "Players" },
   { href: "/backups", label: "Backups" },
+  { href: "/cloud-storage", label: "Cloud Storage" },
   { href: "/settings", label: "Settings" },
 ];
 
