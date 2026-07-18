@@ -102,6 +102,17 @@ export function createTestDb(): Database.Database {
       description TEXT,
       created_at  TEXT NOT NULL DEFAULT (datetime('now'))
     );
+    CREATE TABLE IF NOT EXISTS sessions (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id     INTEGER NOT NULL,
+      jti         TEXT UNIQUE NOT NULL,
+      user_agent  TEXT,
+      ip          TEXT,
+      created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+      last_used   TEXT NOT NULL DEFAULT (datetime('now')),
+      expired     INTEGER NOT NULL DEFAULT 0,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
     CREATE TABLE IF NOT EXISTS cloud_storage_configs (
       id          INTEGER PRIMARY KEY AUTOINCREMENT,
       server_id   INTEGER NOT NULL,
