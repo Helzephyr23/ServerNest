@@ -1,5 +1,5 @@
 import { FastifyInstance } from "fastify";
-import { getUserByUsername, createUser, verifyPassword, isFirstRun } from "../services/auth.service.js";
+import { getUserByUsername, createUser, verifyPassword, isFirstRun, createSession } from "../services/auth.service.js";
 import { rateLimit } from "../middleware/rate-limit.js";
 import { validate, schemas } from "../middleware/validate.js";
 
@@ -12,7 +12,8 @@ export default async function authRoutes(app: FastifyInstance) {
     }
     const { username, password } = request.body as any;
     const user = await createUser(username, password, "admin");
-    const token = app.jwt.sign({ id: user.id, username: user.username, role: user.role });
+    const jti = createSession(user.id, request.headers["user-agent"], request.ip);
+    const token = app.jwt.sign({ id: user.id, username: user.username, role: user.role, jti });
     return { token, user: { id: user.id, username: user.username, role: user.role } };
   });
 
@@ -29,7 +30,8 @@ export default async function authRoutes(app: FastifyInstance) {
       if (!user || !(await verifyPassword(user, password))) {
         return reply.status(401).send({ error: "Invalid credentials" });
       }
-      const token = app.jwt.sign({ id: user.id, username: user.username, role: user.role });
+      const jti = createSession(user.id, request.headers["user-agent"], request.ip);
+      const token = app.jwt.sign({ id: user.id, username: user.username, role: user.role, jti });
       return { token, user: { id: user.id, username: user.username, role: user.role } };
     } catch (err: any) {
       request.log.error(err, "Login failed");
