@@ -56,6 +56,7 @@ export function createTestDb(): Database.Database {
       server_id INTEGER NOT NULL,
       filename TEXT NOT NULL,
       size INTEGER NOT NULL DEFAULT 0,
+      checksum TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       FOREIGN KEY (server_id) REFERENCES servers(id) ON DELETE CASCADE
     );
@@ -90,6 +91,28 @@ export function createTestDb(): Database.Database {
       source TEXT NOT NULL DEFAULT 'modrinth',
       installed_at TEXT NOT NULL DEFAULT (datetime('now')),
       FOREIGN KEY (server_id) REFERENCES servers(id) ON DELETE CASCADE
+    );
+    CREATE TABLE IF NOT EXISTS cloud_storage_configs (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      server_id   INTEGER NOT NULL,
+      provider    TEXT NOT NULL,
+      label       TEXT NOT NULL,
+      config_json TEXT NOT NULL,
+      enabled     INTEGER NOT NULL DEFAULT 1,
+      created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (server_id) REFERENCES servers(id) ON DELETE CASCADE
+    );
+    CREATE TABLE IF NOT EXISTS backup_uploads (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      backup_id   INTEGER NOT NULL,
+      storage_id  INTEGER NOT NULL,
+      status      TEXT NOT NULL DEFAULT 'pending',
+      checksum    TEXT,
+      error       TEXT,
+      created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+      completed_at TEXT,
+      FOREIGN KEY (backup_id) REFERENCES backups(id) ON DELETE CASCADE,
+      FOREIGN KEY (storage_id) REFERENCES cloud_storage_configs(id) ON DELETE CASCADE
     );
   `);
 
