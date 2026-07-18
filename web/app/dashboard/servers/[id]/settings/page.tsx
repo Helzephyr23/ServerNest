@@ -60,6 +60,7 @@ export default function ServerSettingsPage() {
   const [saving, setSaving] = useState(false);
   const [needsRestart, setNeedsRestart] = useState(false);
   const [server, setServer] = useState<any>(null);
+  const [search, setSearch] = useState("");
 
   const fetchProps = () => {
     Promise.all([
@@ -108,6 +109,12 @@ export default function ServerSettingsPage() {
   }
 
   const sortedKeys = Object.keys(properties || {}).sort();
+  const filteredKeys = search
+    ? sortedKeys.filter((key) => {
+        const label = PROPERTY_LABELS[key] || key;
+        return label.toLowerCase().includes(search.toLowerCase()) || key.toLowerCase().includes(search.toLowerCase());
+      })
+    : sortedKeys;
 
   return (
     <div className="space-y-4">
@@ -134,8 +141,15 @@ export default function ServerSettingsPage() {
         </div>
       )}
 
-      <div className="space-y-3">
-        {sortedKeys.map((key) => {
+      <Input
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        placeholder="Search settings..."
+        className="max-w-sm"
+      />
+
+      <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+        {filteredKeys.map((key) => {
           const label = PROPERTY_LABELS[key] || key;
           const value = properties[key];
 
