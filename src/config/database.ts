@@ -51,6 +51,8 @@ export function migrate() {
       ram_mb INTEGER NOT NULL DEFAULT 2048,
       cpu_percent REAL DEFAULT NULL,
       container_id TEXT,
+      eula_accepted INTEGER NOT NULL DEFAULT 0,
+      eula_accepted_at TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       FOREIGN KEY (node_id) REFERENCES nodes(id)
     );
@@ -128,6 +130,10 @@ export function migrate() {
   const serverColumns = db.prepare("PRAGMA table_info(servers)").all() as { name: string }[];
   if (!serverColumns.some((c) => c.name === "image")) {
     db.exec("ALTER TABLE servers ADD COLUMN image TEXT NOT NULL DEFAULT 'itzg/minecraft-server'");
+  }
+  if (!serverColumns.some((c) => c.name === "eula_accepted")) {
+    db.exec("ALTER TABLE servers ADD COLUMN eula_accepted INTEGER NOT NULL DEFAULT 0");
+    db.exec("ALTER TABLE servers ADD COLUMN eula_accepted_at TEXT");
   }
 
   const nodeColumns = db.prepare("PRAGMA table_info(nodes)").all() as { name: string }[];

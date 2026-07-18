@@ -10,7 +10,7 @@ const testDb = vi.hoisted(() => {
   db.exec(`
     CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE NOT NULL, password_hash TEXT NOT NULL, role TEXT NOT NULL DEFAULT 'admin', created_at TEXT NOT NULL DEFAULT (datetime('now')));
     CREATE TABLE IF NOT EXISTS nodes (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE NOT NULL, hostname TEXT NOT NULL, port INTEGER NOT NULL DEFAULT 50051, status TEXT NOT NULL DEFAULT 'offline', api_key TEXT NOT NULL, max_servers INTEGER NOT NULL DEFAULT 10, current_servers INTEGER NOT NULL DEFAULT 0, last_heartbeat TEXT, cpu_percent REAL DEFAULT 0, memory_percent REAL DEFAULT 0, disk_percent REAL DEFAULT 0, created_at TEXT NOT NULL DEFAULT (datetime('now')));
-    CREATE TABLE IF NOT EXISTS servers (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, node_id INTEGER NOT NULL DEFAULT 1, port INTEGER UNIQUE NOT NULL, status TEXT NOT NULL DEFAULT 'stopped', mc_version TEXT NOT NULL DEFAULT '1.21.4', software TEXT NOT NULL DEFAULT 'vanilla', image TEXT NOT NULL DEFAULT 'itzg/minecraft-server', ram_mb INTEGER NOT NULL DEFAULT 2048, cpu_percent REAL DEFAULT NULL, container_id TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')), FOREIGN KEY (node_id) REFERENCES nodes(id));
+    CREATE TABLE IF NOT EXISTS servers (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, node_id INTEGER NOT NULL DEFAULT 1, port INTEGER UNIQUE NOT NULL, status TEXT NOT NULL DEFAULT 'stopped', mc_version TEXT NOT NULL DEFAULT '1.21.4', software TEXT NOT NULL DEFAULT 'vanilla', image TEXT NOT NULL DEFAULT 'itzg/minecraft-server', ram_mb INTEGER NOT NULL DEFAULT 2048, cpu_percent REAL DEFAULT NULL, container_id TEXT, eula_accepted INTEGER NOT NULL DEFAULT 0, eula_accepted_at TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')), FOREIGN KEY (node_id) REFERENCES nodes(id));
     CREATE TABLE IF NOT EXISTS server_config (server_id INTEGER NOT NULL, key TEXT NOT NULL, value TEXT NOT NULL, PRIMARY KEY (server_id, key), FOREIGN KEY (server_id) REFERENCES servers(id) ON DELETE CASCADE);
     CREATE TABLE IF NOT EXISTS backups (id INTEGER PRIMARY KEY AUTOINCREMENT, server_id INTEGER NOT NULL, filename TEXT NOT NULL, size INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL DEFAULT (datetime('now')), FOREIGN KEY (server_id) REFERENCES servers(id) ON DELETE CASCADE);
     CREATE TABLE IF NOT EXISTS scheduled_tasks (id INTEGER PRIMARY KEY AUTOINCREMENT, server_id INTEGER NOT NULL, name TEXT NOT NULL, type TEXT NOT NULL, schedule TEXT NOT NULL, command TEXT, enabled INTEGER NOT NULL DEFAULT 1, last_run TEXT, next_run TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')), FOREIGN KEY (server_id) REFERENCES servers(id) ON DELETE CASCADE);
@@ -171,7 +171,7 @@ describe("Server API Integration", () => {
     it("should create a server", async () => {
       const res = await app.inject({
         method: "POST", url: "/api/servers", headers: authHeaders(),
-        payload: { name: "Test Server", mc_version: "1.21.4", software: "vanilla", ram_mb: 2048 },
+        payload: { name: "Test Server", mc_version: "1.21.4", software: "vanilla", ram_mb: 2048, eula_accepted: true },
       });
       expect(res.statusCode).toBe(201);
       const body = JSON.parse(res.payload);
@@ -188,7 +188,7 @@ describe("Server API Integration", () => {
     });
 
     it("should return created servers", async () => {
-      await app.inject({ method: "POST", url: "/api/servers", headers: authHeaders(), payload: { name: "S1", mc_version: "1.21.4", software: "vanilla", ram_mb: 2048 } });
+      await app.inject({ method: "POST", url: "/api/servers", headers: authHeaders(), payload: { name: "S1", mc_version: "1.21.4", software: "vanilla", ram_mb: 2048, eula_accepted: true } });
       const res = await app.inject({ method: "GET", url: "/api/servers", headers: authHeaders() });
       expect(JSON.parse(res.payload).servers.length).toBe(1);
     });
@@ -196,7 +196,7 @@ describe("Server API Integration", () => {
 
   describe("GET /api/servers/:id", () => {
     it("should return server by id", async () => {
-      const createRes = await app.inject({ method: "POST", url: "/api/servers", headers: authHeaders(), payload: { name: "Test", mc_version: "1.21.4" } });
+      const createRes = await app.inject({ method: "POST", url: "/api/servers", headers: authHeaders(), payload: { name: "Test", mc_version: "1.21.4", eula_accepted: true } });
       const id = JSON.parse(createRes.payload).server.id;
       const res = await app.inject({ method: "GET", url: `/api/servers/${id}`, headers: authHeaders() });
       expect(res.statusCode).toBe(200);
@@ -211,7 +211,7 @@ describe("Server API Integration", () => {
 
   describe("DELETE /api/servers/:id", () => {
     it("should delete a server", async () => {
-      const createRes = await app.inject({ method: "POST", url: "/api/servers", headers: authHeaders(), payload: { name: "ToDelete", mc_version: "1.21.4" } });
+      const createRes = await app.inject({ method: "POST", url: "/api/servers", headers: authHeaders(), payload: { name: "ToDelete", mc_version: "1.21.4", eula_accepted: true } });
       const id = JSON.parse(createRes.payload).server.id;
       const res = await app.inject({ method: "DELETE", url: `/api/servers/${id}`, headers: authHeaders() });
       expect(res.statusCode).toBe(200);

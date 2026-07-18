@@ -39,6 +39,8 @@ export function createTestDb(): Database.Database {
       ram_mb INTEGER NOT NULL DEFAULT 2048,
       cpu_percent REAL DEFAULT NULL,
       container_id TEXT,
+      eula_accepted INTEGER NOT NULL DEFAULT 0,
+      eula_accepted_at TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       FOREIGN KEY (node_id) REFERENCES nodes(id)
     );
