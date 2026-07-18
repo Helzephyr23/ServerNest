@@ -7,6 +7,7 @@ import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/components/toast";
+import { useConfirm } from "@/components/confirm-dialog";
 
 export default function ServerDetailPage() {
   const params = useParams();
@@ -14,6 +15,7 @@ export default function ServerDetailPage() {
   const pathname = usePathname();
   const id = params.id as string;
   const { success, error: toastError } = useToast();
+  const { confirm: showConfirm } = useConfirm();
   const [server, setServer] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -45,7 +47,7 @@ export default function ServerDetailPage() {
   };
 
   const handleDelete = async () => {
-    if (!confirm(`Delete server "${server.name}"? This will remove all data and cannot be undone.`)) return;
+    if (!(await showConfirm({ title: "Delete Server", message: `Delete server "${server.name}"? This will remove all data and cannot be undone.` }))) return;
     try {
       await api.delete(`/api/servers/${id}`);
       router.push("/dashboard/servers");
