@@ -17,6 +17,8 @@ interface Server {
   ram_mb: number;
   cpu_percent: number | null;
   container_id: string | null;
+  eula_accepted: number;
+  eula_accepted_at: string | null;
   created_at: string;
 }
 
@@ -41,15 +43,13 @@ export function createServer(data: {
   port: number;
   node_id?: number;
   image?: string;
+  eula_accepted: boolean;
 }): Server {
   const nodeId = data.node_id || 1;
   const image = data.image || "itzg/minecraft-server";
   const result = db.prepare(
-    "INSERT INTO servers (name, node_id, port, mc_version, software, ram_mb, image) VALUES (?, ?, ?, ?, ?, ?, ?)"
+    "INSERT INTO servers (name, node_id, port, mc_version, software, ram_mb, image, eula_accepted, eula_accepted_at) VALUES (?, ?, ?, ?, ?, ?, ?, 1, datetime('now'))"
   ).run(data.name, nodeId, data.port, data.mc_version, data.software, data.ram_mb, image);
-
-  db.prepare("INSERT INTO server_config (server_id, key, value) VALUES (?, ?, ?)")
-    .run(result.lastInsertRowid, "EULA", "TRUE");
   db.prepare("INSERT INTO server_config (server_id, key, value) VALUES (?, ?, ?)")
     .run(result.lastInsertRowid, "TYPE", data.software === "vanilla" ? "VANILLA" : data.software.toUpperCase());
   db.prepare("INSERT INTO server_config (server_id, key, value) VALUES (?, ?, ?)")
@@ -91,7 +91,12 @@ export async function startServer(id: number): Promise<string | null> {
     throw new Error("Docker is not available");
   }
 
-  const eula = db.prepare("SELECT value FROM server_config WHERE server_id = ? AND key = 'EULA'").get(id) as ServerConfig | undefined;
+  if (!server.eula_accepted) {
+    db.prepare("UPDATE servers SET status = 'error' WHERE id = ?").run(id);
+    notify("server_error", "Server Start Failed", `Server "${server.name}" failed: Minecraft EULA not accepted`, 0xff0000);
+    throw new Error("Minecraft EULA has not been accepted. Please accept the EULA in server settings before starting.");
+  }
+
   const type = db.prepare("SELECT value FROM server_config WHERE server_id = ? AND key = 'TYPE'").get(id) as ServerConfig | undefined;
   const version = db.prepare("SELECT value FROM server_config WHERE server_id = ? AND key = 'VERSION'").get(id) as ServerConfig | undefined;
 
@@ -106,7 +111,7 @@ export async function startServer(id: number): Promise<string | null> {
 
   const configs = db.prepare("SELECT key, value FROM server_config WHERE server_id = ?").all(id) as ServerConfig[];
   for (const cfg of configs) {
-    if (cfg.key !== "EULA" && cfg.key !== "TYPE" && cfg.key !== "VERSION") {
+    if (cfg.key !== "TYPE" && cfg.key !== "VERSION") {
       envVars[cfg.key] = cfg.value;
     }
   }

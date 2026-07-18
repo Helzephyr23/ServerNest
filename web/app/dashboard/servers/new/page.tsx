@@ -25,12 +25,14 @@ export default function NewServerPage() {
   const [software, setSoftware] = useState("vanilla");
   const [version, setVersion] = useState("1.21.4");
   const [ram, setRam] = useState(2048);
+  const [eulaAccepted, setEulaAccepted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) { setError("Server name is required"); return; }
+    if (!eulaAccepted) { setError("You must accept the Minecraft EULA"); return; }
     setLoading(true);
     setError("");
     try {
@@ -39,6 +41,7 @@ export default function NewServerPage() {
         software,
         mc_version: version,
         ram_mb: ram,
+        eula_accepted: true,
       });
       router.push(`/dashboard/servers/${server.id}`);
     } catch (err: any) {
@@ -108,9 +111,29 @@ export default function NewServerPage() {
               </select>
             </div>
 
+            <label className="flex items-start gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={eulaAccepted}
+                onChange={(e) => setEulaAccepted(e.target.checked)}
+                className="mt-1 h-4 w-4 rounded border-input accent-primary"
+              />
+              <span className="text-sm text-muted-foreground leading-5">
+                I agree to the{" "}
+                <a
+                  href="https://minecraft.net/eula"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary underline underline-offset-2 hover:text-primary/80"
+                >
+                  Minecraft End User License Agreement
+                </a>
+              </span>
+            </label>
+
             <div className="flex gap-3">
               <Button type="button" variant="outline" onClick={() => router.back()}>Cancel</Button>
-              <Button type="submit" disabled={loading} className="flex-1">
+              <Button type="submit" disabled={loading || !eulaAccepted} className="flex-1">
                 {loading ? "Creating..." : "Create Server"}
               </Button>
             </div>
