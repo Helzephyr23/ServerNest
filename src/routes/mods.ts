@@ -81,6 +81,33 @@ export default async function modsRoutes(app: FastifyInstance) {
     return { success: true, filename: result.filename };
   });
 
+  app.post("/api/servers/:id/mods/install-batch", opts, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const { versionIds } = request.body as { versionIds: string[] };
+    if (!versionIds || !Array.isArray(versionIds) || versionIds.length === 0) {
+      return reply.status(400).send({ error: "versionIds array is required" });
+    }
+
+    const server = getServerById(Number(id));
+    if (!server) return reply.status(404).send({ error: "Server not found" });
+
+    const dataDir = `${process.cwd()}/data/server-${server.id}`;
+    const results = [];
+
+    for (const versionId of versionIds) {
+      const result = await downloadMod(versionId, dataDir);
+      results.push({ versionId, success: result.success, filename: result.filename, error: result.error });
+      if (result.success) {
+        try {
+          db.prepare("INSERT INTO installed_mods (server_id, mod_slug, version_id, filename) VALUES (?, ?, ?, ?)")
+            .run(Number(id), "", versionId, result.filename);
+        } catch {}
+      }
+    }
+
+    return { results };
+  });
+
   app.delete("/api/servers/:id/mods/:filename", opts, async (request, reply) => {
     const { id, filename } = request.params as { id: string; filename: string };
     const server = getServerById(Number(id));
