@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { formatBytes } from "@/lib/utils";
 import { useToast } from "@/components/toast";
+import { useConfirm } from "@/components/confirm-dialog";
 
 interface FileEntry {
   name: string;
@@ -19,6 +20,7 @@ interface FileEntry {
 
 export default function FilesPage() {
   const { success, error: toastError } = useToast();
+  const { confirm: showConfirm } = useConfirm();
   const params = useParams();
   const id = params.id as string;
   const [entries, setEntries] = useState<FileEntry[]>([]);
@@ -103,7 +105,7 @@ export default function FilesPage() {
   };
 
   const deleteFile = async (filePath: string, name: string) => {
-    if (!confirm(`Delete "${name}"?`)) return;
+    if (!(await showConfirm({ title: "Delete File", message: `Delete "${name}"?` }))) return;
     try {
       await api.delete(`/api/servers/${id}/files?path=${encodeURIComponent(filePath)}`);
       fetchFiles(currentPath);
