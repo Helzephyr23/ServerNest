@@ -1,6 +1,6 @@
 import { FastifyInstance } from "fastify";
 import { authMiddleware } from "../middleware/auth.js";
-import docker from "../config/docker.js";
+import docker, { dockerStreamDemux } from "../config/docker.js";
 import db from "../config/database.js";
 import { join } from "path";
 import { existsSync, mkdirSync, writeFileSync, readFileSync } from "fs";
@@ -14,7 +14,10 @@ async function execInContainer(serverId: number, cmd: string[]): Promise<string>
   const stream = await exec.start({ Detach: false });
   return new Promise((resolve, reject) => {
     let output = "";
-    stream.on("data", (chunk: Buffer) => { output += chunk.toString("utf-8").replace(/[^\x20-\x7E\n]/g, ""); });
+    dockerStreamDemux(stream,
+      (data) => { output += data; },
+      (data) => { output += data; },
+    );
     stream.on("end", () => resolve(output.trim()));
     stream.on("error", reject);
   });

@@ -21,6 +21,11 @@ export default function ConsolePage() {
   const fitAddonRef = useRef<FitAddon | null>(null);
   const socketRef = useRef<Socket | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const cmdBufferRef = useRef<string>("");
+
+  const writePrompt = useCallback((term: Terminal) => {
+    term.write("\r\n\x1b[36m>\x1b[0m ");
+  }, []);
 
   const initTerminal = useCallback(() => {
     if (termRef.current || !containerRef.current) return;
@@ -52,8 +57,11 @@ export default function ConsolePage() {
       fontSize: 14,
       lineHeight: 1.2,
       cursorBlink: true,
+      cursorStyle: "block",
+      cursorInactiveStyle: "bar",
       scrollback: 5000,
       allowProposedApi: true,
+      disableStdin: false,
     });
 
     const fitAddon = new FitAddon();
@@ -62,6 +70,7 @@ export default function ConsolePage() {
 
     term.open(containerRef.current);
     fitAddon.fit();
+    term.focus();
     termRef.current = term;
     fitAddonRef.current = fitAddon;
 
@@ -69,7 +78,7 @@ export default function ConsolePage() {
     term.writeln("\x1b[1;36m║          Biryani Server Console          ║\x1b[0m");
     term.writeln("\x1b[1;36m╚══════════════════════════════════════════╝\x1b[0m");
     term.writeln("");
-    term.writeln("\x1b[90mConnecting to server...\x1b[0m");
+    term.write("\x1b[90mConnecting to server...\x1b[0m");
 
     const handleResize = () => fitAddon.fit();
     window.addEventListener("resize", handleResize);
@@ -100,22 +109,31 @@ export default function ConsolePage() {
     socket.on("console:attached", () => {
       setAttached(true);
       if (termRef.current) {
-        termRef.current.writeln("\r\n\x1b[32m✓ Connected to server console\x1b[0m\r\n");
+        termRef.current.writeln("\r\n\x1b[32m✓ Connected to server console\x1b[0m");
+        writePrompt(termRef.current);
       }
     });
 
     socket.on("console:output", ({ data }: { data: string }) => {
-      if (termRef.current) {
-        const lines = data.split("\n");
-        for (const line of lines) {
-          termRef.current.writeln(line);
-        }
+      if (!termRef.current) return;
+      const term = termRef.current;
+      const bufLen = cmdBufferRef.current.length;
+      if (bufLen > 0) {
+        term.write("\r" + " ".repeat(2 + bufLen) + "\r");
+      }
+      const lines = data.split("\n");
+      for (const line of lines) {
+        term.writeln(line);
+      }
+      if (bufLen > 0) {
+        term.write("\x1b[36m>\x1b[0m " + cmdBufferRef.current);
       }
     });
 
     socket.on("console:error", ({ error }: { error: string }) => {
       if (termRef.current) {
         termRef.current.writeln(`\r\n\x1b[31m✗ Error: ${error}\x1b[0m`);
+        writePrompt(termRef.current);
       }
     });
 
@@ -137,14 +155,7 @@ export default function ConsolePage() {
       termRef.current?.dispose();
       termRef.current = null;
     };
-  }, [id]);
-
-  useEffect(() => {
-    if (attached && termRef.current) {
-      termRef.current.clear();
-      termRef.current.writeln("\x1b[32m✓ Connected to server console\x1b[0m\r\n");
-    }
-  }, [attached]);
+  }, [id, writePrompt]);
 
   useEffect(() => {
     const cleanup = initTerminal();
@@ -153,19 +164,35 @@ export default function ConsolePage() {
 
   useEffect(() => {
     const term = termRef.current;
-    if (!term || !attached || !socketRef.current) return;
+    if (!term || !socketRef.current) return;
 
     const disposable = term.onData((data: string) => {
+      if (!attached) return;
+
       if (data === "\r") {
+        const cmd = cmdBufferRef.current;
+        cmdBufferRef.current = "";
         socketRef.current!.emit("console:command", {
           serverId: Number(id),
-          command: term.buffer.active.getLine(term.buffer.active.cursorY)?.translateToString(true) || "",
+          command: cmd,
         });
+      } else if (data === "\x7f" || data === "\b") {
+        if (cmdBufferRef.current.length > 0) {
+          cmdBufferRef.current = cmdBufferRef.current.slice(0, -1);
+          term.write("\b \b");
+        }
+      } else if (data === "\x03") {
+        cmdBufferRef.current = "";
+        term.write("^C");
+        writePrompt(term);
+      } else if (data >= " ") {
+        cmdBufferRef.current += data;
+        term.write(data);
       }
     });
 
     return () => disposable.dispose();
-  }, [attached, id]);
+  }, [attached, id, writePrompt]);
 
   const handleReconnect = () => {
     if (socketRef.current) {
@@ -202,13 +229,13 @@ export default function ConsolePage() {
         <Card className="overflow-hidden">
           <div
             ref={containerRef}
-            className="h-[600px] w-full bg-[#0a0a0a]"
+            className="relative h-[600px] w-full bg-[#0a0a0a]"
           />
         </Card>
       )}
 
       <p className="text-xs text-muted-foreground">
-        Type commands directly in the terminal. Press Enter to send. Uses Minecraft RCON for command execution.
+        Type commands in the terminal and press Enter to execute. Ctrl+C to cancel input.
       </p>
     </div>
   );
