@@ -78,6 +78,14 @@ export default function DashboardPage() {
           <CardContent>
             <div className="text-3xl font-bold">{stats?.used_memory_mb || 0} MB</div>
             <p className="text-xs text-muted-foreground">of {stats?.total_memory_mb || 0} MB allocated</p>
+            {stats && stats.total_memory_mb > 0 && (
+              <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-muted">
+                <div
+                  className="h-full rounded-full bg-primary transition-all"
+                  style={{ width: `${Math.min((stats.used_memory_mb / stats.total_memory_mb) * 100, 100)}%` }}
+                />
+              </div>
+            )}
           </CardContent>
         </Card>
         <Card>
@@ -102,16 +110,42 @@ export default function DashboardPage() {
             {data?.nodes?.length ? (
               <div className="space-y-3">
                 {data.nodes.map((node: any) => (
-                  <div key={node.id} className="flex items-center justify-between rounded-lg border p-3">
-                    <div>
-                      <p className="font-medium">{node.name}</p>
-                      <p className="text-xs text-muted-foreground">{node.hostname}:{node.port}</p>
+                  <div key={node.id} className="rounded-lg border p-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium">{node.name}</p>
+                        <p className="text-xs text-muted-foreground">{node.hostname}:{node.port}</p>
+                      </div>
+                      <span className={`rounded-full px-2 py-1 text-xs font-medium ${
+                        node.status === "online" ? "bg-green-500/10 text-green-500" : "bg-red-500/10 text-red-500"
+                      }`}>
+                        {node.status}
+                      </span>
                     </div>
-                    <span className={`rounded-full px-2 py-1 text-xs font-medium ${
-                      node.status === "online" ? "bg-green-500/10 text-green-500" : "bg-red-500/10 text-red-500"
-                    }`}>
-                      {node.status}
-                    </span>
+                    {node.status === "online" && (
+                      <div className="mt-3 grid grid-cols-2 gap-3">
+                        <div>
+                          <p className="text-xs text-muted-foreground">CPU</p>
+                          <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-muted">
+                            <div
+                              className="h-full rounded-full bg-blue-500 transition-all"
+                              style={{ width: `${Math.min(node.cpu_percent || 0, 100)}%` }}
+                            />
+                          </div>
+                          <p className="mt-0.5 text-xs text-muted-foreground">{Math.round(node.cpu_percent || 0)}%</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">RAM</p>
+                          <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-muted">
+                            <div
+                              className="h-full rounded-full bg-green-500 transition-all"
+                              style={{ width: `${Math.min(node.memory_percent || 0, 100)}%` }}
+                            />
+                          </div>
+                          <p className="mt-0.5 text-xs text-muted-foreground">{Math.round(node.memory_percent || 0)}%</p>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
