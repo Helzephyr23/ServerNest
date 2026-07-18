@@ -15,6 +15,7 @@ const TABS = [
   { href: "/backups", label: "Backups" },
   { href: "/cloud-storage", label: "Cloud Storage" },
   { href: "/settings", label: "Settings" },
+  { href: "/performance", label: "Performance" },
 ];
 
 export default function ServerLayout({ children }: { children: React.ReactNode }) {

@@ -16,7 +16,7 @@ import {
   setServerConfig,
   findAvailablePort,
 } from "../services/server.service.js";
-import { getServerMetrics } from "../services/metrics.service.js";
+import { getServerMetrics, getMetricsHistory } from "../services/metrics.service.js";
 import { getImageName } from "../config/docker.js";
 import docker from "../config/docker.js";
 import { rmSync, existsSync } from "fs";
@@ -154,6 +154,13 @@ export default async function serverRoutes(app: FastifyInstance) {
     const { id } = request.params as { id: string };
     const metrics = await getServerMetrics(Number(id));
     if (!metrics) return reply.status(404).send({ error: "No metrics available" });
+    return { metrics };
+  });
+
+  app.get("/api/servers/:id/metrics/history", opts, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const range = (request.query as any).range || "1h";
+    const metrics = getMetricsHistory(Number(id), range);
     return { metrics };
   });
 

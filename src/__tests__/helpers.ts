@@ -102,6 +102,15 @@ export function createTestDb(): Database.Database {
       description TEXT,
       created_at  TEXT NOT NULL DEFAULT (datetime('now'))
     );
+    CREATE TABLE IF NOT EXISTS server_metrics (
+      id              INTEGER PRIMARY KEY AUTOINCREMENT,
+      server_id       INTEGER NOT NULL,
+      cpu_percent     REAL,
+      memory_mb       REAL,
+      memory_limit_mb REAL,
+      collected_at    TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (server_id) REFERENCES servers(id) ON DELETE CASCADE
+    );
     CREATE TABLE IF NOT EXISTS sessions (
       id          INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id     INTEGER NOT NULL,
