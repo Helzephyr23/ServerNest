@@ -99,6 +99,11 @@ setInterval(() => {
 }, 3600000);
 
 setInterval(async () => {
+  const { collectAllMetrics } = await import("./services/metrics.service.js");
+  await collectAllMetrics();
+}, 60000);
+
+setInterval(async () => {
   try {
     const servers = db.prepare("SELECT id, container_id, status FROM servers WHERE status IN ('running', 'starting')").all() as any[];
     for (const server of servers) {

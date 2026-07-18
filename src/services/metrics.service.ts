@@ -40,6 +40,37 @@ export async function getServerMetrics(serverId: number): Promise<Metrics | null
   }
 }
 
+export async function collectMetrics(serverId: number): Promise<void> {
+  const metrics = await getServerMetrics(serverId);
+  if (metrics) {
+    db.prepare("INSERT INTO server_metrics (server_id, cpu_percent, memory_mb, memory_limit_mb) VALUES (?, ?, ?, ?)")
+      .run(serverId, metrics.cpu_percent, metrics.memory_mb, metrics.memory_limit_mb);
+  }
+}
+
+export async function collectAllMetrics(): Promise<void> {
+  const servers = db.prepare("SELECT id FROM servers WHERE status = 'running'").all() as { id: number }[];
+  for (const server of servers) {
+    try {
+      await collectMetrics(server.id);
+    } catch {}
+  }
+}
+
+export function getMetricsHistory(serverId: number, range: string): any[] {
+  let timeFilter: string;
+  switch (range) {
+    case "1h": timeFilter = "datetime('now', '-1 hour')"; break;
+    case "6h": timeFilter = "datetime('now', '-6 hours')"; break;
+    case "24h": timeFilter = "datetime('now', '-24 hours')"; break;
+    case "7d": timeFilter = "datetime('now', '-7 days')"; break;
+    default: timeFilter = "datetime('now', '-1 hour')";
+  }
+  return db.prepare(
+    `SELECT * FROM server_metrics WHERE server_id = ? AND collected_at >= ${timeFilter} ORDER BY collected_at ASC`
+  ).all(serverId) as any[];
+}
+
 export async function getNodeMetrics(): Promise<{
   total_servers: number;
   running_servers: number;
