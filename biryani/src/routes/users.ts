@@ -14,7 +14,6 @@ export default async function userRoutes(app: FastifyInstance) {
     preHandler: [adminMiddleware, validate(schemas.createUser)],
   }, async (request, reply) => {
     const { username, password, role } = request.body as any;
-    const existing = getUserById(0);
     if (listUsers().find((u: any) => u.username === username)) {
       return reply.status(400).send({ error: "Username already exists" });
     }
@@ -52,6 +51,12 @@ export default async function userRoutes(app: FastifyInstance) {
     if (!user) return reply.status(404).send({ error: "User not found" });
     if (Number(id) === (request as any).user.id) {
       return reply.status(400).send({ error: "Cannot delete yourself" });
+    }
+    if (user.role === "admin") {
+      const adminCount = (listUsers() as any[]).filter((u: any) => u.role === "admin").length;
+      if (adminCount <= 1) {
+        return reply.status(400).send({ error: "Cannot delete the last admin" });
+      }
     }
     deleteUser(Number(id));
     return { success: true };
