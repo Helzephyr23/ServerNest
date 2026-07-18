@@ -15,7 +15,7 @@
 ## Phase 7 — Multi-User & UX
 
 - [ ] **User management UI** — Invite, remove, and assign roles to users
-- [ ] **Dark mode / theme toggle** — System-default + manual light/dark switch
+- [x] **Dark mode / theme toggle** — System-default + manual light/dark switch
 - [ ] **PWA support** — Installable as a progressive web app with offline fallback
 - [ ] **Responsive improvements** — Better tablet and mobile layouts
 - [ ] **Keyboard shortcuts** — Power-user shortcuts for common actions
