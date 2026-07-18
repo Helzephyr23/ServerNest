@@ -33,7 +33,9 @@ export default function ServerDetailPage() {
 
   const handleAction = async (action: "start" | "stop" | "restart") => {
     if (action === "start") setServer((s: any) => ({ ...s, status: "starting" }));
-    await api.post(`/api/servers/${id}/${action}`);
+    try {
+      await api.post(`/api/servers/${id}/${action}`);
+    } catch {}
     fetchServer();
   };
 

@@ -81,8 +81,13 @@ export async function startServer(id: number): Promise<string | null> {
   const server = getServerById(id);
   if (!server) throw new Error("Server not found");
 
+  db.prepare("UPDATE servers SET status = 'starting' WHERE id = ?").run(id);
+
   const available = await isDockerAvailable();
-  if (!available) throw new Error("Docker is not available");
+  if (!available) {
+    db.prepare("UPDATE servers SET status = 'error' WHERE id = ?").run(id);
+    throw new Error("Docker is not available");
+  }
 
   const eula = db.prepare("SELECT value FROM server_config WHERE server_id = ? AND key = 'EULA'").get(id) as ServerConfig | undefined;
   const type = db.prepare("SELECT value FROM server_config WHERE server_id = ? AND key = 'TYPE'").get(id) as ServerConfig | undefined;
@@ -117,25 +122,30 @@ export async function startServer(id: number): Promise<string | null> {
   } catch {}
 
   const image = server.image || "itzg/minecraft-server";
-  await docker.pull(image);
+  try {
+    await docker.pull(image);
 
-  const container = await docker.createContainer({
-    Image: image,
-    name: containerName,
-    Env: Object.entries(envVars).map(([k, v]) => `${k}=${v}`),
-    HostConfig: {
-      PortBindings: { "25565/tcp": [{ HostPort: server.port.toString() }] },
-      Memory: server.ram_mb * 1024 * 1024,
-      Binds: [`${dataDir}:/data`],
-      RestartPolicy: { Name: "unless-stopped" },
-    },
-    WorkingDir: "/data",
-    Labels: { "biryani.managed": "true", "biryani.server_id": server.id.toString() },
-  });
+    const container = await docker.createContainer({
+      Image: image,
+      name: containerName,
+      Env: Object.entries(envVars).map(([k, v]) => `${k}=${v}`),
+      HostConfig: {
+        PortBindings: { "25565/tcp": [{ HostPort: server.port.toString() }] },
+        Memory: server.ram_mb * 1024 * 1024,
+        Binds: [`${dataDir}:/data`],
+        RestartPolicy: { Name: "unless-stopped" },
+      },
+      WorkingDir: "/data",
+      Labels: { "biryani.managed": "true", "biryani.server_id": server.id.toString() },
+    });
 
-  await container.start();
-  db.prepare("UPDATE servers SET status = 'running', container_id = ? WHERE id = ?").run(container.id, id);
-  return container.id;
+    await container.start();
+    db.prepare("UPDATE servers SET status = 'running', container_id = ? WHERE id = ?").run(container.id, id);
+    return container.id;
+  } catch (err) {
+    db.prepare("UPDATE servers SET status = 'error' WHERE id = ?").run(id);
+    throw err;
+  }
 }
 
 export async function stopServer(id: number): Promise<void> {

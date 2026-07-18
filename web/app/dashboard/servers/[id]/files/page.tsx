@@ -27,6 +27,14 @@ export default function FilesPage() {
   const [showMkdir, setShowMkdir] = useState(false);
   const [newDirName, setNewDirName] = useState("");
 
+  const [server, setServer] = useState<any>(null);
+
+  const fetchServer = () => {
+    api.get(`/api/servers/${id}`)
+      .then(({ server }) => setServer(server))
+      .catch(() => {});
+  };
+
   const fetchFiles = (path: string = "") => {
     setLoading(true);
     api.get(`/api/servers/${id}/files?path=${encodeURIComponent(path)}`)
@@ -38,7 +46,7 @@ export default function FilesPage() {
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { fetchFiles(); }, [id]);
+  useEffect(() => { fetchServer(); fetchFiles(); }, [id]);
 
   const navigate = (entry: FileEntry) => {
     if (entry.isDir) {
@@ -170,6 +178,13 @@ export default function FilesPage() {
         <div className="flex justify-center py-12">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
         </div>
+      ) : server && server.status !== "running" ? (
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <span className="mb-2 text-4xl">▶</span>
+            <p className="text-muted-foreground">Start the server to browse files</p>
+          </CardContent>
+        </Card>
       ) : entries.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
