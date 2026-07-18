@@ -37,10 +37,12 @@ async function request<T>(method: string, path: string, body?: any): Promise<T> 
   }
 
   let data: any;
+  let text: string;
   try {
-    data = await res.json();
+    text = await res.text();
+    data = JSON.parse(text);
   } catch {
-    throw new Error(`Unexpected response (${res.status})`);
+    throw new Error(`Unexpected response (${res.status}): ${(text || "").slice(0, 200)}`);
   }
 
   if (!res.ok) throw new Error(data.error || "Request failed");
