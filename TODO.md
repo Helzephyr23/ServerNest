@@ -55,5 +55,5 @@
 - [x] **CI/CD** — GitHub Actions workflow (lint, typecheck, build, Docker)
 - [x] **Docker optimization** — Multi-stage build, dependency caching, health check
 - [x] **Security** — Rate limiting, input validation, SQL injection prevented (parameterized queries)
-- [ ] **Testing** — Unit tests for services, API integration tests
-- [ ] **README & docs** — Setup guide, architecture overview, contribution guide
+- [x] **Testing** — Unit tests for services, API integration tests
+- [x] **README & docs** — Setup guide, architecture overview, contribution guide

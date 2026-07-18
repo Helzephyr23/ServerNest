@@ -10,7 +10,9 @@
     "start": "pnpm --filter @biryani/api start",
     "lint": "pnpm -r lint",
     "typecheck": "pnpm -r typecheck",
-    "db:migrate": "pnpm --filter @biryani/api db:migrate"
+    "db:migrate": "pnpm --filter @biryani/api db:migrate",
+    "test": "pnpm --filter @biryani/api test",
+    "test:watch": "pnpm --filter @biryani/api test:watch"
   },
   "devDependencies": {
     "concurrently": "^9.1.0",

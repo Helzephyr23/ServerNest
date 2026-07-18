@@ -1,7 +1,7 @@
 import { FastifyRequest, FastifyReply } from "fastify";
-import { z, ZodSchema } from "zod";
+import { z, ZodType } from "zod";
 
-export function validate(schema: ZodSchema) {
+export function validate(schema: ZodType) {
   return async (request: FastifyRequest, reply: FastifyReply) => {
     const result = schema.safeParse(request.body);
     if (!result.success) {
@@ -13,7 +13,7 @@ export function validate(schema: ZodSchema) {
   };
 }
 
-export function validateQuery(schema: ZodSchema) {
+export function validateQuery(schema: ZodType) {
   return async (request: FastifyRequest, reply: FastifyReply) => {
     const result = schema.safeParse(request.query);
     if (!result.success) {
