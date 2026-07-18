@@ -6,6 +6,7 @@ import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Link from "next/link";
+import { useToast } from "@/components/toast";
 
 function formatBytes(bytes: number) {
   if (bytes === 0) return "0 B";
@@ -16,6 +17,7 @@ function formatBytes(bytes: number) {
 }
 
 export default function ModsPage() {
+  const { error: toastError } = useToast();
   const params = useParams();
   const id = params.id as string;
   const [server, setServer] = useState<any>(null);
@@ -47,7 +49,7 @@ export default function ModsPage() {
       await api.delete(`/api/servers/${id}/mods/${encodeURIComponent(filename)}`);
       setMods((prev) => prev.filter((m) => m.filename !== filename));
     } catch (err: any) {
-      alert(`Failed to delete: ${err.message}`);
+      toastError("Failed to delete", err.message);
     } finally {
       setDeleting(null);
     }

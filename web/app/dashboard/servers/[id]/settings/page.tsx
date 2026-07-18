@@ -6,6 +6,7 @@ import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useToast } from "@/components/toast";
 
 const PROPERTY_LABELS: Record<string, string> = {
   "server-name": "Server Name",
@@ -51,6 +52,7 @@ const BOOLEAN_KEYS = new Set([
 ]);
 
 export default function ServerSettingsPage() {
+  const { success, error: toastError } = useToast();
   const params = useParams();
   const id = params.id as string;
   const [properties, setProperties] = useState<Record<string, string>>({});
@@ -89,9 +91,9 @@ export default function ServerSettingsPage() {
     try {
       await api.put(`/api/servers/${id}/properties`, { properties, reload: applyNow });
       setNeedsRestart(false);
-      alert(applyNow ? "Settings saved and reloaded." : "Settings saved. Restart the server to apply changes.");
+      success(applyNow ? "Settings saved and reloaded." : "Settings saved. Restart the server to apply changes.");
     } catch (err: any) {
-      alert("Failed to save: " + err.message);
+      toastError("Failed to save", err.message);
     } finally {
       setSaving(false);
     }

@@ -6,12 +6,14 @@ import Link from "next/link";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useToast } from "@/components/toast";
 
 export default function ServerDetailPage() {
   const params = useParams();
   const router = useRouter();
   const pathname = usePathname();
   const id = params.id as string;
+  const { success, error: toastError } = useToast();
   const [server, setServer] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -35,7 +37,10 @@ export default function ServerDetailPage() {
     if (action === "start") setServer((s: any) => ({ ...s, status: "starting" }));
     try {
       await api.post(`/api/servers/${id}/${action}`);
-    } catch {}
+      success(`Server ${action}ed`);
+    } catch (err: any) {
+      toastError(`Failed to ${action} server`, err.message);
+    }
     fetchServer();
   };
 
@@ -45,7 +50,7 @@ export default function ServerDetailPage() {
       await api.delete(`/api/servers/${id}`);
       router.push("/dashboard/servers");
     } catch (err: any) {
-      alert(`Failed to delete server: ${err.message}`);
+      toastError("Failed to delete server", err.message);
     }
   };
 

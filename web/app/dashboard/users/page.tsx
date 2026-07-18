@@ -5,8 +5,10 @@ import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useToast } from "@/components/toast";
 
 export default function UsersPage() {
+  const { success, error: toastError } = useToast();
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
@@ -40,14 +42,22 @@ export default function UsersPage() {
   const handleRoleChange = async (id: number, role: string) => {
     try {
       await api.put(`/api/users/${id}/role`, { role });
+      success("Role updated");
       fetchUsers();
-    } catch {}
+    } catch (err: any) {
+      toastError("Failed to update role", err.message);
+    }
   };
 
   const handleDelete = async (id: number, username: string) => {
     if (confirm(`Delete user "${username}"? This cannot be undone.`)) {
-      await api.delete(`/api/users/${id}`);
-      fetchUsers();
+      try {
+        await api.delete(`/api/users/${id}`);
+        success(`User "${username}" deleted`);
+        fetchUsers();
+      } catch (err: any) {
+        toastError("Failed to delete user", err.message);
+      }
     }
   };
 
@@ -56,10 +66,13 @@ export default function UsersPage() {
     if (!password || password.length < 6) return;
     try {
       await api.put(`/api/users/${id}/password`, { password });
+      success("Password reset");
       setPasswordResets({ ...passwordResets, [id]: false });
       setResetPasswords({ ...resetPasswords, [id]: "" });
       fetchUsers();
-    } catch {}
+    } catch (err: any) {
+      toastError("Failed to reset password", err.message);
+    }
   };
 
   const adminCount = users.filter((u: any) => u.role === "admin").length;
@@ -155,7 +168,7 @@ export default function UsersPage() {
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/20 text-sm font-medium text-primary">
-                          {user.username[0].toUpperCase()}
+                          {user.username?.[0]?.toUpperCase() || "?"}
                         </div>
                         <span className="font-medium">{user.username}</span>
                       </div>

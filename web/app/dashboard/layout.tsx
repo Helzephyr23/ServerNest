@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { AuthProvider, useAuth } from "@/lib/auth";
 import { ToastProvider } from "@/components/toast";
+import { ErrorBoundary } from "@/components/error-boundary";
 import Sidebar from "@/components/sidebar";
 
 function AuthGuard({ children }: { children: React.ReactNode }) {
@@ -29,7 +30,9 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen">
       <Sidebar />
-      <main className="flex-1 overflow-auto p-6">{children}</main>
+      <main className="flex-1 overflow-auto p-6">
+        <ErrorBoundary>{children}</ErrorBoundary>
+      </main>
     </div>
   );
 }
