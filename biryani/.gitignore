@@ -12,3 +12,5 @@ dist/
 Thumbs.db
 data/
 pnpm-lock.yaml
+package-lock.json
+*.tsbuildinfo
