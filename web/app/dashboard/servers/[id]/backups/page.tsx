@@ -6,8 +6,10 @@ import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { formatBytes, formatDate } from "@/lib/utils";
+import { useToast } from "@/components/toast";
 
 export default function BackupsPage() {
+  const { success, error: toastError } = useToast();
   const params = useParams();
   const id = params.id as string;
   const [backups, setBackups] = useState<any[]>([]);
@@ -36,7 +38,7 @@ export default function BackupsPage() {
       await api.post(`/api/servers/${id}/backups`);
       fetchBackups();
     } catch (err: any) {
-      alert(err.message || "Failed to create backup");
+      toastError("Failed to create backup", err.message);
     } finally {
       setCreating(false);
     }
@@ -46,9 +48,9 @@ export default function BackupsPage() {
     if (!confirm("Restore this backup? The server will restart.")) return;
     try {
       await api.post(`/api/servers/${id}/backups/${backupId}/restore`);
-      alert("Backup restored! Server is restarting.");
+      success("Backup restored! Server is restarting.");
     } catch (err: any) {
-      alert(err.message || "Failed to restore backup");
+      toastError("Failed to restore backup", err.message);
     }
   };
 
@@ -58,7 +60,7 @@ export default function BackupsPage() {
       await api.delete(`/api/backups/${backupId}`);
       fetchBackups();
     } catch (err: any) {
-      alert(err.message || "Failed to delete backup");
+      toastError("Failed to delete backup", err.message);
     }
   };
 

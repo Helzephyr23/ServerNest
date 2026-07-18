@@ -5,6 +5,7 @@ import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useToast } from "@/components/toast";
 
 const TASK_TYPES = [
   { id: "backup", label: "Backup", icon: "💾" },
@@ -25,6 +26,7 @@ const SCHEDULE_PRESETS = [
 ];
 
 export default function TasksPage() {
+  const { success, error: toastError } = useToast();
   const [tasks, setTasks] = useState<any[]>([]);
   const [servers, setServers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -65,7 +67,7 @@ export default function TasksPage() {
       setShowAdd(false);
       fetchData();
     } catch (err: any) {
-      alert(err.message);
+      toastError("Failed to create task", err.message);
     }
   };
 
@@ -84,9 +86,9 @@ export default function TasksPage() {
   const handleRunNow = async (id: number) => {
     try {
       await api.post(`/api/tasks/${id}/run`);
-      alert("Task executed successfully");
+      success("Task executed successfully");
     } catch (err: any) {
-      alert(err.message);
+      toastError("Failed to run task", err.message);
     }
   };
 
