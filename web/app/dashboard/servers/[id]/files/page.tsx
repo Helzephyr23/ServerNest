@@ -77,7 +77,6 @@ export default function FilesPage() {
     setSaving(true);
     try {
       await api.put(`/api/servers/${id}/files/content`, { path: editing, content: editContent });
-      setEditing(null);
       fetchFiles(currentPath);
     } catch (err: any) {
       alert("Save failed: " + err.message);

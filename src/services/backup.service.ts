@@ -1,6 +1,7 @@
 import db from "../config/database.js";
 import docker from "../config/docker.js";
 import { env } from "../config/env.js";
+import { notify } from "./notification.service.js";
 import fs from "fs";
 import path from "path";
 import { createGzip, createGunzip } from "zlib";
@@ -39,9 +40,14 @@ export async function createBackup(serverId: number): Promise<Backup> {
   if (server.container_id) {
     try {
       const container = docker.getContainer(containerName);
-      const archive = await container.export();
+      const exec = await container.exec({
+        Cmd: ["tar", "czf", "-", "-C", "/data", "."],
+        AttachStdout: true,
+        AttachStderr: true,
+      });
+      const stream = await exec.start({ Detach: false });
       const writeStream = createWriteStream(backupPath);
-      await pipeline(Readable.from(archive), createGzip(), writeStream);
+      await pipeline(Readable.from(stream), createGzip(), writeStream);
     } catch {
       throw new Error("Failed to create backup - server may not be running");
     }
@@ -51,7 +57,7 @@ export async function createBackup(serverId: number): Promise<Backup> {
 
   const stats = fs.statSync(backupPath);
   const result = db.prepare("INSERT INTO backups (server_id, filename, size) VALUES (?, ?, ?)").run(serverId, filename, stats.size);
-
+  notify("backup_created", "Backup Created", `Backup "${filename}" created for server "${server.name}" (${(stats.size / 1024 / 1024).toFixed(1)} MB)`, 0x00ff00);
   return { id: result.lastInsertRowid as number, server_id: serverId, filename, size: stats.size, created_at: new Date().toISOString() };
 }
 
@@ -120,6 +126,7 @@ export async function restoreBackup(serverId: number, backupId: number): Promise
   // Now start the container
   await container.start();
   db.prepare("UPDATE servers SET status = 'running', container_id = ? WHERE id = ?").run(container.id, serverId);
+  notify("backup_restored", "Backup Restored", `Backup "${backup.filename}" restored for server "${server.name}"`, 0x00ff00);
 }
 
 export function deleteBackup(backupId: number) {

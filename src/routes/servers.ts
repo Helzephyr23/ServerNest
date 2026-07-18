@@ -1,5 +1,5 @@
 import { FastifyInstance } from "fastify";
-import { authMiddleware } from "../middleware/auth.js";
+import { authMiddleware, adminMiddleware } from "../middleware/auth.js";
 import { validate, schemas } from "../middleware/validate.js";
 import {
   getAllServers,
@@ -41,7 +41,7 @@ export default async function serverRoutes(app: FastifyInstance) {
     return { server };
   });
 
-  app.post("/api/servers", { preHandler: [authMiddleware, validate(schemas.createServer)] }, async (request, reply) => {
+  app.post("/api/servers", { preHandler: [authMiddleware, adminMiddleware, validate(schemas.createServer)] }, async (request, reply) => {
     const { name, mc_version, software, ram_mb, image } = request.body as any;
     const port = findAvailablePort();
     const server = createServer({
@@ -63,7 +63,7 @@ export default async function serverRoutes(app: FastifyInstance) {
     return { server: getServerById(Number(id)) };
   });
 
-  app.delete("/api/servers/:id", opts, async (request, reply) => {
+  app.delete("/api/servers/:id", { preHandler: [authMiddleware, adminMiddleware] }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const server = getServerById(Number(id));
     if (!server) return reply.status(404).send({ error: "Server not found" });
@@ -141,7 +141,7 @@ export default async function serverRoutes(app: FastifyInstance) {
     return { config: getServerConfig(Number(id)) };
   });
 
-  app.put("/api/servers/:id/config", opts, async (request) => {
+  app.put("/api/servers/:id/config", { preHandler: [authMiddleware, adminMiddleware] }, async (request) => {
     const { id } = request.params as { id: string };
     const { key, value } = request.body as { key: string; value: string };
     setServerConfig(Number(id), key, value);

@@ -65,8 +65,9 @@ export default async function filesRoutes(app: FastifyInstance) {
     const { path: filePath, content } = request.body as { path: string; content: string };
     if (!filePath || content === undefined) return reply.status(400).send({ error: "path and content are required" });
     try {
+      const b64 = Buffer.from(content).toString("base64");
       await execInContainer(serverId, [
-        "bash", "-c", `cat > /data/${filePath} << 'BIRYANI_EOF'\n${content}\nBIRYANI_EOF`,
+        "bash", "-c", `echo '${b64}' | base64 -d > /data/${filePath}`,
       ]);
       return { success: true };
     } catch (err: any) {
@@ -129,8 +130,9 @@ export default async function filesRoutes(app: FastifyInstance) {
     try {
       const lines = Object.entries(properties).map(([k, v]) => `${k}=${v}`);
       const content = lines.join("\n");
+      const b64 = Buffer.from(content).toString("base64");
       await execInContainer(serverId, [
-        "bash", "-c", `cat > /data/server.properties << 'BIRYANI_EOF'\n${content}\nBIRYANI_EOF`,
+        "bash", "-c", `echo '${b64}' | base64 -d > /data/server.properties`,
       ]);
       if (reload) {
         try {

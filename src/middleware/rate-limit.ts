@@ -1,5 +1,12 @@
 const rateLimitStore = new Map<string, { count: number; resetAt: number }>();
 
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, entry] of rateLimitStore) {
+    if (entry.resetAt <= now) rateLimitStore.delete(key);
+  }
+}, 60_000);
+
 export function rateLimit(maxRequests: number, windowMs: number) {
   return async (request: any, reply: any) => {
     const key = `${request.ip}-${request.url}`;
