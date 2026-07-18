@@ -19,6 +19,7 @@ import templateRoutes from "./routes/templates.js";
 import notificationRoutes from "./routes/notifications.js";
 import userRoutes from "./routes/users.js";
 import overviewRoutes from "./routes/overview.js";
+import cloudStorageRoutes from "./routes/cloud-storage.js";
 import { setSocketIO } from "./routes/servers.js";
 import { startAllTasks } from "./services/schedule.service.js";
 import { notify } from "./services/notification.service.js";
@@ -47,6 +48,7 @@ await app.register(templateRoutes);
 await app.register(notificationRoutes);
 await app.register(userRoutes);
 await app.register(overviewRoutes);
+await app.register(cloudStorageRoutes);
 
 app.get("/api/health", async () => {
   let dockerOk = false;

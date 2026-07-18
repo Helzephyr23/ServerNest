@@ -149,6 +149,37 @@ export function migrate() {
   if (!nodeColumns.some((c) => c.name === "disk_percent")) {
     db.exec("ALTER TABLE nodes ADD COLUMN disk_percent REAL DEFAULT 0");
   }
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS cloud_storage_configs (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      server_id   INTEGER NOT NULL,
+      provider    TEXT NOT NULL,
+      label       TEXT NOT NULL,
+      config_json TEXT NOT NULL,
+      enabled     INTEGER NOT NULL DEFAULT 1,
+      created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (server_id) REFERENCES servers(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS backup_uploads (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      backup_id   INTEGER NOT NULL,
+      storage_id  INTEGER NOT NULL,
+      status      TEXT NOT NULL DEFAULT 'pending',
+      checksum    TEXT,
+      error       TEXT,
+      created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+      completed_at TEXT,
+      FOREIGN KEY (backup_id) REFERENCES backups(id) ON DELETE CASCADE,
+      FOREIGN KEY (storage_id) REFERENCES cloud_storage_configs(id) ON DELETE CASCADE
+    );
+  `);
+
+  const backupColumns = db.prepare("PRAGMA table_info(backups)").all() as { name: string }[];
+  if (!backupColumns.some((c) => c.name === "checksum")) {
+    db.exec("ALTER TABLE backups ADD COLUMN checksum TEXT");
+  }
 }
 
 export default db;
