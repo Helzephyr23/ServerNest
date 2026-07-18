@@ -46,6 +46,12 @@
 - [ ] **Web terminal for node SSH** — SSH into the host machine from the panel
 - [ ] **Plugin/mod dependencies** — Resolve and install required dependencies
 
+## Backlog
+
+- **Home screen CPU/RAM gauges** — Visual progress bars for per-server CPU and memory usage on dashboard
+- **Console page layout** — Show server tabs (Files, Mods, Players, etc.) alongside the console terminal
+- **Google Drive backup target** — Covered under Phase 6 (Cloud backup targets)
+
 ---
 
 > **Legend:** `[ ]` — Planned / Not started | `[x]` — Completed
