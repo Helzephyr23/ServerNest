@@ -1,7 +1,9 @@
 import Docker from "dockerode";
 import { env } from "./env.js";
 
-const docker = new Docker({ socketPath: "/var/run/docker.sock" });
+const docker = process.env.DOCKER_HOST
+  ? new Docker({ host: process.env.DOCKER_HOST })
+  : new Docker();
 
 export default docker;
 
