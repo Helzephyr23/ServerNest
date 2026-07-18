@@ -31,6 +31,7 @@ export default function FilesPage() {
   const [saving, setSaving] = useState(false);
   const [showMkdir, setShowMkdir] = useState(false);
   const [newDirName, setNewDirName] = useState("");
+  const [fileSearch, setFileSearch] = useState("");
 
   const [server, setServer] = useState<any>(null);
 
@@ -179,6 +180,13 @@ export default function FilesPage() {
         </Button>
       )}
 
+      <Input
+        value={fileSearch}
+        onChange={(e) => setFileSearch(e.target.value)}
+        placeholder="Search files..."
+        className="max-w-sm"
+      />
+
       {loading ? (
         <div className="flex justify-center py-12">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
@@ -198,8 +206,8 @@ export default function FilesPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-1">
-          {entries.map((entry) => (
+        <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
+          {(fileSearch ? entries.filter((e) => e.name.toLowerCase().includes(fileSearch.toLowerCase())) : entries).map((entry) => (
             <div
               key={entry.path}
               className="flex items-center justify-between rounded-lg border p-3 transition-colors hover:bg-accent cursor-pointer"
