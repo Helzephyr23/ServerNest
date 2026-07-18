@@ -42,7 +42,7 @@ export default async function serverRoutes(app: FastifyInstance) {
   });
 
   app.post("/api/servers", { preHandler: [authMiddleware, adminMiddleware, validate(schemas.createServer)] }, async (request, reply) => {
-    const { name, mc_version, software, ram_mb, image } = request.body as any;
+    const { name, mc_version, software, ram_mb, image, eula_accepted } = request.body as any;
     const port = findAvailablePort();
     const server = createServer({
       name,
@@ -51,6 +51,7 @@ export default async function serverRoutes(app: FastifyInstance) {
       ram_mb: ram_mb || 2048,
       port,
       image,
+      eula_accepted,
     });
     return reply.status(201).send({ server });
   });

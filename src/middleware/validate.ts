@@ -43,6 +43,7 @@ export const schemas = {
     ram_mb: z.number().int().min(512).max(32768).optional().default(2048),
     template: z.string().optional(),
     image: z.string().optional(),
+    eula_accepted: z.boolean().refine((v) => v === true, { message: "You must accept the Minecraft EULA" }),
   }),
 
   createNode: z.object({
