@@ -6,6 +6,8 @@ import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
+import { formatBytes } from "@/lib/utils";
+import { useToast } from "@/components/toast";
 
 interface FileEntry {
   name: string;
@@ -16,6 +18,7 @@ interface FileEntry {
 }
 
 export default function FilesPage() {
+  const { success, error: toastError } = useToast();
   const params = useParams();
   const id = params.id as string;
   const [entries, setEntries] = useState<FileEntry[]>([]);
@@ -68,7 +71,7 @@ export default function FilesPage() {
       setEditing(filePath);
       setEditContent(content);
     } catch (err: any) {
-      alert("Cannot open file: " + err.message);
+      toastError("Cannot open file", err.message);
     }
   };
 
@@ -77,9 +80,10 @@ export default function FilesPage() {
     setSaving(true);
     try {
       await api.put(`/api/servers/${id}/files/content`, { path: editing, content: editContent });
+      success("File saved");
       fetchFiles(currentPath);
     } catch (err: any) {
-      alert("Save failed: " + err.message);
+      toastError("Save failed", err.message);
     } finally {
       setSaving(false);
     }
@@ -94,7 +98,7 @@ export default function FilesPage() {
       setShowMkdir(false);
       fetchFiles(currentPath);
     } catch (err: any) {
-      alert(err.message);
+      toastError("Failed to create folder", err.message);
     }
   };
 
@@ -104,7 +108,7 @@ export default function FilesPage() {
       await api.delete(`/api/servers/${id}/files?path=${encodeURIComponent(filePath)}`);
       fetchFiles(currentPath);
     } catch (err: any) {
-      alert(err.message);
+      toastError("Failed to delete", err.message);
     }
   };
 
@@ -221,12 +225,4 @@ export default function FilesPage() {
       )}
     </div>
   );
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes === 0) return "0 B";
-  const k = 1024;
-  const sizes = ["B", "KB", "MB", "GB"];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
 }

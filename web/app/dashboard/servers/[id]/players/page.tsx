@@ -6,6 +6,7 @@ import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useToast } from "@/components/toast";
 
 type Tab = "whitelist" | "ops" | "bans";
 const TABS: { id: Tab; label: string; icon: string }[] = [
@@ -15,6 +16,7 @@ const TABS: { id: Tab; label: string; icon: string }[] = [
 ];
 
 export default function PlayersPage() {
+  const { success, error: toastError } = useToast();
   const params = useParams();
   const id = params.id as string;
   const [tab, setTab] = useState<Tab>("whitelist");
@@ -52,7 +54,7 @@ export default function PlayersPage() {
       setReason("");
       fetchPlayers();
     } catch (err: any) {
-      alert(err.message);
+      toastError("Failed to add player", err.message);
     }
   };
 
@@ -60,9 +62,10 @@ export default function PlayersPage() {
     if (!confirm(`Remove ${name}?`)) return;
     try {
       await api.delete(`/api/servers/${id}/players/${tab}/${name}`);
+      success(`Removed ${name}`);
       fetchPlayers();
     } catch (err: any) {
-      alert(err.message);
+      toastError("Failed to remove player", err.message);
     }
   };
 

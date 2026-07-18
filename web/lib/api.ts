@@ -1,4 +1,5 @@
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
+const TIMEOUT_MS = 15000;
 
 function getToken(): string | null {
   if (typeof window === "undefined") return null;
@@ -11,11 +12,23 @@ async function request<T>(method: string, path: string, body?: any): Promise<T> 
   if (token) headers["Authorization"] = `Bearer ${token}`;
   if (body !== undefined) headers["Content-Type"] = "application/json";
 
-  const res = await fetch(`${API_BASE}${path}`, {
-    method,
-    headers,
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}${path}`, {
+      method,
+      headers,
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+      signal: controller.signal,
+    });
+  } catch (err: any) {
+    clearTimeout(timeoutId);
+    if (err.name === "AbortError") throw new Error("Request timed out");
+    throw new Error("Network error");
+  }
+  clearTimeout(timeoutId);
 
   if (res.status === 401 && typeof window !== "undefined" && window.location.pathname !== "/login") {
     localStorage.removeItem("biryani_token");
@@ -23,7 +36,13 @@ async function request<T>(method: string, path: string, body?: any): Promise<T> 
     throw new Error("Unauthorized");
   }
 
-  const data = await res.json();
+  let data: any;
+  try {
+    data = await res.json();
+  } catch {
+    throw new Error(`Unexpected response (${res.status})`);
+  }
+
   if (!res.ok) throw new Error(data.error || "Request failed");
   return data;
 }
