@@ -1,4 +1,5 @@
 import { FastifyRequest, FastifyReply } from "fastify";
+import { getUserById } from "../services/auth.service.js";
 
 export async function authMiddleware(request: FastifyRequest, reply: FastifyReply) {
   try {
@@ -7,7 +8,11 @@ export async function authMiddleware(request: FastifyRequest, reply: FastifyRepl
       return reply.status(401).send({ error: "No token provided" });
     }
     const decoded = request.server.jwt.verify<{ id: number; username: string; role: string }>(token);
-    (request as any).user = decoded;
+    const user = getUserById(decoded.id);
+    if (!user) {
+      return reply.status(401).send({ error: "User no longer exists" });
+    }
+    (request as any).user = { id: user.id, username: user.username, role: user.role };
   } catch {
     return reply.status(401).send({ error: "Invalid token" });
   }
