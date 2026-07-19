@@ -50,7 +50,7 @@ Biryani is a **free, open-source, self-hosted** Minecraft server management pane
 ### Docker Compose (Recommended)
 
 ```bash
-git clone https://github.com/yourusername/biryani.git
+git clone https://github.com/Helzephyr23/biryani.git
 cd biryani
 cp .env.example .env
 # Edit .env — set a secure JWT_SECRET
@@ -64,7 +64,7 @@ Open **http://localhost:3000** and follow the setup wizard to create your admin 
 **Requirements:** Node.js 20+, [pnpm](https://pnpm.io), Docker
 
 ```bash
-git clone https://github.com/yourusername/biryani.git
+git clone https://github.com/Helzephyr23/biryani.git
 cd biryani
 pnpm install
 cp .env.example .env
@@ -402,7 +402,7 @@ Check **[ROADMAP.md](./ROADMAP.md)** for upcoming features and **[ISSUES.md](./I
 1. Fork the repository
 2. Clone your fork:
    ```bash
-   git clone https://github.com/yourusername/biryani.git
+   git clone https://github.com/Helzephyr23/biryani.git
    cd biryani
    ```
 3. Install dependencies:

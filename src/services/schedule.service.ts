@@ -1,4 +1,5 @@
 import db from "../config/database.js";
+import { logger } from "../utils/logger.js";
 
 export interface ScheduledTask {
   id: number;
@@ -105,7 +106,7 @@ export function startTask(task: ScheduledTask, executor: (task: ScheduledTask) =
       const now = new Date().toISOString();
       db.prepare("UPDATE scheduled_tasks SET last_run = ? WHERE id = ?").run(now, task.id);
     } catch (err) {
-      console.error(`[Scheduler] Task ${task.id} failed:`, err);
+      logger.error(`Scheduler - Task ${task.id} failed:`, err);
     }
   }, interval);
 
