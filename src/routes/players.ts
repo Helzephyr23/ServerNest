@@ -71,8 +71,9 @@ export default async function playersRoutes(app: FastifyInstance) {
   });
 
   app.post("/api/servers/:id/players/whitelist", opts, async (request, reply) => {
-    const { name } = request.body as { name: string };
-    if (!name) return reply.status(400).send({ error: "name is required" });
+    const rawName = (request.body as { name: string }).name;
+    if (!rawName) return reply.status(400).send({ error: "name is required" });
+    const name = sanitizeName(rawName);
     const { id } = request.params as { id: string };
     try {
       const entry = JSON.stringify({ name });
@@ -114,8 +115,9 @@ export default async function playersRoutes(app: FastifyInstance) {
 
   app.post("/api/servers/:id/players/ops", opts, async (request, reply) => {
     const { id } = request.params as { id: string };
-    const { name } = request.body as { name: string };
-    if (!name) return reply.status(400).send({ error: "name is required" });
+    const rawName = (request.body as { name: string }).name;
+    if (!rawName) return reply.status(400).send({ error: "name is required" });
+    const name = sanitizeName(rawName);
     try {
       const entry = { name, level: 4, bypassesPlayerLimit: false };
       const script = `import json,sys; f=open('/data/ops.json','r'); d=json.load(f); f.close(); d.append(${JSON.stringify(entry)}); f=open('/data/ops.json','w'); json.dump(d,f); f.close()`;
@@ -156,8 +158,9 @@ export default async function playersRoutes(app: FastifyInstance) {
 
   app.post("/api/servers/:id/players/bans", opts, async (request, reply) => {
     const { id } = request.params as { id: string };
-    const { name, reason } = request.body as { name: string; reason?: string };
-    if (!name) return reply.status(400).send({ error: "name is required" });
+    const { name: rawName, reason } = request.body as { name: string; reason?: string };
+    if (!rawName) return reply.status(400).send({ error: "name is required" });
+    const name = sanitizeName(rawName);
     try {
       const entry = { name, reason: reason || "Banned by operator", created: new Date().toISOString(), source: "Biryani" };
       const script = `import json,sys; f=open('/data/banned-players.json','r'); d=json.load(f); f.close(); d.append(${JSON.stringify(entry)}); f=open('/data/banned-players.json','w'); json.dump(d,f); f.close()`;

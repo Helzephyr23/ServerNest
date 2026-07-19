@@ -9,7 +9,7 @@ export const env = {
   PANEL_PORT: parseInt(process.env.PANEL_PORT || "3000", 10),
   API_PORT: parseInt(process.env.API_PORT || "3001", 10),
   JWT_SECRET: process.env.JWT_SECRET || "change-me-to-a-random-string",
-  JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || "7d",
+  JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || "24h",
   DATABASE_PATH: process.env.DATABASE_PATH || "./data/biryani.db",
   DOCKER_IMAGE: process.env.DOCKER_IMAGE || "itzg/minecraft-server",
   SERVER_PORT_RANGE_START: parseInt(process.env.SERVER_PORT_RANGE_START || "25565", 10),
@@ -18,3 +18,11 @@ export const env = {
   NODE_API_KEY: process.env.NODE_API_KEY || "",
   GRPC_PORT: parseInt(process.env.GRPC_PORT || "50051", 10),
 };
+
+export function checkJwtSecret(): void {
+  if (env.JWT_SECRET === "change-me-to-a-random-string" || env.JWT_SECRET === "change-me-in-production") {
+    console.error("\n🚨 SECURITY ERROR: JWT_SECRET is set to an insecure default value.");
+    console.error("   Set a strong, unique JWT_SECRET in your .env file before starting in production.\n");
+    process.exit(1);
+  }
+}
