@@ -25,8 +25,8 @@ ARG NEXT_PUBLIC_API_URL=http://127.0.0.1:3001
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 RUN npx next build && ls -la .next/standalone/
 
-# Stage 4: Production runtime
-FROM node:20-alpine AS runtime
+# Stage 4: API runtime
+FROM node:20-alpine AS api-runtime
 RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
 WORKDIR /app
 
@@ -34,20 +34,33 @@ RUN apk add --no-cache docker-cli curl
 
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
 COPY src/package.json ./src/
-COPY web/package.json ./web/
 RUN pnpm install --frozen-lockfile --prod
 
 COPY --from=build-api /app/src/dist ./src/dist
-COPY --from=build-web /app/web/.next/standalone ./web-standalone/
-COPY --from=build-web /app/web/.next/static ./web-standalone/.next/static
 RUN mkdir -p /app/data
 
-EXPOSE 3000 3001 25565-25665
+EXPOSE 3001 25565-25665
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD curl -f http://localhost:3001/api/health || exit 1
 
-COPY entrypoint.sh /app/entrypoint.sh
-RUN chmod +x /app/entrypoint.sh
+CMD ["node", "src/dist/index.js"]
 
-CMD ["/app/entrypoint.sh"]
+# Stage 5: Web runtime
+FROM node:20-alpine AS web-runtime
+RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
+WORKDIR /app
+
+COPY package.json pnpm-lock.yaml ./
+COPY web/package.json ./web/
+RUN pnpm install --frozen-lockfile --prod
+
+COPY --from=build-web /app/web/.next/standalone ./
+COPY --from=build-web /app/web/.next/static ./.next/static
+
+EXPOSE 3000
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD curl -f http://localhost:3000/ || exit 1
+
+CMD ["node", "server.js"]
