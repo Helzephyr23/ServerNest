@@ -16,10 +16,18 @@ import {
   setServerConfig,
   findAvailablePort,
 } from "../services/server.service.js";
-import { getServerMetrics } from "../services/metrics.service.js";
+import { getServerMetrics, getMetricsHistory } from "../services/metrics.service.js";
 import { getImageName } from "../config/docker.js";
 import docker from "../config/docker.js";
-import { rmSync, existsSync } from "fs";
+import { rmSync, existsSync, mkdirSync, readdirSync, readFileSync, createWriteStream, statSync, createReadStream } from "fs";
+import os from "os";
+import { join } from "path";
+import { pipeline } from "stream/promises";
+import { Transform } from "stream";
+import zlib from "zlib";
+import tar from "tar-fs";
+import yauzl from "yauzl";
+import db from "../config/database.js";
 
 let ioRef: any = null;
 
@@ -54,6 +62,145 @@ export default async function serverRoutes(app: FastifyInstance) {
       eula_accepted,
     });
     return reply.status(201).send({ server });
+  });
+
+  app.post("/api/servers/import", { preHandler: [authMiddleware, adminMiddleware] }, async (request, reply) => {
+    let importedServer: any = null;
+    try {
+      const data = await request.file();
+      if (!data) return reply.status(400).send({ error: "No file uploaded" });
+
+      const fields = data.fields as any;
+      const name = fields.name?.value?.trim();
+      const software = fields.software?.value || "vanilla";
+      const mc_version = fields.mc_version?.value || "1.21.4";
+      const ram_mb = parseInt(fields.ram_mb?.value || "2048");
+      const eula_accepted = fields.eula_accepted?.value === "true";
+
+      if (!name) return reply.status(400).send({ error: "Server name is required" });
+      if (!eula_accepted) return reply.status(400).send({ error: "You must accept the Minecraft EULA" });
+      if (name.length > 50) return reply.status(400).send({ error: "Name must be 50 characters or less" });
+      if (isNaN(ram_mb) || ram_mb < 512 || ram_mb > 32768) return reply.status(400).send({ error: "RAM must be between 512 and 32768 MB" });
+
+      const port = findAvailablePort();
+      importedServer = createServer({ name, software, mc_version, ram_mb, port, eula_accepted });
+      const serverDataDir = `${process.cwd()}/data/server-${importedServer.id}`;
+      if (!existsSync(serverDataDir)) mkdirSync(serverDataDir, { recursive: true });
+
+      const filename = data.filename.toLowerCase();
+      if (filename.endsWith(".zip")) {
+        const tmpPath = join(os.tmpdir(), `import-${importedServer.id}-${Date.now()}.zip`);
+        const ws = createWriteStream(tmpPath);
+        await pipeline(data.file, ws);
+        const fileSize = statSync(tmpPath).size;
+        request.log.info({ fileSize }, "Received zip upload");
+        if (fileSize === 0) throw new Error("Uploaded file is empty");
+        await new Promise<void>((resolve, reject) => {
+          yauzl.open(tmpPath, { lazyEntries: true }, (err: any, zipfile: any) => {
+            if (err) { reject(err); return; }
+            zipfile.on("entry", (entry: any) => {
+              const entryPath = join(serverDataDir, entry.fileName);
+              if (entry.fileName.endsWith("/")) {
+                if (!existsSync(entryPath)) mkdirSync(entryPath, { recursive: true });
+                zipfile.readEntry();
+              } else {
+                mkdirSync(join(entryPath, ".."), { recursive: true });
+                zipfile.openReadStream(entry, (err2: any, readStream: any) => {
+                  if (err2) { reject(err2); return; }
+                  const ws2 = createWriteStream(entryPath);
+                  ws2.on("finish", () => zipfile.readEntry());
+                  ws2.on("error", reject);
+                  readStream.pipe(ws2);
+                });
+              }
+            });
+            zipfile.on("end", resolve);
+            zipfile.on("error", reject);
+            zipfile.readEntry();
+          });
+        });
+        try { rmSync(tmpPath, { force: true }); } catch {}
+      } else if (filename.endsWith(".tar.gz") || filename.endsWith(".tgz")) {
+        const gunzip1 = zlib.createGunzip();
+        let g2: any = null;
+        let checked = false;
+        const dedouble = new Transform({
+          transform(chunk: any, encoding: any, callback: any) {
+            const self = this as any;
+            if (!checked) {
+              checked = true;
+              if (chunk.length >= 2 && chunk[0] === 0x1f && chunk[1] === 0x8b) {
+                g2 = zlib.createGunzip();
+                g2.on("data", (d: Buffer) => self.push(d));
+                g2.on("end", () => self.push(null));
+                g2.on("error", callback);
+                g2.write(chunk, encoding, callback);
+                return;
+              }
+            }
+            if (g2) { g2.write(chunk, encoding, callback); }
+            else { self.push(chunk); callback(); }
+          },
+          final(callback: any) {
+            if (g2) { g2.end(); callback(); }
+            else { callback(); }
+          }
+        });
+        await pipeline(data.file, gunzip1, dedouble, tar.extract(serverDataDir));
+      } else {
+        throw new Error("Unsupported archive format. Upload a .zip or .tar.gz file");
+      }
+
+      const detected: { software?: string; version?: string } = {};
+      try {
+        const files = readdirSync(serverDataDir);
+        for (const file of files) {
+          const lower = file.toLowerCase();
+          if (lower.startsWith("paper-") && lower.endsWith(".jar")) {
+            detected.software = "paper"; break;
+          }
+          if (lower.startsWith("purpur-") && lower.endsWith(".jar")) {
+            detected.software = "purpur"; break;
+          }
+          if (lower.startsWith("fabric-server-") && lower.endsWith(".jar")) {
+            detected.software = "fabric"; break;
+          }
+          if ((lower.startsWith("forge-") || lower.includes("-universal")) && lower.endsWith(".jar")) {
+            detected.software = "forge"; break;
+          }
+          if (lower.startsWith("spigot-") && lower.endsWith(".jar")) {
+            detected.software = "spigot"; break;
+          }
+        }
+        const versionPath = join(serverDataDir, "version.json");
+        if (existsSync(versionPath)) {
+          try {
+            const vdata = JSON.parse(readFileSync(versionPath, "utf-8"));
+            detected.version = vdata.id || vdata.name || undefined;
+          } catch {}
+        }
+      } catch {}
+
+      if (detected.software && detected.software !== software) {
+        db.prepare("UPDATE servers SET software = ? WHERE id = ?").run(detected.software, importedServer.id);
+        db.prepare("UPDATE server_config SET value = ? WHERE server_id = ? AND key = 'TYPE'")
+          .run(detected.software.toUpperCase(), importedServer.id);
+      }
+      if (detected.version) {
+        db.prepare("UPDATE servers SET mc_version = ? WHERE id = ?").run(detected.version, importedServer.id);
+        db.prepare("UPDATE server_config SET value = ? WHERE server_id = ? AND key = 'VERSION'")
+          .run(detected.version, importedServer.id);
+      }
+
+      return reply.status(201).send({ server: getServerById(importedServer.id), detected });
+    } catch (err: any) {
+      if (importedServer) {
+        const dir = `${process.cwd()}/data/server-${importedServer.id}`;
+        try { rmSync(dir, { recursive: true, force: true }); } catch {}
+        try { db.prepare("DELETE FROM servers WHERE id = ?").run(importedServer.id); } catch {}
+      }
+      return reply.status(500).send({ error: err.message });
+    }
   });
 
   app.put("/api/servers/:id", opts, async (request, reply) => {
@@ -154,5 +301,64 @@ export default async function serverRoutes(app: FastifyInstance) {
     const metrics = await getServerMetrics(Number(id));
     if (!metrics) return reply.status(404).send({ error: "No metrics available" });
     return { metrics };
+  });
+
+  app.get("/api/servers/:id/metrics/history", opts, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const range = (request.query as any).range || "1h";
+    const metrics = getMetricsHistory(Number(id), range);
+    return { metrics };
+  });
+
+  app.get("/api/mc-versions", opts, async (_request, reply) => {
+    try {
+      const res = await fetch("https://launchermeta.mojang.com/mc/game/version_manifest.json");
+      const data = await res.json() as any;
+      const versions = (data.versions || []).map((v: any) => ({
+        id: v.id,
+        type: v.type,
+        releaseDate: v.releaseTime,
+      }));
+      const latest = data.latest || {};
+      return { versions, latest };
+    } catch {
+      return reply.status(502).send({ error: "Failed to fetch Minecraft versions" });
+    }
+  });
+
+  app.post("/api/servers/:id/update-version", opts, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const { version } = request.body as { version: string };
+    if (!version) return reply.status(400).send({ error: "version is required" });
+
+    const server = getServerById(Number(id));
+    if (!server) return reply.status(404).send({ error: "Server not found" });
+
+    try {
+      const res = await fetch("https://launchermeta.mojang.com/mc/game/version_manifest.json");
+      const data = await res.json() as any;
+      const exists = (data.versions || []).some((v: any) => v.id === version);
+      if (!exists) return reply.status(400).send({ error: `Version "${version}" not found` });
+    } catch {
+      return reply.status(502).send({ error: "Failed to validate version" });
+    }
+
+    if (server.status === "running") {
+      await stopServer(Number(id));
+    }
+
+    db.prepare("UPDATE servers SET mc_version = ? WHERE id = ?").run(version, Number(id));
+    const existing = db.prepare("SELECT 1 FROM server_config WHERE server_id = ? AND key = 'VERSION'").get(Number(id));
+    if (existing) {
+      db.prepare("UPDATE server_config SET value = ? WHERE server_id = ? AND key = 'VERSION'").run(version, Number(id));
+    } else {
+      db.prepare("INSERT INTO server_config (server_id, key, value) VALUES (?, ?, ?)").run(Number(id), "VERSION", version);
+    }
+
+    if (server.status === "running") {
+      await startServer(Number(id));
+    }
+
+    return { success: true, version };
   });
 }

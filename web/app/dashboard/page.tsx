@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { api } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -16,22 +17,26 @@ interface OverviewData {
 
 export default function DashboardPage() {
   const [data, setData] = useState<OverviewData | null>(null);
+  const [servers, setServers] = useState<any[]>([]);
 
   useEffect(() => {
-    api.get("/api/overview")
-      .then((response: any) => {
-        const safeData: OverviewData = {
-          nodes: Array.isArray(response?.nodes) ? response.nodes : [],
-          metrics: response?.metrics || {
-            total_servers: 0,
-            running_servers: 0,
-            total_memory_mb: 0,
-            used_memory_mb: 0,
-          },
-        };
-        setData(safeData);
-      })
-      .catch((err) => {
+    Promise.all([
+      api.get("/api/overview"),
+      api.get("/api/servers"),
+    ]).then(([overview, serverRes]) => {
+      const safeData: OverviewData = {
+        nodes: Array.isArray(overview?.nodes) ? overview.nodes : [],
+        metrics: overview?.metrics || {
+          total_servers: 0,
+          running_servers: 0,
+          total_memory_mb: 0,
+          used_memory_mb: 0,
+        },
+      };
+      setData(safeData);
+      setServers(Array.isArray(serverRes?.servers) ? serverRes.servers : []);
+    })
+    .catch((err) => {
         console.error(err);
         setData({
           nodes: [],
@@ -100,6 +105,59 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Servers</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {servers.length ? (
+            <div className="space-y-3">
+              {servers.filter((s) => s.status === "running").map((server) => (
+                <Link key={server.id} href={`/dashboard/servers/${server.id}`} className="block rounded-lg border p-3 transition-colors hover:bg-accent">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="font-medium">{server.name}</p>
+                    <span className="rounded-full bg-green-500/10 px-2 py-0.5 text-xs text-green-500">Running</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <p className="text-xs text-muted-foreground">CPU</p>
+                      <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-muted">
+                        <div
+                          className="h-full rounded-full bg-blue-500 transition-all"
+                          style={{ width: `${Math.min(server.cpu_percent || 0, 100)}%` }}
+                        />
+                      </div>
+                      <p className="mt-0.5 text-xs text-muted-foreground">{Math.round(server.cpu_percent || 0)}%</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">RAM</p>
+                      <p className="mt-1 text-sm font-medium">{server.ram_mb || 0} MB</p>
+                    </div>
+                  </div>
+                </Link>
+              ))}
+              {servers.filter((s) => s.status !== "running").length > 0 && (
+                <details className="text-sm text-muted-foreground">
+                  <summary className="cursor-pointer hover:text-foreground">
+                    {servers.filter((s) => s.status !== "running").length} stopped servers
+                  </summary>
+                  <div className="mt-2 space-y-1">
+                    {servers.filter((s) => s.status !== "running").map((server) => (
+                      <Link key={server.id} href={`/dashboard/servers/${server.id}`} className="flex items-center justify-between rounded px-2 py-1 hover:bg-accent">
+                        <span>{server.name}</span>
+                        <span className={`text-xs ${server.status === "error" ? "text-red-500" : "text-muted-foreground"}`}>{server.status}</span>
+                      </Link>
+                    ))}
+                  </div>
+                </details>
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">No servers created yet</p>
+          )}
+        </CardContent>
+      </Card>
 
       <div className="grid gap-4 md:grid-cols-2">
         <Card>

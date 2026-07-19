@@ -21,6 +21,7 @@ import userRoutes from "./routes/users.js";
 import overviewRoutes from "./routes/overview.js";
 import cloudStorageRoutes from "./routes/cloud-storage.js";
 import rateLimitRoutes from "./routes/rate-limits.js";
+import sessionRoutes from "./routes/sessions.js";
 import { loadRateLimits } from "./middleware/rate-limit.js";
 import { setSocketIO } from "./routes/servers.js";
 import { startAllTasks } from "./services/schedule.service.js";
@@ -36,7 +37,7 @@ const app = Fastify({
 
 await app.register(cors, { origin: true, credentials: true });
 await app.register(jwt, { secret: env.JWT_SECRET, sign: { expiresIn: env.JWT_EXPIRES_IN } });
-await app.register(multipart);
+await app.register(multipart, { limits: { fileSize: 2048 * 1024 * 1024 } });
 
 await app.register(authRoutes);
 await app.register(serverRoutes);
@@ -52,6 +53,7 @@ await app.register(userRoutes);
 await app.register(overviewRoutes);
 await app.register(cloudStorageRoutes);
 await app.register(rateLimitRoutes);
+await app.register(sessionRoutes);
 
 app.get("/api/health", async () => {
   let dockerOk = false;
@@ -95,6 +97,11 @@ setInterval(() => {
 setInterval(() => {
   rotateAllBackups(10);
 }, 3600000);
+
+setInterval(async () => {
+  const { collectAllMetrics } = await import("./services/metrics.service.js");
+  await collectAllMetrics();
+}, 60000);
 
 setInterval(async () => {
   try {

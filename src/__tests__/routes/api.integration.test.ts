@@ -17,6 +17,7 @@ const testDb = vi.hoisted(() => {
     CREATE TABLE IF NOT EXISTS notifications (id INTEGER PRIMARY KEY AUTOINCREMENT, type TEXT NOT NULL, webhook_url TEXT, email TEXT, enabled INTEGER NOT NULL DEFAULT 1, events TEXT NOT NULL DEFAULT '[]', created_at TEXT NOT NULL DEFAULT (datetime('now')));
     CREATE TABLE IF NOT EXISTS installed_mods (id INTEGER PRIMARY KEY AUTOINCREMENT, server_id INTEGER NOT NULL, mod_name TEXT NOT NULL, filename TEXT NOT NULL, version TEXT, source TEXT NOT NULL DEFAULT 'modrinth', installed_at TEXT NOT NULL DEFAULT (datetime('now')), FOREIGN KEY (server_id) REFERENCES servers(id) ON DELETE CASCADE);
     CREATE TABLE IF NOT EXISTS rate_limits (id INTEGER PRIMARY KEY AUTOINCREMENT, route TEXT NOT NULL, method TEXT NOT NULL DEFAULT 'POST', max_requests INTEGER NOT NULL DEFAULT 10, window_ms INTEGER NOT NULL DEFAULT 60000, enabled INTEGER NOT NULL DEFAULT 1, description TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')));
+    CREATE TABLE IF NOT EXISTS sessions (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, jti TEXT UNIQUE NOT NULL, user_agent TEXT, ip TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')), last_used TEXT NOT NULL DEFAULT (datetime('now')), expired INTEGER NOT NULL DEFAULT 0, FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE);
   `);
   return db;
 });
