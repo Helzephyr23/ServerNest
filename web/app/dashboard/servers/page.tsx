@@ -5,8 +5,10 @@ import Link from "next/link";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useConfirm } from "@/components/confirm-dialog";
 
 export default function ServersPage() {
+  const { confirm: showConfirm } = useConfirm();
   const [servers, setServers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -25,10 +27,9 @@ export default function ServersPage() {
   };
 
   const handleDelete = async (id: number, name: string) => {
-    if (confirm(`Delete server "${name}"? This cannot be undone.`)) {
-      await api.delete(`/api/servers/${id}`);
-      fetchServers();
-    }
+    if (!(await showConfirm({ title: "Delete Server", message: `Delete server "${name}"? This cannot be undone.` }))) return;
+    await api.delete(`/api/servers/${id}`);
+    fetchServers();
   };
 
   return (

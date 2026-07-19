@@ -2,8 +2,24 @@ import { FastifyInstance } from "fastify";
 import { authMiddleware } from "../middleware/auth.js";
 import docker, { dockerStreamDemux } from "../config/docker.js";
 import db from "../config/database.js";
-import { join } from "path";
+import { join, normalize, relative } from "path";
 import { existsSync, mkdirSync, writeFileSync, readFileSync } from "fs";
+
+function sanitizePath(userPath: string): string {
+  const normal = normalize(userPath).replace(/\\/g, "/");
+  if (normal.startsWith("..") || normal.includes("/../")) {
+    throw new Error("Invalid path: directory traversal detected");
+  }
+  return normal;
+}
+
+function sanitizeContainerPath(userPath: string): string {
+  const normal = normalize("/data/" + userPath).replace(/\\/g, "/");
+  if (!normal.startsWith("/data/") || normal.includes("/../")) {
+    throw new Error("Invalid path: directory traversal detected");
+  }
+  return normal;
+}
 
 async function execInContainer(serverId: number, cmd: string[]): Promise<string> {
   const server = db.prepare("SELECT * FROM servers WHERE id = ?").get(serverId) as any;
@@ -31,8 +47,9 @@ export default async function filesRoutes(app: FastifyInstance) {
     const serverId = Number(id);
     const reqPath = (request.query as any).path || "";
     try {
+      const safePath = sanitizeContainerPath(reqPath);
       const output = await execInContainer(serverId, [
-        "ls", "-la", "--time-style=long-iso", `/data/${reqPath}`,
+        "ls", "-la", "--time-style=long-iso", safePath,
       ]);
       const lines = output.split("\n").filter((l) => l.trim());
       const entries = lines.slice(1).map((line) => {
@@ -55,7 +72,8 @@ export default async function filesRoutes(app: FastifyInstance) {
     const filePath = (request.query as any).path;
     if (!filePath) return reply.status(400).send({ error: "path is required" });
     try {
-      const output = await execInContainer(serverId, ["cat", `/data/${filePath}`]);
+      const safePath = sanitizeContainerPath(filePath);
+      const output = await execInContainer(serverId, ["cat", safePath]);
       return { content: output, path: filePath };
     } catch (err: any) {
       return reply.status(500).send({ error: err.message });
@@ -68,9 +86,10 @@ export default async function filesRoutes(app: FastifyInstance) {
     const { path: filePath, content } = request.body as { path: string; content: string };
     if (!filePath || content === undefined) return reply.status(400).send({ error: "path and content are required" });
     try {
+      const safePath = sanitizeContainerPath(filePath);
       const b64 = Buffer.from(content).toString("base64");
       await execInContainer(serverId, [
-        "bash", "-c", `echo '${b64}' | base64 -d > /data/${filePath}`,
+        "bash", "-c", `echo '${b64}' | base64 -d > ${safePath}`,
       ]);
       return { success: true };
     } catch (err: any) {
@@ -84,7 +103,8 @@ export default async function filesRoutes(app: FastifyInstance) {
     const { path: dirPath } = request.body as { path: string };
     if (!dirPath) return reply.status(400).send({ error: "path is required" });
     try {
-      await execInContainer(serverId, ["mkdir", "-p", `/data/${dirPath}`]);
+      const safePath = sanitizeContainerPath(dirPath);
+      await execInContainer(serverId, ["mkdir", "-p", safePath]);
       return { success: true };
     } catch (err: any) {
       return reply.status(500).send({ error: err.message });
@@ -97,7 +117,8 @@ export default async function filesRoutes(app: FastifyInstance) {
     const filePath = (request.query as any).path;
     if (!filePath) return reply.status(400).send({ error: "path is required" });
     try {
-      await execInContainer(serverId, ["rm", "-rf", `/data/${filePath}`]);
+      const safePath = sanitizeContainerPath(filePath);
+      await execInContainer(serverId, ["rm", "-rf", safePath]);
       return { success: true };
     } catch (err: any) {
       return reply.status(500).send({ error: err.message });
@@ -158,15 +179,18 @@ export default async function filesRoutes(app: FastifyInstance) {
       const data = await request.file();
       if (!data) return reply.status(400).send({ error: "No file provided" });
 
-      const filePath = data.filename;
+      const filePath = sanitizePath(data.filename);
       const chunks: Buffer[] = [];
       for await (const chunk of data.file) {
         chunks.push(chunk);
       }
       const buffer = Buffer.concat(chunks);
 
-      const serverDataDir = `${process.cwd()}/data/server-${serverId}`;
+      const serverDataDir = join(process.cwd(), "data", `server-${serverId}`);
       const fullPath = join(serverDataDir, filePath);
+      if (!fullPath.startsWith(serverDataDir)) {
+        return reply.status(400).send({ error: "Invalid path" });
+      }
       const dir = fullPath.substring(0, fullPath.lastIndexOf("/"));
       if (!existsSync(dir)) {
         mkdirSync(dir, { recursive: true });
@@ -189,12 +213,16 @@ export default async function filesRoutes(app: FastifyInstance) {
     if (!server) return reply.status(404).send({ error: "Server not found" });
 
     try {
-      const serverDataDir = `${process.cwd()}/data/server-${serverId}`;
-      const fullPath = join(serverDataDir, filePath);
+      const safePath = sanitizePath(filePath);
+      const serverDataDir = join(process.cwd(), "data", `server-${serverId}`);
+      const fullPath = join(serverDataDir, safePath);
+      if (!fullPath.startsWith(serverDataDir)) {
+        return reply.status(400).send({ error: "Invalid path" });
+      }
       if (!existsSync(fullPath)) return reply.status(404).send({ error: "File not found" });
 
       const content = readFileSync(fullPath);
-      const filename = filePath.split("/").pop() || "download";
+      const filename = safePath.split("/").pop() || "download";
       return reply
         .header("Content-Type", "application/octet-stream")
         .header("Content-Disposition", `attachment; filename="${filename}"`)
