@@ -16,7 +16,7 @@ if [ -d "$INSTALL_DIR" ]; then
   git pull
 else
   echo "Cloning Biryani to $INSTALL_DIR..."
-  git clone https://github.com/yourusername/biryani.git "$INSTALL_DIR"
+  git clone https://github.com/Helzephyr23/biryani.git "$INSTALL_DIR"
   cd "$INSTALL_DIR"
 fi
 
