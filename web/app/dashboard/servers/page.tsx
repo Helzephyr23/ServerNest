@@ -38,9 +38,14 @@ export default function ServersPage() {
           <h1 className="text-3xl font-bold">Servers</h1>
           <p className="text-muted-foreground">Manage your Minecraft servers</p>
         </div>
-        <Link href="/dashboard/servers/new">
-          <Button>Create Server</Button>
-        </Link>
+        <div className="flex gap-2">
+          <Link href="/dashboard/servers/import">
+            <Button variant="outline">Import Server</Button>
+          </Link>
+          <Link href="/dashboard/servers/new">
+            <Button>Create Server</Button>
+          </Link>
+        </div>
       </div>
 
       {loading ? (

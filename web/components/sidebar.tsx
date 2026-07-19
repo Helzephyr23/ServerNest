@@ -18,6 +18,7 @@ const navItems = [
   { href: "/dashboard/notifications", label: "Notifications", icon: "🔔" },
   { href: "/dashboard/rate-limits", label: "Rate Limits", icon: "🚦" },
   { href: "/dashboard/users", label: "Users", icon: "👤" },
+  { href: "/dashboard/sessions", label: "Sessions", icon: "🔐" },
 ];
 
 export default function Sidebar() {
