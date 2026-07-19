@@ -1,5 +1,5 @@
 import db from "../config/database.js";
-import docker from "../config/docker.js";
+import docker, { dockerStreamDemux } from "../config/docker.js";
 import { env } from "../config/env.js";
 import { notify } from "./notification.service.js";
 import { uploadBackupToCloud, deleteFromCloud, CloudStorageConfig } from "./cloud-storage.service.js";
@@ -68,13 +68,30 @@ export async function createBackup(serverId: number): Promise<Backup> {
     try {
       const container = docker.getContainer(containerName);
       const exec = await container.exec({
-        Cmd: ["tar", "czf", "-", "-C", "/data", "."],
+        Cmd: ["tar", "cf", "-", "-C", "/data", "."],
         AttachStdout: true,
         AttachStderr: true,
       });
       const stream = await exec.start({ Detach: false });
       const writeStream = createWriteStream(backupPath);
-      await pipeline(Readable.from(stream), createGzip(), writeStream);
+      const gzip = createGzip();
+      const stdoutStream = new Readable({
+        read() {},
+      });
+      let buf = Buffer.alloc(0);
+      stream.on("data", (chunk: Buffer) => {
+        buf = Buffer.concat([buf, chunk]);
+        while (buf.length >= 8) {
+          const type = buf[0];
+          const size = buf.readUInt32BE(4);
+          if (buf.length < 8 + size) break;
+          const data = buf.subarray(8, 8 + size);
+          buf = buf.subarray(8 + size);
+          if (type === 1) stdoutStream.push(data);
+        }
+      });
+      stream.on("end", () => stdoutStream.push(null));
+      await pipeline(stdoutStream, gzip, writeStream);
     } catch {
       throw new Error("Failed to create backup - server may not be running");
     }
