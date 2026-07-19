@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm-dialog";
+import { useServer } from "@/lib/server-context";
 
 type Tab = "whitelist" | "ops" | "bans";
 const TABS: { id: Tab; label: string; icon: string }[] = [
@@ -26,23 +27,18 @@ export default function PlayersPage() {
   const [loading, setLoading] = useState(true);
   const [newName, setNewName] = useState("");
   const [reason, setReason] = useState("");
-  const [server, setServer] = useState<any>(null);
+  const { server } = useServer();
 
   const fetchPlayers = () => {
     setLoading(true);
-    Promise.all([
-      api.get(`/api/servers/${id}/players/${tab}`),
-      api.get(`/api/servers/${id}`),
-    ]).then(([{ players: p }, { server: s }]) => {
-      setPlayers(Array.isArray(p) ? p : []);
-      setServer(s || null);
-    }).catch(() => {
-      setPlayers([]);
-      setServer(null);
-    }).finally(() => setLoading(false));
+    api.get(`/api/servers/${id}/players/${tab}`)
+      .then(({ players: p }) => setPlayers(Array.isArray(p) ? p : []))
+      .catch(() => setPlayers([]))
+      .finally(() => setLoading(false));
   };
 
   useEffect(() => { fetchPlayers(); }, [id, tab]);
+  useEffect(() => { if (server?.status) fetchPlayers(); }, [server?.status]);
 
   const handleAdd = async () => {
     if (!newName.trim()) return;

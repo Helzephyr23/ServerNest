@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm-dialog";
+import { useServer } from "@/lib/server-context";
 
 export default function ServerDetailPage() {
   const params = useParams();
@@ -14,11 +14,7 @@ export default function ServerDetailPage() {
   const id = params.id as string;
   const { success, error: toastError } = useToast();
   const { confirm: showConfirm } = useConfirm();
-  const [server, setServer] = useState<any>(null);
-
-  useEffect(() => {
-    api.get(`/api/servers/${id}`).then(({ server }) => setServer(server)).catch(() => {});
-  }, [id]);
+  const { server } = useServer();
 
   const handleDelete = async () => {
     if (!(await showConfirm({ title: "Delete Server", message: `Delete server "${server?.name}"? This will remove all data and cannot be undone.` }))) return;
