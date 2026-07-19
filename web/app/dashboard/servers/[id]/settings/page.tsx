@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/components/toast";
+import { useServer } from "@/lib/server-context";
 
 const PROPERTY_LABELS: Record<string, string> = {
   "server-name": "Server Name",
@@ -59,23 +60,18 @@ export default function ServerSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [needsRestart, setNeedsRestart] = useState(false);
-  const [server, setServer] = useState<any>(null);
+  const { server } = useServer();
   const [search, setSearch] = useState("");
 
   const fetchProps = () => {
-    Promise.all([
-      api.get(`/api/servers/${id}/properties`),
-      api.get(`/api/servers/${id}`),
-    ]).then(([{ properties: p }, { server: s }]) => {
-      setProperties(p || {});
-      setServer(s || null);
-    }).catch(() => {
-      setProperties({});
-      setServer(null);
-    }).finally(() => setLoading(false));
+    api.get(`/api/servers/${id}/properties`)
+      .then(({ properties: p }) => setProperties(p || {}))
+      .catch(() => setProperties({}))
+      .finally(() => setLoading(false));
   };
 
   useEffect(() => { fetchProps(); }, [id]);
+  useEffect(() => { if (server?.status) fetchProps(); }, [server?.status]);
 
   const handleChange = (key: string, value: string) => {
     setProperties((prev) => ({ ...prev, [key]: value }));

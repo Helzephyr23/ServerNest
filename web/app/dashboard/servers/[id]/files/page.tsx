@@ -9,6 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { formatBytes } from "@/lib/utils";
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm-dialog";
+import { useServer } from "@/lib/server-context";
 
 interface FileEntry {
   name: string;
@@ -33,13 +34,7 @@ export default function FilesPage() {
   const [newDirName, setNewDirName] = useState("");
   const [fileSearch, setFileSearch] = useState("");
 
-  const [server, setServer] = useState<any>(null);
-
-  const fetchServer = () => {
-    api.get(`/api/servers/${id}`)
-      .then(({ server }) => setServer(server))
-      .catch(() => {});
-  };
+  const { server } = useServer();
 
   const fetchFiles = (path: string = "") => {
     setLoading(true);
@@ -52,7 +47,9 @@ export default function FilesPage() {
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { fetchServer(); fetchFiles(); }, [id]);
+  useEffect(() => { fetchFiles(); }, [id]);
+
+  useEffect(() => { if (server?.status) fetchFiles(); }, [server?.status]);
 
   const navigate = (entry: FileEntry) => {
     if (entry.isDir) {
