@@ -16,6 +16,17 @@ const TASK_TYPES = [
   { id: "command", label: "Command", icon: "⌨️" },
 ];
 
+const TEMPLATES = [
+  { name: "Daily Backup", type: "backup", schedule: "0 0 * * *", desc: "Backup server every day at midnight" },
+  { name: "Hourly Backup", type: "backup", schedule: "0 * * * *", desc: "Backup server every hour" },
+  { name: "Daily Restart", type: "restart", schedule: "0 3 * * *", desc: "Restart server daily at 3 AM" },
+  { name: "Weekly Restart", type: "restart", schedule: "0 0 * * 0", desc: "Restart server every Sunday midnight" },
+  { name: "Stop at Midnight", type: "stop", schedule: "0 0 * * *", desc: "Stop server every night" },
+  { name: "Start at 6 AM", type: "start", schedule: "0 6 * * *", desc: "Start server every morning" },
+  { name: "Hourly Broadcast", type: "command", schedule: "0 * * * *", desc: "Broadcast a message every hour", command: "say Server maintenance reminder!" },
+  { name: "Auto Save", type: "command", schedule: "*/30 * * * *", desc: "Run save-all every 30 minutes", command: "save-all" },
+];
+
 const SCHEDULE_PRESETS = [
   { label: "Every hour", value: "0 * * * *" },
   { label: "Every 6 hours", value: "0 */6 * * *" },
@@ -33,6 +44,9 @@ export default function TasksPage() {
   const [servers, setServers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
+  const [showTemplates, setShowTemplates] = useState(false);
+  const [templateServer, setTemplateServer] = useState("");
+  const [applyingTemplate, setApplyingTemplate] = useState<string | null>(null);
   const [form, setForm] = useState({
     server_id: "",
     name: "",
@@ -83,6 +97,24 @@ export default function TasksPage() {
       await api.delete(`/api/tasks/${id}`);
       fetchData();
     }
+  };
+
+  const handleApplyTemplate = async (tpl: typeof TEMPLATES[0]) => {
+    if (!templateServer) { toastError("Select a server first", ""); return; }
+    setApplyingTemplate(tpl.name);
+    try {
+      await api.post(`/api/servers/${templateServer}/tasks`, {
+        name: tpl.name,
+        type: tpl.type,
+        schedule: tpl.schedule,
+        command: (tpl as any).command || undefined,
+      });
+      success(`Template "${tpl.name}" applied`);
+      fetchData();
+    } catch (err: any) {
+      toastError("Failed to apply template", err.message);
+    }
+    setApplyingTemplate(null);
   };
 
   const handleRunNow = async (id: number) => {
@@ -204,6 +236,52 @@ export default function TasksPage() {
             </form>
           </CardContent>
         </Card>
+      )}
+
+      <div>
+        <Button variant="ghost" onClick={() => setShowTemplates(!showTemplates)} className="text-sm text-muted-foreground">
+          {showTemplates ? "Hide Templates" : "Browse Templates"}
+        </Button>
+      </div>
+
+      {showTemplates && (
+        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+          {TEMPLATES.map((tpl) => {
+            const typeInfo = TASK_TYPES.find((t) => t.id === tpl.type);
+            return (
+              <Card key={tpl.name}>
+                <CardContent className="p-4">
+                  <div className="mb-2 flex items-center gap-2">
+                    <span className="text-lg">{typeInfo?.icon}</span>
+                    <p className="font-medium text-sm">{tpl.name}</p>
+                  </div>
+                  <p className="mb-3 text-[11px] text-muted-foreground">{tpl.desc}</p>
+                  <p className="mb-3 text-[10px] font-mono text-zinc-500">{tpl.schedule}</p>
+                  <div className="flex gap-2">
+                    <select
+                      value={templateServer}
+                      onChange={(e) => setTemplateServer(e.target.value)}
+                      className="min-w-0 flex-1 rounded-md border bg-background px-2 py-1 text-xs"
+                    >
+                      <option value="">Select server</option>
+                      {servers.map((s: any) => (
+                        <option key={s.id} value={s.id}>{s.name}</option>
+                      ))}
+                    </select>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleApplyTemplate(tpl)}
+                      disabled={applyingTemplate === tpl.name}
+                    >
+                      {applyingTemplate === tpl.name ? "..." : "Apply"}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
       )}
 
       {tasks.length === 0 ? (
