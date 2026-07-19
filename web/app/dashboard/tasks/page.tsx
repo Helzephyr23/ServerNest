@@ -204,13 +204,13 @@ export default function TasksPage() {
                     placeholder="0 0 * * *"
                     required
                   />
-                  <div className="flex flex-wrap gap-1">
+                  <div className="flex flex-wrap gap-1.5">
                     {SCHEDULE_PRESETS.map((preset) => (
                       <button
                         key={preset.value}
                         type="button"
                         onClick={() => setForm({ ...form, schedule: preset.value })}
-                        className="rounded bg-zinc-800 px-2 py-0.5 text-[10px] text-zinc-400 hover:bg-zinc-700"
+                        className="rounded bg-zinc-800 px-3 py-1.5 text-xs text-zinc-400 hover:bg-zinc-700"
                       >
                         {preset.label}
                       </button>
