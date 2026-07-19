@@ -31,13 +31,13 @@ export default function Sidebar() {
 
   const navContent = (
     <>
-      <div className="flex items-center gap-3 border-b p-5">
+      <Link href="/dashboard" className="flex items-center gap-3 border-b p-5 hover:opacity-80 transition-opacity">
         <span className="text-2xl">🍛</span>
         <div>
           <h1 className="text-lg font-bold">Biryani</h1>
           <p className="text-xs text-muted-foreground">Server Panel</p>
         </div>
-      </div>
+      </Link>
 
       <nav className="flex-1 space-y-1 p-3">
         {navItems.map((item) => (
