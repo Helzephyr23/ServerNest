@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { api } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useServer } from "@/lib/server-context";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Area, AreaChart,
@@ -47,6 +48,7 @@ function CustomTooltip({ active, payload, label }: any) {
 export default function PerformancePage() {
   const params = useParams();
   const id = params.id as string;
+  const { server } = useServer();
   const [range, setRange] = useState("1h");
   const [metrics, setMetrics] = useState<MetricPoint[]>([]);
   const [loading, setLoading] = useState(true);
@@ -63,6 +65,8 @@ export default function PerformancePage() {
   }, [id, range]);
 
   useEffect(() => { fetchMetrics(); }, [fetchMetrics]);
+
+  useEffect(() => { if (server?.status) fetchMetrics(); }, [server?.status]);
 
   useEffect(() => {
     if (range === "1h") {

@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { formatBytes, formatDate } from "@/lib/utils";
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm-dialog";
+import { useServer } from "@/lib/server-context";
 
 const PROVIDER_ICONS: Record<string, string> = {
   s3: "☁️",
@@ -37,22 +38,17 @@ export default function BackupsPage() {
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [downloading, setDownloading] = useState<number | null>(null);
-  const [server, setServer] = useState<any>(null);
+  const { server } = useServer();
 
   const fetchBackups = () => {
-    Promise.all([
-      api.get(`/api/servers/${id}/backups`),
-      api.get(`/api/servers/${id}`),
-    ]).then(([{ backups: b }, { server: s }]) => {
-      setBackups(Array.isArray(b) ? b : []);
-      setServer(s || null);
-    }).catch(() => {
-      setBackups([]);
-      setServer(null);
-    }).finally(() => setLoading(false));
+    api.get(`/api/servers/${id}/backups`)
+      .then(({ backups: b }) => setBackups(Array.isArray(b) ? b : []))
+      .catch(() => setBackups([]))
+      .finally(() => setLoading(false));
   };
 
   useEffect(() => { fetchBackups(); }, [id]);
+  useEffect(() => { if (server?.status) fetchBackups(); }, [server?.status]);
 
   const handleCreate = async () => {
     setCreating(true);

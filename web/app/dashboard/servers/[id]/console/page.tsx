@@ -10,11 +10,12 @@ import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import "@xterm/xterm/css/xterm.css";
+import { useServer } from "@/lib/server-context";
 
 export default function ConsolePage() {
   const params = useParams();
   const id = params.id as string;
-  const [server, setServer] = useState<any>(null);
+  const { server } = useServer();
   const [connected, setConnected] = useState(false);
   const [attached, setAttached] = useState(false);
   const termRef = useRef<Terminal | null>(null);
@@ -87,8 +88,6 @@ export default function ConsolePage() {
   }, []);
 
   useEffect(() => {
-    api.get(`/api/servers/${id}`).then(({ server: s }) => setServer(s));
-
     const token = localStorage.getItem("biryani_token");
     const socket = io(typeof window !== "undefined" && window.location.hostname !== "localhost"
       ? `${window.location.protocol}//${window.location.hostname}:3001`
