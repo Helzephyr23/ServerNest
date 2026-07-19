@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm-dialog";
+import { useServer } from "@/lib/server-context";
 
 type Provider = "s3" | "gdrive" | "dropbox";
 
@@ -34,6 +35,7 @@ export default function CloudStoragePage() {
   const { confirm: showConfirm } = useConfirm();
   const params = useParams();
   const id = params.id as string;
+  const { server } = useServer();
   const [configs, setConfigs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -52,6 +54,7 @@ export default function CloudStoragePage() {
   };
 
   useEffect(() => { fetchConfigs(); }, [id]);
+  useEffect(() => { if (server?.status) fetchConfigs(); }, [server?.status]);
 
   const resetForm = () => {
     setShowForm(false);

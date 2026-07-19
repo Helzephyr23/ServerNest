@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Link from "next/link";
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm-dialog";
+import { useServer } from "@/lib/server-context";
 
 function formatBytes(bytes: number) {
   if (bytes === 0) return "0 B";
@@ -22,18 +23,14 @@ export default function ModsPage() {
   const { confirm: showConfirm } = useConfirm();
   const params = useParams();
   const id = params.id as string;
-  const [server, setServer] = useState<any>(null);
+  const { server } = useServer();
   const [mods, setMods] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState<string | null>(null);
 
   const fetchMods = async () => {
     try {
-      const [{ server: s }, { mods: m }] = await Promise.all([
-        api.get(`/api/servers/${id}`),
-        api.get(`/api/servers/${id}/mods`),
-      ]);
-      setServer(s);
+      const { mods: m } = await api.get(`/api/servers/${id}/mods`);
       setMods(m || []);
     } catch {
       setMods([]);
@@ -43,6 +40,7 @@ export default function ModsPage() {
   };
 
   useEffect(() => { fetchMods(); }, [id]);
+  useEffect(() => { if (server?.status) fetchMods(); }, [server?.status]);
 
   const handleDelete = async (filename: string) => {
     if (!(await showConfirm({ title: "Delete Mod", message: `Delete ${filename}?` }))) return;

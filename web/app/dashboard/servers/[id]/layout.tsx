@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { useParams, useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
+import { ServerProvider, useServer } from "@/lib/server-context";
 
 const TABS = [
   { href: "", label: "Overview", exact: true },
@@ -18,37 +19,19 @@ const TABS = [
   { href: "/performance", label: "Performance" },
 ];
 
-export default function ServerLayout({ children }: { children: React.ReactNode }) {
-  const params = useParams();
+function ServerLayoutInner({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
+  const params = useParams();
   const id = params.id as string;
-  const [server, setServer] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const { server, loading, refresh } = useServer();
 
-  const fetchServer = useCallback(() => {
-    api.get(`/api/servers/${id}`)
-      .then(({ server }) => setServer(server))
-      .catch(() => router.push("/dashboard/servers"))
-      .finally(() => setLoading(false));
-  }, [id, router]);
-
-  useEffect(() => { fetchServer(); }, [fetchServer]);
-
-  useEffect(() => {
-    if (server?.status === "starting") {
-      const interval = setInterval(fetchServer, 3000);
-      return () => clearInterval(interval);
-    }
-  }, [server?.status, fetchServer]);
-
-  const handleAction = async (action: "start" | "stop" | "restart") => {
-    if (action === "start") setServer((s: any) => ({ ...s, status: "starting" }));
+  const handleAction = useCallback(async (action: "start" | "stop" | "restart") => {
     try {
       await api.post(`/api/servers/${id}/${action}`);
     } catch {}
-    fetchServer();
-  };
+    refresh();
+  }, [id, refresh]);
 
   if (loading) {
     return (
@@ -107,5 +90,13 @@ export default function ServerLayout({ children }: { children: React.ReactNode }
 
       {children}
     </div>
+  );
+}
+
+export default function ServerLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <ServerProvider>
+      <ServerLayoutInner>{children}</ServerLayoutInner>
+    </ServerProvider>
   );
 }
