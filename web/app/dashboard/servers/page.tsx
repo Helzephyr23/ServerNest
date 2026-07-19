@@ -97,19 +97,19 @@ export default function ServersPage() {
                 <div className="mb-4 space-y-1 text-sm text-muted-foreground">
                   <p>Port: {server.port}</p>
                   <p>RAM: {server.ram_mb} MB</p>
-                  {server.cpu_percent !== null && <p>CPU: {server.cpu_percent}%</p>}
+                  <p>CPU: {server.cpu_percent !== null ? `${server.cpu_percent}%` : "N/A"}</p>
                 </div>
-                <div className="flex gap-2">
-                  <Link href={`/dashboard/servers/${server.id}`} className="flex-1">
+                <div className="grid grid-cols-3 gap-2">
+                  <Link href={`/dashboard/servers/${server.id}`}>
                     <Button variant="outline" className="w-full" size="sm">Manage</Button>
                   </Link>
-                  <Button variant="ghost" size="sm" onClick={() => handleClone(server.id, server.name)} disabled={cloning === server.id}>
+                  <Button variant="ghost" size="sm" className="w-full min-w-[4rem]" onClick={() => handleClone(server.id, server.name)} disabled={cloning === server.id}>
                     {cloning === server.id ? "..." : "Clone"}
                   </Button>
                   {server.status === "running" ? (
-                    <Button variant="outline" size="sm" onClick={() => handleAction(server.id, "stop")}>Stop</Button>
+                    <Button variant="outline" size="sm" className="w-full" onClick={() => handleAction(server.id, "stop")}>Stop</Button>
                   ) : (
-                    <Button size="sm" onClick={() => handleAction(server.id, "start")}>Start</Button>
+                    <Button size="sm" className="w-full" onClick={() => handleAction(server.id, "start")}>Start</Button>
                   )}
                 </div>
               </CardContent>

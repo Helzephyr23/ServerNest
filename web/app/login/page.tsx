@@ -2,14 +2,13 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useAuth } from "@/lib/auth";
+import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login, verifyTotp } = useAuth();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [tempToken, setTempToken] = useState("");
@@ -22,10 +21,11 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
     try {
-      const result = await login(username, password);
-      if (result && result.requiresTotp && result.tempToken) {
-        setTempToken(result.tempToken);
+      const res = await api.post("/api/auth/login", { username, password });
+      if (res.requiresTotp) {
+        setTempToken(res.tempToken);
       } else {
+        localStorage.setItem("biryani_token", res.token);
         router.push("/dashboard");
       }
     } catch (err: any) {
@@ -40,7 +40,8 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
     try {
-      await verifyTotp(tempToken, totpCode);
+      const res = await api.post("/api/auth/2fa/challenge", { tempToken, code: totpCode });
+      localStorage.setItem("biryani_token", res.token);
       router.push("/dashboard");
     } catch (err: any) {
       setError(err.message || "Invalid code");
