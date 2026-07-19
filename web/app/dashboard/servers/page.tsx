@@ -26,6 +26,17 @@ export default function ServersPage() {
     fetchServers();
   };
 
+  const [cloning, setCloning] = useState<number | null>(null);
+
+  const handleClone = async (id: number, name: string) => {
+    setCloning(id);
+    try {
+      await api.post(`/api/servers/${id}/clone`);
+      fetchServers();
+    } catch {}
+    setCloning(null);
+  };
+
   const handleDelete = async (id: number, name: string) => {
     if (!(await showConfirm({ title: "Delete Server", message: `Delete server "${name}"? This cannot be undone.` }))) return;
     await api.delete(`/api/servers/${id}`);
@@ -92,6 +103,9 @@ export default function ServersPage() {
                   <Link href={`/dashboard/servers/${server.id}`} className="flex-1">
                     <Button variant="outline" className="w-full" size="sm">Manage</Button>
                   </Link>
+                  <Button variant="ghost" size="sm" onClick={() => handleClone(server.id, server.name)} disabled={cloning === server.id}>
+                    {cloning === server.id ? "..." : "Clone"}
+                  </Button>
                   {server.status === "running" ? (
                     <Button variant="outline" size="sm" onClick={() => handleAction(server.id, "stop")}>Stop</Button>
                   ) : (

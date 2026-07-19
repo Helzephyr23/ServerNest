@@ -7,6 +7,7 @@ import {
   createServer,
   updateServer,
   deleteServer,
+  cloneServer,
   startServer,
   stopServer,
   restartServer,
@@ -227,6 +228,16 @@ export default async function serverRoutes(app: FastifyInstance) {
     const dataDir = `${process.cwd()}/data/server-${server.id}`;
     try { if (existsSync(dataDir)) rmSync(dataDir, { recursive: true, force: true }); } catch {}
     return { success: true };
+  });
+
+  app.post("/api/servers/:id/clone", { preHandler: [authMiddleware, adminMiddleware] }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    try {
+      const server = await cloneServer(Number(id));
+      return reply.status(201).send({ server });
+    } catch (err: any) {
+      return reply.status(500).send({ error: err.message });
+    }
   });
 
   app.post("/api/servers/:id/start", opts, async (request, reply) => {
