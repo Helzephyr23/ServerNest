@@ -39,6 +39,13 @@ await app.register(cors, { origin: true, credentials: true });
 await app.register(jwt, { secret: env.JWT_SECRET, sign: { expiresIn: env.JWT_EXPIRES_IN } });
 await app.register(multipart, { limits: { fileSize: 2048 * 1024 * 1024 } });
 
+app.addHook("onRequest", async (_request, reply) => {
+  reply.header("X-Content-Type-Options", "nosniff");
+  reply.header("X-Frame-Options", "DENY");
+  reply.header("X-XSS-Protection", "0");
+  reply.header("Referrer-Policy", "strict-origin-when-cross-origin");
+});
+
 await app.register(authRoutes);
 await app.register(serverRoutes);
 await app.register(modsRoutes);

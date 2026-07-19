@@ -18,6 +18,7 @@ interface OverviewData {
 export default function DashboardPage() {
   const [data, setData] = useState<OverviewData | null>(null);
   const [servers, setServers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     Promise.all([
@@ -36,8 +37,7 @@ export default function DashboardPage() {
       setData(safeData);
       setServers(Array.isArray(serverRes?.servers) ? serverRes.servers : []);
     })
-    .catch((err) => {
-        console.error(err);
+    .catch(() => {
         setData({
           nodes: [],
           metrics: {
@@ -47,8 +47,17 @@ export default function DashboardPage() {
             used_memory_mb: 0,
           },
         });
-      });
+      })
+    .finally(() => setLoading(false));
   }, []);
+
+  if (loading) {
+    return (
+      <div className="flex justify-center py-12">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+      </div>
+    );
+  }
 
   const stats = data?.metrics;
 

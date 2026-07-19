@@ -1,4 +1,5 @@
 import db from "../config/database.js";
+import { logger } from "../utils/logger.js";
 
 export interface Notification {
   id: number;
@@ -49,7 +50,7 @@ export async function sendDiscordNotification(webhookUrl: string, title: string,
       }),
     });
   } catch (err) {
-    console.error("[Notification] Failed to send Discord notification:", err);
+    logger.error("Failed to send Discord notification:", err);
   }
 }
 

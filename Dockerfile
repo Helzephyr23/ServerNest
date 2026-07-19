@@ -47,4 +47,7 @@ EXPOSE 3000 3001 25565-25665
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD curl -f http://localhost:3001/api/health || exit 1
 
-CMD ["sh", "-c", "node src/dist/index.js & node web-standalone/server.js & wait"]
+COPY entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+
+CMD ["/app/entrypoint.sh"]
