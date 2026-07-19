@@ -220,6 +220,14 @@ export function migrate() {
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     );
   `);
+
+  const userColumns = db.prepare("PRAGMA table_info(users)").all() as { name: string }[];
+  if (!userColumns.some((c) => c.name === "totp_secret")) {
+    db.exec("ALTER TABLE users ADD COLUMN totp_secret TEXT");
+  }
+  if (!userColumns.some((c) => c.name === "totp_enabled")) {
+    db.exec("ALTER TABLE users ADD COLUMN totp_enabled INTEGER NOT NULL DEFAULT 0");
+  }
 }
 
 export default db;

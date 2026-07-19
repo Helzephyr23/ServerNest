@@ -1,5 +1,9 @@
 import { FastifyInstance } from "fastify";
-import { getUserByUsername, createUser, verifyPassword, isFirstRun, createSession } from "../services/auth.service.js";
+import {
+  getUserByUsername, getUserById, createUser, verifyPassword, isFirstRun, createSession,
+  isTotpEnabled, setupTotp, verifyTotpCode, enableTotp, disableTotp, getUserTotpStatus,
+} from "../services/auth.service.js";
+import { authMiddleware } from "../middleware/auth.js";
 import { rateLimit } from "../middleware/rate-limit.js";
 import { validate, schemas } from "../middleware/validate.js";
 
@@ -30,6 +34,15 @@ export default async function authRoutes(app: FastifyInstance) {
       if (!user || !(await verifyPassword(user, password))) {
         return reply.status(401).send({ error: "Invalid credentials" });
       }
+
+      if (isTotpEnabled(user.id)) {
+        const tempToken = app.jwt.sign(
+          { purpose: "totp", id: user.id },
+          { expiresIn: "5m" }
+        );
+        return { requiresTotp: true, tempToken, user: { id: user.id, username: user.username, role: user.role } };
+      }
+
       const jti = createSession(user.id, request.headers["user-agent"], request.ip);
       const token = app.jwt.sign({ id: user.id, username: user.username, role: user.role, jti });
       return { token, user: { id: user.id, username: user.username, role: user.role } };
@@ -37,6 +50,94 @@ export default async function authRoutes(app: FastifyInstance) {
       request.log.error(err, "Login failed");
       return reply.status(500).send({ error: err.message || "Internal server error" });
     }
+  });
+
+  app.post("/api/auth/2fa/challenge", {
+    preHandler: [rateLimit(5, 60000)],
+  }, async (request, reply) => {
+    try {
+      const { tempToken, code } = request.body as { tempToken: string; code: string };
+      if (!tempToken || !code) {
+        return reply.status(400).send({ error: "tempToken and code are required" });
+      }
+
+      let decoded: any;
+      try {
+        decoded = app.jwt.verify(tempToken);
+      } catch {
+        return reply.status(401).send({ error: "Invalid or expired temp token" });
+      }
+
+      if (decoded.purpose !== "totp" || !decoded.id) {
+        return reply.status(401).send({ error: "Invalid temp token" });
+      }
+
+      if (!verifyTotpCode(code, decoded.id)) {
+        return reply.status(401).send({ error: "Invalid authentication code" });
+      }
+
+      const user = getUserById(decoded.id);
+      if (!user) return reply.status(401).send({ error: "User not found" });
+
+      const jti = createSession(user.id, request.headers["user-agent"], request.ip);
+      const token = app.jwt.sign({ id: user.id, username: user.username, role: user.role, jti });
+      return { token, user: { id: user.id, username: user.username, role: user.role } };
+    } catch (err: any) {
+      return reply.status(500).send({ error: err.message });
+    }
+  });
+
+  app.get("/api/auth/2fa/status", {
+    preHandler: [authMiddleware],
+  }, async (request) => {
+    const user = (request as any).user;
+    return getUserTotpStatus(user.id);
+  });
+
+  app.post("/api/auth/2fa/setup", {
+    preHandler: [authMiddleware],
+  }, async (request, reply) => {
+    const user = (request as any).user;
+    const status = getUserTotpStatus(user.id);
+    if (status.enabled) {
+      return reply.status(400).send({ error: "2FA is already enabled" });
+    }
+    const result = await setupTotp(user.id);
+    return result;
+  });
+
+  app.post("/api/auth/2fa/verify", {
+    preHandler: [authMiddleware],
+  }, async (request, reply) => {
+    const user = (request as any).user;
+    const { code } = request.body as { code: string };
+    if (!code) return reply.status(400).send({ error: "code is required" });
+
+    if (!verifyTotpCode(code, user.id)) {
+      return reply.status(401).send({ error: "Invalid code" });
+    }
+
+    enableTotp(user.id);
+    return { success: true };
+  });
+
+  app.post("/api/auth/2fa/disable", {
+    preHandler: [authMiddleware],
+  }, async (request, reply) => {
+    const user = (request as any).user;
+    const { password, code } = request.body as { password: string; code: string };
+
+    const fullUser = getUserByUsername(user.username);
+    if (!fullUser || !(await verifyPassword(fullUser, password))) {
+      return reply.status(401).send({ error: "Invalid password" });
+    }
+
+    if (!verifyTotpCode(code, user.id)) {
+      return reply.status(401).send({ error: "Invalid code" });
+    }
+
+    disableTotp(user.id);
+    return { success: true };
   });
 
   app.get("/api/auth/me", {

@@ -1,6 +1,8 @@
 import db from "../config/database.js";
 import argon2 from "argon2";
 import crypto from "crypto";
+import * as otplib from "otplib";
+import qrcode from "qrcode";
 import { env } from "../config/env.js";
 
 interface User {
@@ -90,4 +92,48 @@ export function revokeAllUserSessions(userId: number, excludeJti?: string): void
 
 export function touchSession(jti: string): void {
   db.prepare("UPDATE sessions SET last_used = datetime('now') WHERE jti = ?").run(jti);
+}
+
+// ── 2FA / TOTP ──
+
+interface UserWithTotp extends User {
+  totp_secret: string | null;
+  totp_enabled: number;
+}
+
+export function isTotpEnabled(userId: number): boolean {
+  const user = db.prepare("SELECT totp_enabled FROM users WHERE id = ?").get(userId) as { totp_enabled: number } | undefined;
+  return user?.totp_enabled === 1;
+}
+
+export async function setupTotp(userId: number): Promise<{ secret: string; uri: string; qr: string }> {
+  const secret = otplib.generateSecret();
+  const user = db.prepare("SELECT username FROM users WHERE id = ?").get(userId) as { username: string } | undefined;
+  const uri = otplib.generateURI({ issuer: "Biryani", label: user?.username || "user", secret });
+  const qr = await qrcode.toDataURL(uri);
+
+  db.prepare("UPDATE users SET totp_secret = ? WHERE id = ?").run(secret, userId);
+  return { secret, uri, qr };
+}
+
+export function verifyTotpCode(code: string, userId: number): boolean {
+  const user = db.prepare("SELECT totp_secret FROM users WHERE id = ?").get(userId) as UserWithTotp | undefined;
+  if (!user?.totp_secret) return false;
+  return otplib.verifySync({ token: code, secret: user.totp_secret }).valid;
+}
+
+export function enableTotp(userId: number): void {
+  db.prepare("UPDATE users SET totp_enabled = 1 WHERE id = ?").run(userId);
+}
+
+export function disableTotp(userId: number): void {
+  db.prepare("UPDATE users SET totp_secret = NULL, totp_enabled = 0 WHERE id = ?").run(userId);
+}
+
+export function getUserTotpStatus(userId: number): { enabled: boolean; setup: boolean } {
+  const user = db.prepare("SELECT totp_secret, totp_enabled FROM users WHERE id = ?").get(userId) as UserWithTotp | undefined;
+  return {
+    enabled: user?.totp_enabled === 1,
+    setup: !!user?.totp_secret,
+  };
 }
