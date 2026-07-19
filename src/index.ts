@@ -37,7 +37,7 @@ const app = Fastify({
 
 await app.register(cors, { origin: true, credentials: true });
 await app.register(jwt, { secret: env.JWT_SECRET, sign: { expiresIn: env.JWT_EXPIRES_IN } });
-await app.register(multipart);
+await app.register(multipart, { limits: { fileSize: 2048 * 1024 * 1024 } });
 
 await app.register(authRoutes);
 await app.register(serverRoutes);
