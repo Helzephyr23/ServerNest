@@ -3,7 +3,7 @@ import { authMiddleware } from "../middleware/auth.js";
 import { searchMods, searchPlugins, getProject, getProjectVersions, downloadMod } from "../services/modrinth.service.js";
 import { getServerById } from "../services/server.service.js";
 import db from "../config/database.js";
-import { readdirSync, statSync, unlinkSync } from "fs";
+import { readdirSync, statSync, unlinkSync, existsSync } from "fs";
 import { join } from "path";
 
 export default async function modsRoutes(app: FastifyInstance) {
@@ -74,8 +74,8 @@ export default async function modsRoutes(app: FastifyInstance) {
     }
 
     try {
-      db.prepare("INSERT INTO installed_mods (server_id, mod_slug, version_id, filename) VALUES (?, ?, ?, ?)")
-        .run(Number(id), "", versionId, result.filename);
+      db.prepare("INSERT INTO installed_mods (server_id, slug, mod_name, filename, version, source) VALUES (?, ?, ?, ?, ?, 'modrinth')")
+        .run(Number(id), result.slug, result.filename.replace(/\.jar$/, ""), result.filename, result.version_number);
     } catch {}
 
     return { success: true, filename: result.filename };
@@ -99,13 +99,71 @@ export default async function modsRoutes(app: FastifyInstance) {
       results.push({ versionId, success: result.success, filename: result.filename, error: result.error });
       if (result.success) {
         try {
-          db.prepare("INSERT INTO installed_mods (server_id, mod_slug, version_id, filename) VALUES (?, ?, ?, ?)")
-            .run(Number(id), "", versionId, result.filename);
+          db.prepare("INSERT INTO installed_mods (server_id, slug, mod_name, filename, version, source) VALUES (?, ?, ?, ?, ?, 'modrinth')")
+            .run(Number(id), result.slug, result.filename.replace(/\.jar$/, ""), result.filename, result.version_number);
         } catch {}
       }
     }
 
     return { results };
+  });
+
+  app.post("/api/servers/:id/mods/check-updates", opts, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const server = getServerById(Number(id));
+    if (!server) return reply.status(404).send({ error: "Server not found" });
+
+    const dbMods = db.prepare("SELECT slug, filename, version, mod_name FROM installed_mods WHERE server_id = ? AND slug IS NOT NULL AND slug != ''").all(Number(id)) as { slug: string; filename: string; version: string; mod_name: string }[];
+    const updates: any[] = [];
+
+    for (const mod of dbMods) {
+      try {
+        const versions = await getProjectVersions(mod.slug, server.mc_version);
+        if (versions.length === 0) continue;
+        const latest = versions[0];
+        if (latest.version_number !== mod.version) {
+          updates.push({
+            slug: mod.slug,
+            filename: mod.filename,
+            modName: mod.mod_name,
+            currentVersion: mod.version,
+            latestVersion: latest.version_number,
+            latestVersionId: latest.id,
+          });
+        }
+      } catch {}
+    }
+
+    return { updates };
+  });
+
+  app.post("/api/servers/:id/mods/update/:filename", opts, async (request, reply) => {
+    const { id, filename } = request.params as { id: string; filename: string };
+    const server = getServerById(Number(id));
+    if (!server) return reply.status(404).send({ error: "Server not found" });
+
+    const mod = db.prepare("SELECT slug, version FROM installed_mods WHERE server_id = ? AND filename = ?").get(Number(id), filename) as { slug: string; version: string } | undefined;
+    if (!mod || !mod.slug) return reply.status(400).send({ error: "Mod slug not found — cannot check for updates" });
+
+    try {
+      const versions = await getProjectVersions(mod.slug, server.mc_version);
+      if (versions.length === 0) return reply.status(404).send({ error: "No versions found" });
+      const latest = versions[0];
+
+      const dataDir = `${process.cwd()}/data/server-${server.id}`;
+      const oldPath = join(dataDir, "mods", filename);
+      if (existsSync(oldPath)) unlinkSync(oldPath);
+
+      const result = await downloadMod(latest.id, dataDir);
+      if (!result.success) return reply.status(500).send({ error: result.error });
+
+      db.prepare("UPDATE installed_mods SET filename = ?, version = ? WHERE server_id = ? AND filename = ?")
+        .run(result.filename, result.version_number, Number(id), filename);
+
+      return { success: true, filename: result.filename, version: result.version_number };
+    } catch (err: any) {
+      return reply.status(500).send({ error: err.message });
+    }
   });
 
   app.delete("/api/servers/:id/mods/:filename", opts, async (request, reply) => {
@@ -116,6 +174,7 @@ export default async function modsRoutes(app: FastifyInstance) {
     try {
       const filePath = join(`${process.cwd()}/data/server-${server.id}/mods`, filename);
       unlinkSync(filePath);
+      db.prepare("DELETE FROM installed_mods WHERE server_id = ? AND filename = ?").run(Number(id), filename);
       return { success: true };
     } catch (err: any) {
       return reply.status(500).send({ error: err.message });

@@ -176,6 +176,11 @@ export function migrate() {
     );
   `);
 
+  const modColumns = db.prepare("PRAGMA table_info(installed_mods)").all() as { name: string }[];
+  if (!modColumns.some((c) => c.name === "slug")) {
+    db.exec("ALTER TABLE installed_mods ADD COLUMN slug TEXT");
+  }
+
   const backupColumns = db.prepare("PRAGMA table_info(backups)").all() as { name: string }[];
   if (!backupColumns.some((c) => c.name === "checksum")) {
     db.exec("ALTER TABLE backups ADD COLUMN checksum TEXT");

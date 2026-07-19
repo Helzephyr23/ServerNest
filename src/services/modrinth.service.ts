@@ -18,6 +18,7 @@ export interface ModrinthProject {
 
 export interface ModrinthVersion {
   id: string;
+  project_id: string;
   name: string;
   version_number: string;
   game_versions: string[];
@@ -92,7 +93,7 @@ export async function getProjectVersions(
 export async function downloadMod(
   versionId: string,
   serverDataDir: string
-): Promise<{ filename: string; success: boolean; error?: string }> {
+): Promise<{ filename: string; slug: string; version_number: string; success: boolean; error?: string }> {
   try {
     const res = await fetch(`${MODRINTH_API}/version/${versionId}`);
     if (!res.ok) throw new Error("Version not found");
@@ -115,8 +116,8 @@ export async function downloadMod(
     const filePath = join(modsDir, file.filename);
     writeFileSync(filePath, buffer);
 
-    return { filename: file.filename, success: true };
+    return { filename: file.filename, slug: version.project_id, version_number: version.version_number, success: true };
   } catch (err: any) {
-    return { filename: "", success: false, error: err.message };
+    return { filename: "", slug: "", version_number: "", success: false, error: err.message };
   }
 }

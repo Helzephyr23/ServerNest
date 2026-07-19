@@ -19,7 +19,7 @@ function formatBytes(bytes: number) {
 }
 
 export default function ModsPage() {
-  const { error: toastError } = useToast();
+  const { success, error: toastError } = useToast();
   const { confirm: showConfirm } = useConfirm();
   const params = useParams();
   const id = params.id as string;
@@ -27,6 +27,9 @@ export default function ModsPage() {
   const [mods, setMods] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [checkingUpdates, setCheckingUpdates] = useState(false);
+  const [updates, setUpdates] = useState<any[]>([]);
+  const [updatingMod, setUpdatingMod] = useState<string | null>(null);
 
   const fetchMods = async () => {
     try {
@@ -41,6 +44,32 @@ export default function ModsPage() {
 
   useEffect(() => { fetchMods(); }, [id]);
   useEffect(() => { if (server?.status) fetchMods(); }, [server?.status]);
+
+  const handleCheckUpdates = async () => {
+    setCheckingUpdates(true);
+    setUpdates([]);
+    try {
+      const { updates: u } = await api.post(`/api/servers/${id}/mods/check-updates`);
+      setUpdates(Array.isArray(u) ? u : []);
+      if (!u || u.length === 0) success("All mods are up to date");
+    } catch (err: any) {
+      toastError("Failed to check updates", err.message);
+    }
+    setCheckingUpdates(false);
+  };
+
+  const handleUpdate = async (mod: any) => {
+    setUpdatingMod(mod.filename);
+    try {
+      const res = await api.post(`/api/servers/${id}/mods/update/${encodeURIComponent(mod.filename)}`);
+      success(`Updated "${mod.filename}" to ${res.version}`);
+      setUpdates((prev) => prev.filter((u) => u.filename !== mod.filename));
+      fetchMods();
+    } catch (err: any) {
+      toastError("Failed to update", err.message);
+    }
+    setUpdatingMod(null);
+  };
 
   const handleDelete = async (filename: string) => {
     if (!(await showConfirm({ title: "Delete Mod", message: `Delete ${filename}?` }))) return;
@@ -64,18 +93,28 @@ export default function ModsPage() {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-bold">Installed Mods</h2>
-          <p className="text-sm text-muted-foreground">
-            {mods.length} {mods.length === 1 ? "mod" : "mods"} installed
-          </p>
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-xl font-bold">Installed Mods</h2>
+            <p className="text-sm text-muted-foreground">
+              {mods.length} {mods.length === 1 ? "mod" : "mods"} installed
+            </p>
+          </div>
+          <div className="flex gap-2">
+            {updates.length > 0 && (
+              <span className="rounded-full bg-yellow-500/10 px-2 py-1 text-xs font-medium text-yellow-500">
+                {updates.length} update{updates.length > 1 ? "s" : ""} available
+              </span>
+            )}
+            <Button variant="outline" onClick={handleCheckUpdates} disabled={checkingUpdates}>
+              {checkingUpdates ? "Checking..." : "Check Updates"}
+            </Button>
+            <Link href="/dashboard/marketplace">
+              <Button>Browse Marketplace</Button>
+            </Link>
+          </div>
         </div>
-        <Link href="/dashboard/marketplace">
-          <Button>Browse Marketplace</Button>
-        </Link>
-      </div>
 
       <Card>
         <CardContent className="p-0">
@@ -95,23 +134,45 @@ export default function ModsPage() {
             </div>
           ) : (
             <div className="divide-y">
-              {mods.map((mod) => (
-                <div key={mod.filename} className="flex items-center justify-between px-4 py-3">
-                  <div className="flex-1 min-w-0">
-                    <p className="truncate text-sm font-medium">{mod.filename}</p>
-                    <p className="text-xs text-muted-foreground">{formatBytes(mod.size)}</p>
+              {mods.map((mod) => {
+                const update = updates.find((u) => u.filename === mod.filename);
+                return (
+                  <div key={mod.filename} className="flex items-center justify-between px-4 py-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="truncate text-sm font-medium">{mod.filename}</p>
+                        {update && (
+                          <span className="shrink-0 rounded-full bg-yellow-500/10 px-2 py-0.5 text-[10px] font-medium text-yellow-500">
+                            Update available
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground">{formatBytes(mod.size)}</p>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      {update && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleUpdate(update)}
+                          disabled={updatingMod === mod.filename}
+                        >
+                          {updatingMod === mod.filename ? "..." : "Update"}
+                        </Button>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-destructive hover:text-destructive"
+                        onClick={() => handleDelete(mod.filename)}
+                        disabled={deleting === mod.filename}
+                      >
+                        {deleting === mod.filename ? "Deleting..." : "Delete"}
+                      </Button>
+                    </div>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-destructive hover:text-destructive"
-                    onClick={() => handleDelete(mod.filename)}
-                    disabled={deleting === mod.filename}
-                  >
-                    {deleting === mod.filename ? "Deleting..." : "Delete"}
-                  </Button>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </CardContent>
