@@ -30,23 +30,45 @@ A full codebase audit was conducted before launch. Below is a summary of finding
 
 ---
 
+## 🔴 Critical (must fix before production)
+
+### Security
+- [ ] **Encrypt TOTP secrets at rest** — stored in plaintext in SQLite; use encryption-at-rest or a dedicated secrets store
+- [ ] **Fix placeholder email in SECURITY.md** — `[your-email@example.com]` routes vulnerability reports nowhere
+- [ ] **Add brute-force protection / account lockout** — currently only rate limited (10 req/min); no account lockout on repeated failed logins
+- [ ] **Add `helmet` (fastify-helmet)** for more comprehensive security headers (currently set manually)
+
+### Infrastructure
+- [ ] **Add CI/CD pipeline (GitHub Actions)** — `.github/workflows/` is empty; no automated lint → typecheck → test → build on push/PR
+- [ ] **Pin dependency versions** and run `pnpm audit` to eliminate unpinned range risks
+
+### Code Quality
+- [ ] **Replace Python JSON manipulation in `players.ts`** — `routes/players.ts` uses `python3 -c` via Docker exec to edit JSON files; fragile, requires Python in containers. Replace with native `cat`/`tee` + built-in JSON manipulation
+- [ ] **Fix backup restore creating new container unnecessarily** — `backup.service.ts` always creates a new container on restore instead of reusing an existing one; can cause orphan containers and port conflicts
+- [ ] **Reduce `as any` usage** (~100+ occurrences in routes) — erodes type safety and suppresses real errors
+
+### UI Gaps
+- [ ] **Add file upload UI** — backend endpoint `POST /api/servers/:id/files/upload` exists, but the frontend files page has no upload button
+
+---
+
 ## 📋 Remaining (post-launch polish)
 
-### Medium Priority
-- [ ] Add CI/CD pipeline (GitHub Actions) — `.github/workflows/` is empty
-- [ ] Pin dependency versions and run `pnpm audit`
-- [ ] Reduce `as any` usage (~100+ occurrences in routes)
-- [ ] Replace Python JSON manipulation in `players.ts` with proper `rcon-cli` commands
-- [ ] Add `helmet` (fastify-helmet) for more comprehensive security headers
-- [ ] Add brute-force protection / account lockout
-- [ ] Encrypt TOTP secrets at rest
+### High Priority
+- [ ] **Fix silent catch blocks** — `server.service.ts:168-169` and `backup.service.ts:95-97` silently swallow Docker operation errors
+- [ ] **Add Zod validation to remaining routes** — import, update, config endpoints lack schema validation
+- [ ] **Deduplicate `execInContainer`/`writeInContainer`** — duplicated in both `routes/files.ts` and `routes/players.ts`; extract to shared utility
 
 ### Low Priority
-- [ ] Add Zod validation to remaining routes (import, update, config endpoints)
 - [ ] Replace `console.log` in agent with proper logger
 - [ ] Add `ISSUES.md` (referenced in ROADMAP)
 - [ ] Add Code of Conduct
 - [ ] Add `author`, `repository`, `bugs`, `homepage` fields to `package.json`
+- [ ] **Remove unused dependencies** (`adm-zip`, `@fastify/static` in `src/package.json`)
+- [ ] **Deduplicate root dependency** — `@fastify/multipart` in both root and `src/package.json`
+- [ ] **Update ROADMAP.md checkboxes** — several `[ ]` items already implemented (2FA, cloud backups, rate limit UI, session mgmt, batch mod install, cloning, version updater)
+- [ ] **Add `.env` to `.gitignore`** — `.env` file appears to be committed; should be gitignored
+- [ ] **Verify `next.config.ts` has `output: "standalone"`** — Dockerfile expects `.next/standalone/` for web runtime stage
 
 ---
 
