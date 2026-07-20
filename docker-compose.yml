@@ -1,3 +1,7 @@
+networks:
+  biryani:
+    driver: bridge
+
 services:
   api:
     container_name: biryani-api
@@ -5,6 +9,8 @@ services:
       context: .
       target: api-runtime
     restart: unless-stopped
+    networks:
+      - biryani
     ports:
       - "${API_PORT:-3001}:3001"
       - "${SERVER_PORT_RANGE_START:-25565}-${SERVER_PORT_RANGE_END:-25665}:25565-25665"
@@ -28,10 +34,14 @@ services:
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://127.0.0.1:3001}
     restart: unless-stopped
+    networks:
+      - biryani
     ports:
       - "${PANEL_PORT:-3000}:3000"
     environment:
       - NODE_ENV=production
+      - API_HOST=api
+      - API_PORT=3001
     depends_on:
       - api
 
