@@ -55,7 +55,8 @@ A full codebase audit was conducted before launch. Below is a summary of finding
 
 ### Infrastructure
 - [x] **Add CI/CD pipeline (GitHub Actions)** — created `.github/workflows/ci.yml` (lint → typecheck → test → build)
-- [ ] **Pin dependency versions** and run `pnpm audit` to eliminate unpinned range risks
+- [x] **Pin dependency versions** — all `^` ranges replaced with exact versions across all 4 package.json files. Removed unused `adm-zip`, `@fastify/static` and duplicated root `@fastify/multipart`
+- [x] **Run `pnpm audit`** — 7/8 vulns fixed. 1 moderate remaining (`postcss@8.4.31` inside `next@15.5.20`, upstream dep; will resolve when Next.js updates its bundled postcss)
 
 ### Code Quality
 - [x] **Replace Python JSON manipulation in `players.ts`** — now reads via `cat`, modifies in Node.js, writes via `tee`; no Python dependency
