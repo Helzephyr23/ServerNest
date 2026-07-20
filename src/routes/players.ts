@@ -76,9 +76,10 @@ export default async function playersRoutes(app: FastifyInstance) {
     const name = sanitizeName(rawName);
     const { id } = request.params as { id: string };
     try {
-      const entry = JSON.stringify({ name });
-      const script = `import json,sys; f=open('/data/whitelist.json','r'); d=json.load(f); f.close(); d.append(${entry}); f=open('/data/whitelist.json','w'); json.dump(d,f); f.close()`;
-      await execWithStdin(Number(id), ["python3", "-c", script], "");
+      const output = await execInContainer(Number(id), ["cat", "/data/whitelist.json"]);
+      const list = JSON.parse(output || "[]");
+      list.push({ name });
+      await execWithStdin(Number(id), ["tee", "/data/whitelist.json"], JSON.stringify(list, null, 2));
       return { success: true };
     } catch (err: any) {
       return reply.status(500).send({ error: err.message });
@@ -89,9 +90,10 @@ export default async function playersRoutes(app: FastifyInstance) {
     const { id, name: paramName } = request.params as { id: string; name: string };
     const name = sanitizeName(paramName);
     try {
-      const target = JSON.stringify(name.toLowerCase());
-      const script = `import json,sys; f=open('/data/whitelist.json','r'); d=json.load(f); f.close(); d=[x for x in d if x.get('name','').lower()!=${target}]; f=open('/data/whitelist.json','w'); json.dump(d,f); f.close()`;
-      await execWithStdin(Number(id), ["python3", "-c", script], "");
+      const output = await execInContainer(Number(id), ["cat", "/data/whitelist.json"]);
+      const list = JSON.parse(output || "[]");
+      const filtered = list.filter((x: any) => (x.name || "").toLowerCase() !== name.toLowerCase());
+      await execWithStdin(Number(id), ["tee", "/data/whitelist.json"], JSON.stringify(filtered, null, 2));
       return { success: true };
     } catch (err: any) {
       return reply.status(500).send({ error: err.message });
@@ -119,9 +121,10 @@ export default async function playersRoutes(app: FastifyInstance) {
     if (!rawName) return reply.status(400).send({ error: "name is required" });
     const name = sanitizeName(rawName);
     try {
-      const entry = { name, level: 4, bypassesPlayerLimit: false };
-      const script = `import json,sys; f=open('/data/ops.json','r'); d=json.load(f); f.close(); d.append(${JSON.stringify(entry)}); f=open('/data/ops.json','w'); json.dump(d,f); f.close()`;
-      await execWithStdin(Number(id), ["python3", "-c", script], "");
+      const output = await execInContainer(Number(id), ["cat", "/data/ops.json"]);
+      const list = JSON.parse(output || "[]");
+      list.push({ name, level: 4, bypassesPlayerLimit: false });
+      await execWithStdin(Number(id), ["tee", "/data/ops.json"], JSON.stringify(list, null, 2));
       return { success: true };
     } catch (err: any) {
       return reply.status(500).send({ error: err.message });
@@ -132,9 +135,10 @@ export default async function playersRoutes(app: FastifyInstance) {
     const { id, name: paramName } = request.params as { id: string; name: string };
     const name = sanitizeName(paramName);
     try {
-      const target = JSON.stringify(name.toLowerCase());
-      const script = `import json,sys; f=open('/data/ops.json','r'); d=json.load(f); f.close(); d=[x for x in d if x.get('name','').lower()!=${target}]; f=open('/data/ops.json','w'); json.dump(d,f); f.close()`;
-      await execWithStdin(Number(id), ["python3", "-c", script], "");
+      const output = await execInContainer(Number(id), ["cat", "/data/ops.json"]);
+      const list = JSON.parse(output || "[]");
+      const filtered = list.filter((x: any) => (x.name || "").toLowerCase() !== name.toLowerCase());
+      await execWithStdin(Number(id), ["tee", "/data/ops.json"], JSON.stringify(filtered, null, 2));
       return { success: true };
     } catch (err: any) {
       return reply.status(500).send({ error: err.message });
@@ -162,9 +166,10 @@ export default async function playersRoutes(app: FastifyInstance) {
     if (!rawName) return reply.status(400).send({ error: "name is required" });
     const name = sanitizeName(rawName);
     try {
-      const entry = { name, reason: reason || "Banned by operator", created: new Date().toISOString(), source: "Biryani" };
-      const script = `import json,sys; f=open('/data/banned-players.json','r'); d=json.load(f); f.close(); d.append(${JSON.stringify(entry)}); f=open('/data/banned-players.json','w'); json.dump(d,f); f.close()`;
-      await execWithStdin(Number(id), ["python3", "-c", script], "");
+      const output = await execInContainer(Number(id), ["cat", "/data/banned-players.json"]);
+      const list = JSON.parse(output || "[]");
+      list.push({ name, reason: reason || "Banned by operator", created: new Date().toISOString(), source: "Biryani" });
+      await execWithStdin(Number(id), ["tee", "/data/banned-players.json"], JSON.stringify(list, null, 2));
       return { success: true };
     } catch (err: any) {
       return reply.status(500).send({ error: err.message });
@@ -175,9 +180,10 @@ export default async function playersRoutes(app: FastifyInstance) {
     const { id, name: paramName } = request.params as { id: string; name: string };
     const name = sanitizeName(paramName);
     try {
-      const target = JSON.stringify(name.toLowerCase());
-      const script = `import json,sys; f=open('/data/banned-players.json','r'); d=json.load(f); f.close(); d=[x for x in d if x.get('name','').lower()!=${target}]; f=open('/data/banned-players.json','w'); json.dump(d,f); f.close()`;
-      await execWithStdin(Number(id), ["python3", "-c", script], "");
+      const output = await execInContainer(Number(id), ["cat", "/data/banned-players.json"]);
+      const list = JSON.parse(output || "[]");
+      const filtered = list.filter((x: any) => (x.name || "").toLowerCase() !== name.toLowerCase());
+      await execWithStdin(Number(id), ["tee", "/data/banned-players.json"], JSON.stringify(filtered, null, 2));
       return { success: true };
     } catch (err: any) {
       return reply.status(500).send({ error: err.message });

@@ -23,32 +23,47 @@ A full codebase audit was conducted before launch. Below is a summary of finding
 - **Next.js proxy** — rewrite destination uses `API_HOST`/`API_PORT` env vars (defaults `localhost:3001`)
 - **`.gitignore`** — added `web/.env`, `.env.*.local`, `.vscode/`, `.idea/`
 
-### Code Quality
+ ### Code Quality
 - **Zod validation** — `POST /api/nodes` now uses `schemas.createNode`; `PUT /files/content` now uses `schemas.fileContent`
+- **Python dependency removed** — `routes/players.ts` no longer uses `python3 -c`; replaced with native `cat`/`tee` + Node.js JSON manipulation
 - **TypeScript** — both backend and frontend pass `tsc --noEmit`
 - **Tests** — 114/115 pass (1 pre-existing failure unrelated to audit)
+
+### Infrastructure
+- **CI/CD pipeline** — `.github/workflows/ci.yml` created with lint → typecheck → test → build on push/PR to `main`/`feat/*`
+
+### UI
+- **File upload** — upload button with file picker added to files manager toolbar
+
+### Security Hardening
+- **Brute-force lockout** — accounts locked for 15 minutes after 10 failed login attempts
+- **TOTP encryption** — TOTP secrets encrypted at rest with AES-256-GCM (key derived from JWT_SECRET)
+- **Helmet** — `@fastify/helmet` registered; replaces manual security headers
+
+### Operational
+- **Backup restore reuses containers** — `restoreBackup()` now stops/reuses existing container instead of always creating a new one
 
 ---
 
 ## 🔴 Critical (must fix before production)
 
 ### Security
-- [ ] **Encrypt TOTP secrets at rest** — stored in plaintext in SQLite; use encryption-at-rest or a dedicated secrets store
-- [ ] **Fix placeholder email in SECURITY.md** — `[your-email@example.com]` routes vulnerability reports nowhere
-- [ ] **Add brute-force protection / account lockout** — currently only rate limited (10 req/min); no account lockout on repeated failed logins
-- [ ] **Add `helmet` (fastify-helmet)** for more comprehensive security headers (currently set manually)
+- [x] **Encrypt TOTP secrets at rest** — encrypted with AES-256-GCM using key derived from JWT_SECRET
+- [ ] ~~Fix placeholder email in SECURITY.md~~ — skipped (user choice)
+- [x] **Add brute-force protection / account lockout** — 10 failed attempts locks account for 15 minutes
+- [x] **Add `helmet` (fastify-helmet)** — registered in `src/index.ts`, replaced manual headers
 
 ### Infrastructure
-- [ ] **Add CI/CD pipeline (GitHub Actions)** — `.github/workflows/` is empty; no automated lint → typecheck → test → build on push/PR
+- [x] **Add CI/CD pipeline (GitHub Actions)** — created `.github/workflows/ci.yml` (lint → typecheck → test → build)
 - [ ] **Pin dependency versions** and run `pnpm audit` to eliminate unpinned range risks
 
 ### Code Quality
-- [ ] **Replace Python JSON manipulation in `players.ts`** — `routes/players.ts` uses `python3 -c` via Docker exec to edit JSON files; fragile, requires Python in containers. Replace with native `cat`/`tee` + built-in JSON manipulation
-- [ ] **Fix backup restore creating new container unnecessarily** — `backup.service.ts` always creates a new container on restore instead of reusing an existing one; can cause orphan containers and port conflicts
+- [x] **Replace Python JSON manipulation in `players.ts`** — now reads via `cat`, modifies in Node.js, writes via `tee`; no Python dependency
+- [x] **Fix backup restore creating new container unnecessarily** — now reuses existing container if present, falls back to creating new one
 - [ ] **Reduce `as any` usage** (~100+ occurrences in routes) — erodes type safety and suppresses real errors
 
 ### UI Gaps
-- [ ] **Add file upload UI** — backend endpoint `POST /api/servers/:id/files/upload` exists, but the frontend files page has no upload button
+- [x] **Add file upload UI** — upload button in files toolbar, uses hidden input + FormData via `api.upload()`
 
 ---
 
@@ -57,7 +72,9 @@ A full codebase audit was conducted before launch. Below is a summary of finding
 ### High Priority
 - [ ] **Fix silent catch blocks** — `server.service.ts:168-169` and `backup.service.ts:95-97` silently swallow Docker operation errors
 - [ ] **Add Zod validation to remaining routes** — import, update, config endpoints lack schema validation
-- [ ] **Deduplicate `execInContainer`/`writeInContainer`** — duplicated in both `routes/files.ts` and `routes/players.ts`; extract to shared utility
+- [ ] **Deduplicate `execInContainer`/`writeInContainer`** — now only duplicated in `routes/files.ts` and `routes/players.ts` (no longer uses Python); extract to shared utility
+- [ ] **Reduce `as any` usage** (~100+ occurrences in routes) — erodes type safety and suppresses real errors
+- [ ] **Pin dependency versions** and run `pnpm audit` to eliminate unpinned range risks
 
 ### Low Priority
 - [ ] Replace `console.log` in agent with proper logger
@@ -67,7 +84,6 @@ A full codebase audit was conducted before launch. Below is a summary of finding
 - [ ] **Remove unused dependencies** (`adm-zip`, `@fastify/static` in `src/package.json`)
 - [ ] **Deduplicate root dependency** — `@fastify/multipart` in both root and `src/package.json`
 - [ ] **Update ROADMAP.md checkboxes** — several `[ ]` items already implemented (2FA, cloud backups, rate limit UI, session mgmt, batch mod install, cloning, version updater)
-- [ ] **Add `.env` to `.gitignore`** — `.env` file appears to be committed; should be gitignored
 - [ ] **Verify `next.config.ts` has `output: "standalone"`** — Dockerfile expects `.next/standalone/` for web runtime stage
 
 ---
@@ -75,12 +91,19 @@ A full codebase audit was conducted before launch. Below is a summary of finding
 ## Files Modified
 
 | File | Change |
-|---|---|
+|---|---|---|
 | `.gitignore` | Added patterns for `web/.env`, `.env.*.local`, `.vscode/`, `.idea/` |
+| `.github/workflows/ci.yml` | Created CI pipeline (lint → typecheck → test → build) |
 | `docker-compose.yml` | Added `biryani` network; `API_HOST=api` env for web container |
 | `src/config/env.ts` | `JWT_EXPIRES_IN` 24h; `checkJwtSecret()` startup guard |
-| `src/index.ts` | CORS, CSP, HSTS, error handler, Socket.IO CORS |
+| `src/config/database.ts` | Added `failed_logins` table for brute-force lockout tracking |
+| `src/index.ts` | CORS, CSP, HSTS, error handler, Socket.IO CORS; added `@fastify/helmet` |
+| `src/routes/auth.ts` | Brute-force lockout check before login; `recordFailedLogin`/`clearFailedLogins` |
 | `src/routes/files.ts` | `writeInContainer()` function; no shell interpolation |
 | `src/routes/nodes.ts` | Zod validation via `schemas.createNode` |
-| `src/routes/players.ts` | `sanitizeName()` on all POST routes |
+| `src/routes/players.ts` | `sanitizeName()`; replaced all `python3 -c` JSON manipulation with native `cat`/`tee` I/O |
+| `src/services/auth.service.ts` | TOTP secrets encrypted at rest (AES-256-GCM); lockout management functions |
+| `src/services/backup.service.ts` | Restore reuses existing container instead of always creating a new one |
+| `web/lib/api.ts` | Added `api.upload()` method for multipart/form-data uploads |
+| `web/app/.../files/page.tsx` | Added "Upload" button, file input, and upload handler |
 | `web/next.config.ts` | `API_HOST`/`API_PORT` env vars for rewrite destination |

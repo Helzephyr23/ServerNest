@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams } from "next/navigation";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -33,6 +33,8 @@ export default function FilesPage() {
   const [showMkdir, setShowMkdir] = useState(false);
   const [newDirName, setNewDirName] = useState("");
   const [fileSearch, setFileSearch] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { server } = useServer();
 
@@ -102,6 +104,22 @@ export default function FilesPage() {
     }
   };
 
+  const uploadFiles = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      await api.upload(`/api/servers/${id}/files/upload?path=${encodeURIComponent(currentPath)}`, file);
+      success(`Uploaded ${file.name}`);
+      fetchFiles(currentPath);
+    } catch (err: any) {
+      toastError("Upload failed", err.message);
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
   const deleteFile = async (filePath: string, name: string) => {
     if (!(await showConfirm({ title: "Delete File", message: `Delete "${name}"?` }))) return;
     try {
@@ -142,11 +160,20 @@ export default function FilesPage() {
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold">File Manager</h2>
         <div className="flex gap-2">
+          <Button variant="outline" size="sm" disabled={uploading} onClick={() => fileInputRef.current?.click()}>
+            {uploading ? "Uploading..." : "Upload"}
+          </Button>
           <Button variant="outline" size="sm" onClick={() => setShowMkdir(!showMkdir)}>
             {showMkdir ? "Cancel" : "New Folder"}
           </Button>
           <Button variant="outline" size="sm" onClick={() => fetchFiles(currentPath)}>Refresh</Button>
         </div>
+        <input
+          ref={fileInputRef}
+          type="file"
+          onChange={uploadFiles}
+          className="hidden"
+        />
       </div>
 
       {showMkdir && (

@@ -3,6 +3,7 @@ import Fastify from "fastify";
 import cors from "@fastify/cors";
 import jwt from "@fastify/jwt";
 import multipart from "@fastify/multipart";
+import helmet from "@fastify/helmet";
 import { Server as SocketIOServer } from "socket.io";
 import { env, checkJwtSecret } from "./config/env.js";
 import { migrate } from "./config/database.js";
@@ -44,14 +45,13 @@ await app.register(cors, { origin: corsOrigin, credentials: true });
 await app.register(jwt, { secret: env.JWT_SECRET, sign: { expiresIn: env.JWT_EXPIRES_IN } });
 await app.register(multipart, { limits: { fileSize: 2048 * 1024 * 1024 } });
 
-app.addHook("onRequest", async (_request, reply) => {
-  reply.header("X-Content-Type-Options", "nosniff");
-  reply.header("X-Frame-Options", "DENY");
-  reply.header("X-XSS-Protection", "0");
-  reply.header("Referrer-Policy", "strict-origin-when-cross-origin");
-  if (env.NODE_ENV === "production") {
-    reply.header("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
-  }
+await app.register(helmet, {
+  contentSecurityPolicy: env.NODE_ENV === "production" ? undefined : false,
+  hsts: env.NODE_ENV === "production" ? { maxAge: 31536000, includeSubDomains: true } : false,
+  xssFilter: true,
+  noSniff: true,
+  frameguard: { action: "deny" },
+  referrerPolicy: { policy: "strict-origin-when-cross-origin" },
 });
 
 app.setErrorHandler((error: any, request, reply) => {
