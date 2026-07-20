@@ -49,9 +49,38 @@ async function request<T>(method: string, path: string, body?: any): Promise<T> 
   return data;
 }
 
+async function uploadFile<T>(path: string, file: File): Promise<T> {
+  const token = getToken();
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: "POST",
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: formData,
+  });
+
+  if (res.status === 401 && typeof window !== "undefined" && window.location.pathname !== "/login") {
+    localStorage.removeItem("biryani_token");
+    window.location.href = "/login";
+    throw new Error("Unauthorized");
+  }
+
+  let data: any;
+  try {
+    data = await res.json();
+  } catch {
+    throw new Error(`Upload failed (${res.status})`);
+  }
+
+  if (!res.ok) throw new Error(data.error || "Upload failed");
+  return data;
+}
+
 export const api = {
   get: <T = any>(path: string) => request<T>("GET", path),
   post: <T = any>(path: string, body?: any) => request<T>("POST", path, body),
   put: <T = any>(path: string, body?: any) => request<T>("PUT", path, body),
   delete: <T = any>(path: string) => request<T>("DELETE", path),
+  upload: <T = any>(path: string, file: File) => uploadFile<T>(path, file),
 };

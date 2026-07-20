@@ -4,6 +4,7 @@ import { env } from "../config/env.js";
 import { notify } from "./notification.service.js";
 import { Readable } from "stream";
 import { mkdirSync, existsSync } from "fs";
+import { cp } from "fs/promises";
 
 interface Server {
   id: number;
@@ -76,6 +77,45 @@ export function deleteServer(id: number) {
   db.prepare("DELETE FROM scheduled_tasks WHERE server_id = ?").run(id);
   db.prepare("DELETE FROM installed_mods WHERE server_id = ?").run(id);
   db.prepare("DELETE FROM servers WHERE id = ?").run(id);
+}
+
+export async function cloneServer(id: number): Promise<Server> {
+  const source = getServerById(id);
+  if (!source) throw new Error("Server not found");
+
+  const port = findAvailablePort();
+  const newName = `Copy of ${source.name}`;
+
+  const cloneTx = db.transaction(() => {
+    const result = db.prepare(
+      "INSERT INTO servers (name, node_id, port, mc_version, software, ram_mb, image, eula_accepted, eula_accepted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))"
+    ).run(newName, source.node_id, port, source.mc_version, source.software, source.ram_mb, source.image, source.eula_accepted);
+
+    const newId = result.lastInsertRowid as number;
+
+    const configs = db.prepare("SELECT key, value FROM server_config WHERE server_id = ?").all(id) as ServerConfig[];
+    for (const cfg of configs) {
+      db.prepare("INSERT INTO server_config (server_id, key, value) VALUES (?, ?, ?)").run(newId, cfg.key, cfg.value);
+    }
+
+    const mods = db.prepare("SELECT mod_name, filename, version, source FROM installed_mods WHERE server_id = ?").all(id) as { mod_name: string; filename: string; version: string; source: string }[];
+    for (const mod of mods) {
+      db.prepare("INSERT INTO installed_mods (server_id, mod_name, filename, version, source) VALUES (?, ?, ?, ?, ?)").run(newId, mod.mod_name, mod.filename, mod.version, mod.source);
+    }
+
+    return newId;
+  });
+
+  const newId = cloneTx();
+
+  const srcDir = `${process.cwd()}/data/server-${id}`;
+  const dstDir = `${process.cwd()}/data/server-${newId}`;
+  if (existsSync(srcDir)) {
+    mkdirSync(dstDir, { recursive: true });
+    await cp(srcDir, dstDir, { recursive: true, force: true });
+  }
+
+  return getServerById(newId)!;
 }
 
 export async function startServer(id: number): Promise<string | null> {

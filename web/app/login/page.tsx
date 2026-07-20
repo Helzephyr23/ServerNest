@@ -11,6 +11,8 @@ export default function LoginPage() {
   const router = useRouter();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [tempToken, setTempToken] = useState("");
+  const [totpCode, setTotpCode] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -19,11 +21,30 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
     try {
-      const { token } = await api.post("/api/auth/login", { username, password });
-      localStorage.setItem("biryani_token", token);
-      router.push("/dashboard");
+      const res = await api.post("/api/auth/login", { username, password });
+      if (res.requiresTotp) {
+        setTempToken(res.tempToken);
+      } else {
+        localStorage.setItem("biryani_token", res.token);
+        router.push("/dashboard");
+      }
     } catch (err: any) {
       setError(err.message || "Login failed");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleTotpSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+    try {
+      const res = await api.post("/api/auth/2fa/challenge", { tempToken, code: totpCode });
+      localStorage.setItem("biryani_token", res.token);
+      router.push("/dashboard");
+    } catch (err: any) {
+      setError(err.message || "Invalid code");
     } finally {
       setLoading(false);
     }
@@ -40,33 +61,59 @@ export default function LoginPage() {
           <CardDescription>Minecraft Server Panel</CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {error && (
-              <div className="rounded-md bg-destructive/10 px-4 py-3 text-sm text-destructive">{error}</div>
-            )}
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Username</label>
-              <Input
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="admin"
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Password</label>
-              <Input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                required
-              />
-            </div>
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Signing in..." : "Sign In"}
-            </Button>
-          </form>
+          {!tempToken ? (
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {error && (
+                <div className="rounded-md bg-destructive/10 px-4 py-3 text-sm text-destructive">{error}</div>
+              )}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Username</label>
+                <Input
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="admin"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Password</label>
+                <Input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  required
+                />
+              </div>
+              <Button type="submit" className="w-full" disabled={loading}>
+                {loading ? "Signing in..." : "Sign In"}
+              </Button>
+            </form>
+          ) : (
+            <form onSubmit={handleTotpSubmit} className="space-y-4">
+              {error && (
+                <div className="rounded-md bg-destructive/10 px-4 py-3 text-sm text-destructive">{error}</div>
+              )}
+              <div className="text-center">
+                <span className="text-4xl">🔐</span>
+                <p className="mt-2 text-sm text-muted-foreground">Enter the code from your authenticator app</p>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Authentication Code</label>
+                <Input
+                  value={totpCode}
+                  onChange={(e) => setTotpCode(e.target.value)}
+                  placeholder="000000"
+                  maxLength={6}
+                  className="text-center text-lg tracking-widest"
+                  required
+                />
+              </div>
+              <Button type="submit" className="w-full" disabled={loading}>
+                {loading ? "Verifying..." : "Verify"}
+              </Button>
+            </form>
+          )}
         </CardContent>
       </Card>
     </div>

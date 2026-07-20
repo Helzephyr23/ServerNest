@@ -15,14 +15,11 @@
     "test:watch": "pnpm --filter @biryani/api test:watch"
   },
   "devDependencies": {
-    "concurrently": "^9.1.0",
-    "typescript": "^5.7.0"
+    "concurrently": "9.2.4",
+    "typescript": "5.9.3"
   },
   "engines": {
     "node": ">=20.0.0"
   },
-  "packageManager": "pnpm@9.15.0",
-  "dependencies": {
-    "@fastify/multipart": "^9.0.1"
-  }
+  "packageManager": "pnpm@9.15.0"
 }

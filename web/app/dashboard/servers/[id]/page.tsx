@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -15,6 +16,19 @@ export default function ServerDetailPage() {
   const { success, error: toastError } = useToast();
   const { confirm: showConfirm } = useConfirm();
   const { server } = useServer();
+  const [cloning, setCloning] = useState(false);
+
+  const handleClone = async () => {
+    setCloning(true);
+    try {
+      const { server: cloned } = await api.post(`/api/servers/${id}/clone`);
+      success(`Cloned "${server?.name}" — new server created`);
+      router.push(`/dashboard/servers/${cloned.id}`);
+    } catch (err: any) {
+      toastError("Failed to clone server", err.message);
+    }
+    setCloning(false);
+  };
 
   const handleDelete = async () => {
     if (!(await showConfirm({ title: "Delete Server", message: `Delete server "${server?.name}"? This will remove all data and cannot be undone.` }))) return;
@@ -59,6 +73,15 @@ export default function ServerDetailPage() {
           <CardContent><p className="text-lg font-bold">{server.ram_mb >= 1024 ? `${server.ram_mb / 1024} GB` : `${server.ram_mb} MB`}</p></CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader><CardTitle>Actions</CardTitle></CardHeader>
+        <CardContent className="flex gap-2">
+          <Button variant="outline" onClick={handleClone} disabled={cloning}>
+            {cloning ? "Cloning..." : "Clone Server"}
+          </Button>
+        </CardContent>
+      </Card>
 
       <Card className="border-destructive/50">
         <CardHeader><CardTitle className="text-destructive">Danger Zone</CardTitle></CardHeader>
