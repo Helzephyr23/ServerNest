@@ -1,5 +1,6 @@
 import { FastifyInstance } from "fastify";
 import { authMiddleware } from "../middleware/auth.js";
+import { validate, schemas } from "../middleware/validate.js";
 import docker, { dockerStreamDemux } from "../config/docker.js";
 import db from "../config/database.js";
 import { join, normalize, relative } from "path";
@@ -28,6 +29,31 @@ async function execInContainer(serverId: number, cmd: string[]): Promise<string>
   const container = docker.getContainer(server.container_id);
   const exec = await container.exec({ Cmd: cmd, AttachStdout: true, AttachStderr: true });
   const stream = await exec.start({ Detach: false });
+  return new Promise((resolve, reject) => {
+    let output = "";
+    dockerStreamDemux(stream,
+      (data) => { output += data; },
+      (data) => { output += data; },
+    );
+    stream.on("end", () => resolve(output.trim()));
+    stream.on("error", reject);
+  });
+}
+
+async function writeInContainer(serverId: number, cmd: string[], stdin: string): Promise<string> {
+  const server = db.prepare("SELECT * FROM servers WHERE id = ?").get(serverId) as any;
+  if (!server || !server.container_id) throw new Error("Server not running");
+
+  const container = docker.getContainer(server.container_id);
+  const exec = await container.exec({
+    Cmd: cmd,
+    AttachStdin: true,
+    AttachStdout: true,
+    AttachStderr: true,
+  });
+  const stream = await exec.start({ Detach: false, Tty: false, hijack: true });
+  stream.write(stdin);
+  stream.end();
   return new Promise((resolve, reject) => {
     let output = "";
     dockerStreamDemux(stream,
@@ -80,17 +106,13 @@ export default async function filesRoutes(app: FastifyInstance) {
     }
   });
 
-  app.put("/api/servers/:id/files/content", opts, async (request, reply) => {
+  app.put("/api/servers/:id/files/content", { preHandler: [authMiddleware, validate(schemas.fileContent)] }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const serverId = Number(id);
     const { path: filePath, content } = request.body as { path: string; content: string };
-    if (!filePath || content === undefined) return reply.status(400).send({ error: "path and content are required" });
     try {
       const safePath = sanitizeContainerPath(filePath);
-      const b64 = Buffer.from(content).toString("base64");
-      await execInContainer(serverId, [
-        "bash", "-c", `echo '${b64}' | base64 -d > ${safePath}`,
-      ]);
+      await writeInContainer(serverId, ["tee", safePath], content);
       return { success: true };
     } catch (err: any) {
       return reply.status(500).send({ error: err.message });
@@ -154,10 +176,7 @@ export default async function filesRoutes(app: FastifyInstance) {
     try {
       const lines = Object.entries(properties).map(([k, v]) => `${k}=${v}`);
       const content = lines.join("\n");
-      const b64 = Buffer.from(content).toString("base64");
-      await execInContainer(serverId, [
-        "bash", "-c", `echo '${b64}' | base64 -d > /data/server.properties`,
-      ]);
+      await writeInContainer(serverId, ["tee", "/data/server.properties"], content);
       if (reload) {
         try {
           await execInContainer(serverId, ["rcon-cli", "reload"]);

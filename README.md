@@ -14,6 +14,10 @@
 
 Biryani is a **free, open-source, self-hosted** Minecraft server management panel with a modern UI, built-in mod marketplace, and multi-node clustering.
 
+### Screenshots
+
+> Screenshots coming soon — the project is in its initial release. We'd love to see your deployments!
+
 ### Features
 
 - **🖥️ Server Management** — Create, start, stop, restart Minecraft servers with one click
@@ -296,7 +300,8 @@ All API endpoints are prefixed with `/api` and require JWT authentication (via `
 | `PANEL_PORT` | `3000` | Frontend port |
 | `API_PORT` | `3001` | API port |
 | `JWT_SECRET` | - | **Required.** Secret for JWT tokens (change in production!) |
-| `JWT_EXPIRES_IN` | `1d` | Token expiration time |
+| `JWT_EXPIRES_IN` | `24h` | Token expiration time |
+| `CORS_ORIGIN` | `false` (prod) | Allowed CORS origin. Set to frontend URL (e.g. `https://panel.example.com`) in production. Disables CORS entirely when `false`. |
 | `DATABASE_PATH` | `./data/biryani.db` | SQLite database file path |
 | `DOCKER_IMAGE` | `itzg/minecraft-server` | Default Docker image for servers |
 | `SERVER_PORT_RANGE_START` | `25565` | Start of Minecraft server port range |
@@ -304,6 +309,7 @@ All API endpoints are prefixed with `/api` and require JWT authentication (via `
 | `NODE_NAME` | `master` | Name for this node |
 | `NODE_API_KEY` | - | API key for agent authentication |
 | `GRPC_PORT` | `50051` | Agent gRPC/Express port |
+| `NEXT_PUBLIC_API_URL` | `http://127.0.0.1:3001` | Frontend API base URL (used by the web container) |
 
 ---
 

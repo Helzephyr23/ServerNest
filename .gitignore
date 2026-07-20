@@ -3,6 +3,7 @@ dist/
 .next/
 .env
 .env.local
+.env.*.local
 *.db
 *.db-journal
 *.db-shm
@@ -13,3 +14,5 @@ Thumbs.db
 data/
 package-lock.json
 *.tsbuildinfo
+.vscode/
+.idea/

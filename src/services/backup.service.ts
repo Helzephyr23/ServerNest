@@ -135,52 +135,53 @@ export async function restoreBackup(serverId: number, backupId: number): Promise
   const containerName = `biryani-mc-${server.id}`;
   const dataDir = `${process.cwd()}/data/server-${server.id}`;
 
-  // Stop and remove existing container
-  try {
-    const existing = docker.getContainer(containerName);
-    await existing.stop({ t: 30 }).catch(() => {});
-    await existing.remove({ force: true }).catch(() => {});
-  } catch {}
-
   // Ensure data directory exists
   if (!existsSync(dataDir)) {
     mkdirSync(dataDir, { recursive: true });
   }
 
-  // Create a new container (without starting)
-  const image = server.image || "itzg/minecraft-server";
-  await docker.pull(image);
+  // Try to reuse existing container; fall back to creating a new one
+  let container;
+  try {
+    container = docker.getContainer(containerName);
+    await container.inspect();
+    await container.stop({ t: 30 }).catch(() => {});
+    await container.start().catch(() => {});
+  } catch {
+    const image = server.image || "itzg/minecraft-server";
+    await docker.pull(image);
 
-  const configs = db.prepare("SELECT key, value FROM server_config WHERE server_id = ?").all(serverId) as { key: string; value: string }[];
-  const envVars: Record<string, string> = {
-    EULA: "TRUE",
-    TYPE: "VANILLA",
-    VERSION: server.mc_version,
-    MEMORY: `${Math.floor(server.ram_mb / 1024)}G`,
-    SERVER_PORT: "25565",
-    TZ: "UTC",
-  };
-  for (const cfg of configs) {
-    if (cfg.key !== "EULA" && cfg.key !== "TYPE" && cfg.key !== "VERSION") {
-      envVars[cfg.key] = cfg.value;
+    const configs = db.prepare("SELECT key, value FROM server_config WHERE server_id = ?").all(serverId) as { key: string; value: string }[];
+    const envVars: Record<string, string> = {
+      EULA: "TRUE",
+      TYPE: "VANILLA",
+      VERSION: server.mc_version,
+      MEMORY: `${Math.floor(server.ram_mb / 1024)}G`,
+      SERVER_PORT: "25565",
+      TZ: "UTC",
+    };
+    for (const cfg of configs) {
+      if (cfg.key !== "EULA" && cfg.key !== "TYPE" && cfg.key !== "VERSION") {
+        envVars[cfg.key] = cfg.value;
+      }
     }
+
+    container = await docker.createContainer({
+      Image: image,
+      name: containerName,
+      Env: Object.entries(envVars).map(([k, v]) => `${k}=${v}`),
+      HostConfig: {
+        PortBindings: { "25565/tcp": [{ HostPort: server.port.toString() }] },
+        Memory: server.ram_mb * 1024 * 1024,
+        Binds: [`${dataDir}:/data`],
+        RestartPolicy: { Name: "unless-stopped" },
+      },
+      WorkingDir: "/data",
+      Labels: { "biryani.managed": "true", "biryani.server_id": server.id.toString() },
+    });
   }
 
-  const container = await docker.createContainer({
-    Image: image,
-    name: containerName,
-    Env: Object.entries(envVars).map(([k, v]) => `${k}=${v}`),
-    HostConfig: {
-      PortBindings: { "25565/tcp": [{ HostPort: server.port.toString() }] },
-      Memory: server.ram_mb * 1024 * 1024,
-      Binds: [`${dataDir}:/data`],
-      RestartPolicy: { Name: "unless-stopped" },
-    },
-    WorkingDir: "/data",
-    Labels: { "biryani.managed": "true", "biryani.server_id": server.id.toString() },
-  });
-
-  // Restore archive into the new container
+  // Restore archive into the container
   const restoreStream = createReadStream(backupPath).pipe(createGunzip());
   await container.putArchive(restoreStream, { path: "/data" });
 

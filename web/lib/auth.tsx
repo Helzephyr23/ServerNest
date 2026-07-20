@@ -12,7 +12,8 @@ interface User {
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  login: (username: string, password: string) => Promise<void>;
+  login: (username: string, password: string) => Promise<{ requiresTotp?: boolean; tempToken?: string } | void>;
+  verifyTotp: (tempToken: string, code: string) => Promise<void>;
   logout: () => void;
 }
 
@@ -20,6 +21,7 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   loading: true,
   login: async () => {},
+  verifyTotp: async () => {},
   logout: () => {},
 });
 
@@ -45,9 +47,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = async (username: string, password: string) => {
-    const { token, user } = await api.post("/api/auth/login", { username, password });
-    localStorage.setItem("biryani_token", token);
-    setUser(user);
+    const res = await api.post("/api/auth/login", { username, password });
+    if (res.requiresTotp) {
+      return { requiresTotp: true, tempToken: res.tempToken };
+    }
+    localStorage.setItem("biryani_token", res.token);
+    setUser(res.user);
+  };
+
+  const verifyTotp = async (tempToken: string, code: string) => {
+    const res = await api.post("/api/auth/2fa/challenge", { tempToken, code });
+    localStorage.setItem("biryani_token", res.token);
+    setUser(res.user);
   };
 
   const logout = () => {
@@ -57,7 +68,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, verifyTotp, logout }}>
       {children}
     </AuthContext.Provider>
   );

@@ -3,8 +3,9 @@ import Fastify from "fastify";
 import cors from "@fastify/cors";
 import jwt from "@fastify/jwt";
 import multipart from "@fastify/multipart";
+import helmet from "@fastify/helmet";
 import { Server as SocketIOServer } from "socket.io";
-import { env } from "./config/env.js";
+import { env, checkJwtSecret } from "./config/env.js";
 import { migrate } from "./config/database.js";
 import db from "./config/database.js";
 import authRoutes from "./routes/auth.js";
@@ -30,20 +31,38 @@ import { markStaleNodesOffline } from "./services/node.service.js";
 import { rotateAllBackups } from "./services/backup.service.js";
 import docker, { dockerStreamDemux } from "./config/docker.js";
 
+if (env.NODE_ENV === "production") {
+  checkJwtSecret();
+}
+
 const app = Fastify({
   logger: true,
   serverFactory: (handler) => http.createServer((req, res) => handler(req, res)),
 });
 
-await app.register(cors, { origin: true, credentials: true });
+const corsOrigin = process.env.CORS_ORIGIN || (env.NODE_ENV === "production" ? false : true);
+await app.register(cors, { origin: corsOrigin, credentials: true });
 await app.register(jwt, { secret: env.JWT_SECRET, sign: { expiresIn: env.JWT_EXPIRES_IN } });
 await app.register(multipart, { limits: { fileSize: 2048 * 1024 * 1024 } });
 
-app.addHook("onRequest", async (_request, reply) => {
-  reply.header("X-Content-Type-Options", "nosniff");
-  reply.header("X-Frame-Options", "DENY");
-  reply.header("X-XSS-Protection", "0");
-  reply.header("Referrer-Policy", "strict-origin-when-cross-origin");
+await app.register(helmet, {
+  contentSecurityPolicy: env.NODE_ENV === "production" ? undefined : false,
+  hsts: env.NODE_ENV === "production" ? { maxAge: 31536000, includeSubDomains: true } : false,
+  xssFilter: true,
+  noSniff: true,
+  frameguard: { action: "deny" },
+  referrerPolicy: { policy: "strict-origin-when-cross-origin" },
+});
+
+app.setErrorHandler((error: any, request, reply) => {
+  const statusCode = error.statusCode || 500;
+  const message = statusCode === 500 && env.NODE_ENV === "production"
+    ? "Internal server error"
+    : error.message || "Unknown error";
+  if (statusCode === 500) {
+    request.log.error(error.stack || error.message);
+  }
+  reply.status(statusCode).send({ error: message });
 });
 
 await app.register(authRoutes);
@@ -75,7 +94,12 @@ app.log.info("Database migrated");
 await app.listen({ port: env.API_PORT, host: "0.0.0.0" });
 app.log.info(`Biryani API running on port ${env.API_PORT}`);
 
-const io = new SocketIOServer(app.server as any, { cors: { origin: "*", credentials: true } });
+const io = new SocketIOServer(app.server as any, {
+  cors: {
+    origin: corsOrigin === true ? "*" : corsOrigin === false ? false : corsOrigin,
+    credentials: true,
+  },
+});
 setSocketIO(io);
 
 startAllTasks(async (task) => {

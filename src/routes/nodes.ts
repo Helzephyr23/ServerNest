@@ -1,5 +1,7 @@
 import { FastifyInstance } from "fastify";
+import { z } from "zod";
 import { authMiddleware, adminMiddleware } from "../middleware/auth.js";
+import { validate, schemas } from "../middleware/validate.js";
 import {
   getAllNodes,
   getNodeById,
@@ -32,12 +34,9 @@ export default async function nodeRoutes(app: FastifyInstance) {
     return { servers: getServersForNode(Number(id)) };
   });
 
-  app.post("/api/nodes", adminOpts, async (request, reply) => {
-    const { name, hostname, port, api_key, max_servers } = request.body as any;
-    if (!name || !hostname || !api_key) {
-      return reply.status(400).send({ error: "name, hostname, and api_key are required" });
-    }
-    const node = createNode({ name, hostname, port: port || 50051, api_key, max_servers });
+  app.post("/api/nodes", { preHandler: [authMiddleware, adminMiddleware, validate(schemas.createNode)] }, async (request, reply) => {
+    const data = request.body as z.infer<typeof schemas.createNode>;
+    const node = createNode(data);
     return reply.status(201).send({ node });
   });
 
