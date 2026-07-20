@@ -2,6 +2,7 @@ import { FastifyInstance } from "fastify";
 import {
   getUserByUsername, getUserById, createUser, verifyPassword, isFirstRun, createSession,
   isTotpEnabled, setupTotp, verifyTotpCode, enableTotp, disableTotp, getUserTotpStatus,
+  isAccountLocked, recordFailedLogin, clearFailedLogins,
 } from "../services/auth.service.js";
 import { authMiddleware } from "../middleware/auth.js";
 import { rateLimit } from "../middleware/rate-limit.js";
@@ -31,9 +32,20 @@ export default async function authRoutes(app: FastifyInstance) {
     try {
       const { username, password } = request.body as any;
       const user = getUserByUsername(username);
-      if (!user || !(await verifyPassword(user, password))) {
+      if (!user) {
         return reply.status(401).send({ error: "Invalid credentials" });
       }
+
+      if (isAccountLocked(user.id)) {
+        return reply.status(429).send({ error: "Account temporarily locked due to too many failed login attempts. Try again later." });
+      }
+
+      if (!(await verifyPassword(user, password))) {
+        recordFailedLogin(user.id);
+        return reply.status(401).send({ error: "Invalid credentials" });
+      }
+
+      clearFailedLogins(user.id);
 
       if (isTotpEnabled(user.id)) {
         const tempToken = app.jwt.sign(

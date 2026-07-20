@@ -5,6 +5,34 @@ import * as otplib from "otplib";
 import qrcode from "qrcode";
 import { env } from "../config/env.js";
 
+const MAX_LOGIN_ATTEMPTS = 10;
+const LOCKOUT_DURATION_MS = 15 * 60 * 1000;
+
+export function isAccountLocked(userId: number): boolean {
+  const row = db.prepare("SELECT locked_until FROM failed_logins WHERE user_id = ?").get(userId) as { locked_until: string | null } | undefined;
+  if (!row?.locked_until) return false;
+  return new Date(row.locked_until).getTime() > Date.now();
+}
+
+export function recordFailedLogin(userId: number): void {
+  const row = db.prepare("SELECT attempts, locked_until FROM failed_logins WHERE user_id = ?").get(userId) as { attempts: number; locked_until: string | null } | undefined;
+  if (row) {
+    const newAttempts = row.attempts + 1;
+    if (newAttempts >= MAX_LOGIN_ATTEMPTS) {
+      const lockedUntil = new Date(Date.now() + LOCKOUT_DURATION_MS).toISOString();
+      db.prepare("UPDATE failed_logins SET attempts = ?, last_attempt = datetime('now'), locked_until = ? WHERE user_id = ?").run(newAttempts, lockedUntil, userId);
+    } else {
+      db.prepare("UPDATE failed_logins SET attempts = ?, last_attempt = datetime('now') WHERE user_id = ?").run(newAttempts, userId);
+    }
+  } else {
+    db.prepare("INSERT INTO failed_logins (user_id, attempts) VALUES (?, 1)").run(userId);
+  }
+}
+
+export function clearFailedLogins(userId: number): void {
+  db.prepare("DELETE FROM failed_logins WHERE user_id = ?").run(userId);
+}
+
 interface User {
   id: number;
   username: string;
@@ -94,6 +122,41 @@ export function touchSession(jti: string): void {
   db.prepare("UPDATE sessions SET last_used = datetime('now') WHERE jti = ?").run(jti);
 }
 
+// ── TOTP Secret Encryption ──
+
+const ALGORITHM = "aes-256-gcm";
+const KEY_LENGTH = 32;
+const IV_LENGTH = 16;
+const TAG_LENGTH = 16;
+
+function deriveEncryptionKey(): Buffer {
+  return crypto.createHash("sha256").update(env.JWT_SECRET).digest();
+}
+
+function encryptSecret(plaintext: string): string {
+  const key = deriveEncryptionKey();
+  const iv = crypto.randomBytes(IV_LENGTH);
+  const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
+  let encrypted = cipher.update(plaintext, "utf8", "hex");
+  encrypted += cipher.final("hex");
+  const tag = cipher.getAuthTag().toString("hex");
+  return `${iv.toString("hex")}:${tag}:${encrypted}`;
+}
+
+function decryptSecret(ciphertext: string): string {
+  const key = deriveEncryptionKey();
+  const parts = ciphertext.split(":");
+  if (parts.length !== 3) throw new Error("Invalid encrypted secret format");
+  const iv = Buffer.from(parts[0], "hex");
+  const tag = Buffer.from(parts[1], "hex");
+  const encrypted = parts[2];
+  const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
+  decipher.setAuthTag(tag);
+  let decrypted = decipher.update(encrypted, "hex", "utf8");
+  decrypted += decipher.final("utf8");
+  return decrypted;
+}
+
 // ── 2FA / TOTP ──
 
 interface UserWithTotp extends User {
@@ -112,14 +175,19 @@ export async function setupTotp(userId: number): Promise<{ secret: string; uri: 
   const uri = otplib.generateURI({ issuer: "Biryani", label: user?.username || "user", secret });
   const qr = await qrcode.toDataURL(uri);
 
-  db.prepare("UPDATE users SET totp_secret = ? WHERE id = ?").run(secret, userId);
+  db.prepare("UPDATE users SET totp_secret = ? WHERE id = ?").run(encryptSecret(secret), userId);
   return { secret, uri, qr };
 }
 
 export function verifyTotpCode(code: string, userId: number): boolean {
   const user = db.prepare("SELECT totp_secret FROM users WHERE id = ?").get(userId) as UserWithTotp | undefined;
   if (!user?.totp_secret) return false;
-  return otplib.verifySync({ token: code, secret: user.totp_secret }).valid;
+  try {
+    const plaintext = decryptSecret(user.totp_secret);
+    return otplib.verifySync({ token: code, secret: plaintext }).valid;
+  } catch {
+    return false;
+  }
 }
 
 export function enableTotp(userId: number): void {

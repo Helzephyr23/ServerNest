@@ -221,6 +221,17 @@ export function migrate() {
     );
   `);
 
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS failed_logins (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id     INTEGER NOT NULL,
+      attempts    INTEGER NOT NULL DEFAULT 1,
+      last_attempt TEXT NOT NULL DEFAULT (datetime('now')),
+      locked_until TEXT,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+  `);
+
   const userColumns = db.prepare("PRAGMA table_info(users)").all() as { name: string }[];
   if (!userColumns.some((c) => c.name === "totp_secret")) {
     db.exec("ALTER TABLE users ADD COLUMN totp_secret TEXT");
