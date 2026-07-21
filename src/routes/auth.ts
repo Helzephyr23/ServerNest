@@ -65,13 +65,10 @@ export default async function authRoutes(app: FastifyInstance) {
   });
 
   app.post("/api/auth/2fa/challenge", {
-    preHandler: [rateLimit(5, 60000)],
+    preHandler: [rateLimit(5, 60000), validate(schemas.twofaChallenge)],
   }, async (request, reply) => {
     try {
       const { tempToken, code } = request.body as { tempToken: string; code: string };
-      if (!tempToken || !code) {
-        return reply.status(400).send({ error: "tempToken and code are required" });
-      }
 
       let decoded: any;
       try {
@@ -102,14 +99,14 @@ export default async function authRoutes(app: FastifyInstance) {
   app.get("/api/auth/2fa/status", {
     preHandler: [authMiddleware],
   }, async (request) => {
-    const user = (request as any).user;
+    const user = request.user!;
     return getUserTotpStatus(user.id);
   });
 
   app.post("/api/auth/2fa/setup", {
     preHandler: [authMiddleware],
   }, async (request, reply) => {
-    const user = (request as any).user;
+    const user = request.user!;
     const status = getUserTotpStatus(user.id);
     if (status.enabled) {
       return reply.status(400).send({ error: "2FA is already enabled" });
@@ -119,11 +116,10 @@ export default async function authRoutes(app: FastifyInstance) {
   });
 
   app.post("/api/auth/2fa/verify", {
-    preHandler: [authMiddleware],
+    preHandler: [authMiddleware, validate(schemas.twofaVerify)],
   }, async (request, reply) => {
-    const user = (request as any).user;
+    const user = request.user!;
     const { code } = request.body as { code: string };
-    if (!code) return reply.status(400).send({ error: "code is required" });
 
     if (!verifyTotpCode(code, user.id)) {
       return reply.status(401).send({ error: "Invalid code" });
@@ -134,9 +130,9 @@ export default async function authRoutes(app: FastifyInstance) {
   });
 
   app.post("/api/auth/2fa/disable", {
-    preHandler: [authMiddleware],
+    preHandler: [authMiddleware, validate(schemas.twofaDisable)],
   }, async (request, reply) => {
-    const user = (request as any).user;
+    const user = request.user!;
     const { password, code } = request.body as { password: string; code: string };
 
     const fullUser = getUserByUsername(user.username);
@@ -158,12 +154,12 @@ export default async function authRoutes(app: FastifyInstance) {
         const token = req.headers.authorization?.replace("Bearer ", "");
         if (!token) return reply.status(401).send({ error: "No token" });
         const decoded = app.jwt.verify<{ id: number; username: string; role: string }>(token);
-        (req as any).user = decoded;
+        req.user = decoded;
       } catch {
         return reply.status(401).send({ error: "Invalid token" });
       }
     }]
   }, async (request) => {
-    return { user: (request as any).user };
+    return { user: request.user };
   });
 }

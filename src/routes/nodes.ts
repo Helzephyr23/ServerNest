@@ -49,7 +49,7 @@ export default async function nodeRoutes(app: FastifyInstance) {
     return { success: true };
   });
 
-  app.post("/api/nodes/:id/heartbeat", opts, async (request, reply) => {
+  app.post("/api/nodes/:id/heartbeat", { preHandler: [authMiddleware, validate(schemas.nodeHeartbeat)] }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const { metrics } = request.body as { metrics?: { cpu_percent?: number; memory_percent?: number; disk_percent?: number } };
     const node = getNodeById(Number(id));
@@ -58,7 +58,7 @@ export default async function nodeRoutes(app: FastifyInstance) {
     return { success: true };
   });
 
-  app.post("/api/nodes/heartbeat", opts, async (request, reply) => {
+  app.post("/api/nodes/heartbeat", { preHandler: [authMiddleware, validate(schemas.nodeHeartbeatAgent)] }, async (request, reply) => {
     const { name, api_key, metrics } = request.body as {
       name?: string;
       api_key: string;

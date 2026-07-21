@@ -1,10 +1,16 @@
 import { FastifyInstance } from "fastify";
 import { authMiddleware } from "../middleware/auth.js";
+import { validate, schemas } from "../middleware/validate.js";
 import docker from "../config/docker.js";
 import db from "../config/database.js";
 
+interface ServerRow {
+  id: number;
+  container_id: string | null;
+}
+
 async function execInContainer(serverId: number, cmd: string[]): Promise<string> {
-  const server = db.prepare("SELECT * FROM servers WHERE id = ?").get(serverId) as any;
+  const server = db.prepare("SELECT * FROM servers WHERE id = ?").get(serverId) as ServerRow | undefined;
   if (!server || !server.container_id) throw new Error("Server not running");
 
   const container = docker.getContainer(server.container_id);
@@ -25,7 +31,7 @@ async function execInContainer(serverId: number, cmd: string[]): Promise<string>
 }
 
 async function execWithStdin(serverId: number, cmd: string[], stdin: string): Promise<string> {
-  const server = db.prepare("SELECT * FROM servers WHERE id = ?").get(serverId) as any;
+  const server = db.prepare("SELECT * FROM servers WHERE id = ?").get(serverId) as ServerRow | undefined;
   if (!server || !server.container_id) throw new Error("Server not running");
 
   const container = docker.getContainer(server.container_id);
@@ -55,13 +61,13 @@ function sanitizeName(name: string): string {
 export default async function playersRoutes(app: FastifyInstance) {
   const opts = { preHandler: [authMiddleware] };
 
-  app.get("/api/servers/:id/players/whitelist", opts, async (request, reply) => {
+  app.get("/api/servers/:id/players/whitelist", opts, async (request) => {
     const { id } = request.params as { id: string };
     try {
       const output = await execInContainer(Number(id), ["cat", "/data/whitelist.json"]);
       try {
         const list = JSON.parse(output);
-        return { players: list.map((e: any) => e.name || e.UUID || JSON.stringify(e)) };
+        return { players: list.map((e: { name?: string; UUID?: string }) => e.name || e.UUID || JSON.stringify(e)) };
       } catch {
         return { players: [] };
       }
@@ -70,9 +76,8 @@ export default async function playersRoutes(app: FastifyInstance) {
     }
   });
 
-  app.post("/api/servers/:id/players/whitelist", opts, async (request, reply) => {
-    const rawName = (request.body as { name: string }).name;
-    if (!rawName) return reply.status(400).send({ error: "name is required" });
+  app.post("/api/servers/:id/players/whitelist", { preHandler: [authMiddleware, validate(schemas.addPlayer)] }, async (request, reply) => {
+    const { name: rawName } = request.body as { name: string };
     const name = sanitizeName(rawName);
     const { id } = request.params as { id: string };
     try {
@@ -81,8 +86,8 @@ export default async function playersRoutes(app: FastifyInstance) {
       list.push({ name });
       await execWithStdin(Number(id), ["tee", "/data/whitelist.json"], JSON.stringify(list, null, 2));
       return { success: true };
-    } catch (err: any) {
-      return reply.status(500).send({ error: err.message });
+    } catch (err: unknown) {
+      return reply.status(500).send({ error: (err as Error).message });
     }
   });
 
@@ -92,21 +97,21 @@ export default async function playersRoutes(app: FastifyInstance) {
     try {
       const output = await execInContainer(Number(id), ["cat", "/data/whitelist.json"]);
       const list = JSON.parse(output || "[]");
-      const filtered = list.filter((x: any) => (x.name || "").toLowerCase() !== name.toLowerCase());
+      const filtered = list.filter((x: { name?: string }) => (x.name || "").toLowerCase() !== name.toLowerCase());
       await execWithStdin(Number(id), ["tee", "/data/whitelist.json"], JSON.stringify(filtered, null, 2));
       return { success: true };
-    } catch (err: any) {
-      return reply.status(500).send({ error: err.message });
+    } catch (err: unknown) {
+      return reply.status(500).send({ error: (err as Error).message });
     }
   });
 
-  app.get("/api/servers/:id/players/ops", opts, async (request, reply) => {
+  app.get("/api/servers/:id/players/ops", opts, async (request) => {
     const { id } = request.params as { id: string };
     try {
       const output = await execInContainer(Number(id), ["cat", "/data/ops.json"]);
       try {
         const list = JSON.parse(output);
-        return { players: list.map((e: any) => e.name || JSON.stringify(e)) };
+        return { players: list.map((e: { name?: string }) => e.name || JSON.stringify(e)) };
       } catch {
         return { players: [] };
       }
@@ -115,10 +120,9 @@ export default async function playersRoutes(app: FastifyInstance) {
     }
   });
 
-  app.post("/api/servers/:id/players/ops", opts, async (request, reply) => {
+  app.post("/api/servers/:id/players/ops", { preHandler: [authMiddleware, validate(schemas.addPlayer)] }, async (request, reply) => {
     const { id } = request.params as { id: string };
-    const rawName = (request.body as { name: string }).name;
-    if (!rawName) return reply.status(400).send({ error: "name is required" });
+    const { name: rawName } = request.body as { name: string };
     const name = sanitizeName(rawName);
     try {
       const output = await execInContainer(Number(id), ["cat", "/data/ops.json"]);
@@ -126,8 +130,8 @@ export default async function playersRoutes(app: FastifyInstance) {
       list.push({ name, level: 4, bypassesPlayerLimit: false });
       await execWithStdin(Number(id), ["tee", "/data/ops.json"], JSON.stringify(list, null, 2));
       return { success: true };
-    } catch (err: any) {
-      return reply.status(500).send({ error: err.message });
+    } catch (err: unknown) {
+      return reply.status(500).send({ error: (err as Error).message });
     }
   });
 
@@ -137,21 +141,21 @@ export default async function playersRoutes(app: FastifyInstance) {
     try {
       const output = await execInContainer(Number(id), ["cat", "/data/ops.json"]);
       const list = JSON.parse(output || "[]");
-      const filtered = list.filter((x: any) => (x.name || "").toLowerCase() !== name.toLowerCase());
+      const filtered = list.filter((x: { name?: string }) => (x.name || "").toLowerCase() !== name.toLowerCase());
       await execWithStdin(Number(id), ["tee", "/data/ops.json"], JSON.stringify(filtered, null, 2));
       return { success: true };
-    } catch (err: any) {
-      return reply.status(500).send({ error: err.message });
+    } catch (err: unknown) {
+      return reply.status(500).send({ error: (err as Error).message });
     }
   });
 
-  app.get("/api/servers/:id/players/bans", opts, async (request, reply) => {
+  app.get("/api/servers/:id/players/bans", opts, async (request) => {
     const { id } = request.params as { id: string };
     try {
       const output = await execInContainer(Number(id), ["cat", "/data/banned-players.json"]);
       try {
         const list = JSON.parse(output);
-        return { players: list.map((e: any) => ({ name: e.name, reason: e.reason, created: e.created })) };
+        return { players: list.map((e: { name?: string; reason?: string; created?: string }) => ({ name: e.name, reason: e.reason, created: e.created })) };
       } catch {
         return { players: [] };
       }
@@ -160,10 +164,9 @@ export default async function playersRoutes(app: FastifyInstance) {
     }
   });
 
-  app.post("/api/servers/:id/players/bans", opts, async (request, reply) => {
+  app.post("/api/servers/:id/players/bans", { preHandler: [authMiddleware, validate(schemas.addBanPlayer)] }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const { name: rawName, reason } = request.body as { name: string; reason?: string };
-    if (!rawName) return reply.status(400).send({ error: "name is required" });
     const name = sanitizeName(rawName);
     try {
       const output = await execInContainer(Number(id), ["cat", "/data/banned-players.json"]);
@@ -171,8 +174,8 @@ export default async function playersRoutes(app: FastifyInstance) {
       list.push({ name, reason: reason || "Banned by operator", created: new Date().toISOString(), source: "Biryani" });
       await execWithStdin(Number(id), ["tee", "/data/banned-players.json"], JSON.stringify(list, null, 2));
       return { success: true };
-    } catch (err: any) {
-      return reply.status(500).send({ error: err.message });
+    } catch (err: unknown) {
+      return reply.status(500).send({ error: (err as Error).message });
     }
   });
 
@@ -182,11 +185,11 @@ export default async function playersRoutes(app: FastifyInstance) {
     try {
       const output = await execInContainer(Number(id), ["cat", "/data/banned-players.json"]);
       const list = JSON.parse(output || "[]");
-      const filtered = list.filter((x: any) => (x.name || "").toLowerCase() !== name.toLowerCase());
+      const filtered = list.filter((x: { name?: string }) => (x.name || "").toLowerCase() !== name.toLowerCase());
       await execWithStdin(Number(id), ["tee", "/data/banned-players.json"], JSON.stringify(filtered, null, 2));
       return { success: true };
-    } catch (err: any) {
-      return reply.status(500).send({ error: err.message });
+    } catch (err: unknown) {
+      return reply.status(500).send({ error: (err as Error).message });
     }
   });
 }

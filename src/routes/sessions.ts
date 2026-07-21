@@ -6,13 +6,13 @@ export default async function sessionRoutes(app: FastifyInstance) {
   const opts = { preHandler: [authMiddleware] };
 
   app.get("/api/sessions", opts, async (request) => {
-    const user = (request as any).user;
+    const user = request.user!;
     const sessions = getSessions(user.id);
     return { sessions };
   });
 
   app.delete("/api/sessions/:id", opts, async (request, reply) => {
-    const user = (request as any).user;
+    const user = request.user!;
     const { id } = request.params as { id: string };
     const allSessions = getSessions(user.id);
     const target = allSessions.find((s) => s.id === Number(id));
@@ -22,7 +22,7 @@ export default async function sessionRoutes(app: FastifyInstance) {
   });
 
   app.post("/api/sessions/revoke-all", opts, async (request) => {
-    const user = (request as any).user;
+    const user = request.user!;
     const token = request.headers.authorization?.replace("Bearer ", "");
     let currentJti: string | undefined;
     if (token) {

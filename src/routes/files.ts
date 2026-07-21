@@ -22,8 +22,13 @@ function sanitizeContainerPath(userPath: string): string {
   return normal;
 }
 
+interface ServerRow {
+  id: number;
+  container_id: string | null;
+}
+
 async function execInContainer(serverId: number, cmd: string[]): Promise<string> {
-  const server = db.prepare("SELECT * FROM servers WHERE id = ?").get(serverId) as any;
+  const server = db.prepare("SELECT * FROM servers WHERE id = ?").get(serverId) as ServerRow | undefined;
   if (!server || !server.container_id) throw new Error("Server not running");
 
   const container = docker.getContainer(server.container_id);
@@ -41,7 +46,7 @@ async function execInContainer(serverId: number, cmd: string[]): Promise<string>
 }
 
 async function writeInContainer(serverId: number, cmd: string[], stdin: string): Promise<string> {
-  const server = db.prepare("SELECT * FROM servers WHERE id = ?").get(serverId) as any;
+  const server = db.prepare("SELECT * FROM servers WHERE id = ?").get(serverId) as ServerRow | undefined;
   if (!server || !server.container_id) throw new Error("Server not running");
 
   const container = docker.getContainer(server.container_id);
@@ -87,22 +92,22 @@ export default async function filesRoutes(app: FastifyInstance) {
         return { name, isDir, size: parseInt(size) || 0, date: dateStr, path: reqPath ? `${reqPath}/${name}` : name };
       }).filter((e) => e.name && e.name !== "." && e.name !== "..");
       return { entries, currentPath: reqPath };
-    } catch (err: any) {
-      return reply.status(500).send({ error: err.message });
+    } catch (err: unknown) {
+      return reply.status(500).send({ error: (err as Error).message });
     }
   });
 
-  app.get("/api/servers/:id/files/content", opts, async (request, reply) => {
+  app.delete("/api/servers/:id/files", opts, async (request, reply) => {
     const { id } = request.params as { id: string };
     const serverId = Number(id);
     const filePath = (request.query as any).path;
     if (!filePath) return reply.status(400).send({ error: "path is required" });
     try {
       const safePath = sanitizeContainerPath(filePath);
-      const output = await execInContainer(serverId, ["cat", safePath]);
-      return { content: output, path: filePath };
-    } catch (err: any) {
-      return reply.status(500).send({ error: err.message });
+      await execInContainer(serverId, ["rm", "-rf", safePath]);
+      return { success: true };
+    } catch (err: unknown) {
+      return reply.status(500).send({ error: (err as Error).message });
     }
   });
 
@@ -119,17 +124,16 @@ export default async function filesRoutes(app: FastifyInstance) {
     }
   });
 
-  app.post("/api/servers/:id/files/mkdir", opts, async (request, reply) => {
+  app.post("/api/servers/:id/files/mkdir", { preHandler: [authMiddleware, validate(schemas.mkdirPath)] }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const serverId = Number(id);
     const { path: dirPath } = request.body as { path: string };
-    if (!dirPath) return reply.status(400).send({ error: "path is required" });
     try {
       const safePath = sanitizeContainerPath(dirPath);
       await execInContainer(serverId, ["mkdir", "-p", safePath]);
       return { success: true };
-    } catch (err: any) {
-      return reply.status(500).send({ error: err.message });
+    } catch (err: unknown) {
+      return reply.status(500).send({ error: (err as Error).message });
     }
   });
 
@@ -142,8 +146,8 @@ export default async function filesRoutes(app: FastifyInstance) {
       const safePath = sanitizeContainerPath(filePath);
       await execInContainer(serverId, ["rm", "-rf", safePath]);
       return { success: true };
-    } catch (err: any) {
-      return reply.status(500).send({ error: err.message });
+    } catch (err: unknown) {
+      return reply.status(500).send({ error: (err as Error).message });
     }
   });
 
@@ -163,16 +167,15 @@ export default async function filesRoutes(app: FastifyInstance) {
         }
       });
       return { properties: props };
-    } catch (err: any) {
-      return reply.status(500).send({ error: err.message });
+    } catch (err: unknown) {
+      return reply.status(500).send({ error: (err as Error).message });
     }
   });
 
-  app.put("/api/servers/:id/properties", opts, async (request, reply) => {
+  app.put("/api/servers/:id/properties", { preHandler: [authMiddleware, validate(schemas.updateProperties)] }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const serverId = Number(id);
     const { properties, reload } = request.body as { properties: Record<string, string>; reload?: boolean };
-    if (!properties) return reply.status(400).send({ error: "properties are required" });
     try {
       const lines = Object.entries(properties).map(([k, v]) => `${k}=${v}`);
       const content = lines.join("\n");
@@ -183,15 +186,15 @@ export default async function filesRoutes(app: FastifyInstance) {
         } catch {}
       }
       return { success: true };
-    } catch (err: any) {
-      return reply.status(500).send({ error: err.message });
+    } catch (err: unknown) {
+      return reply.status(500).send({ error: (err as Error).message });
     }
   });
 
   app.post("/api/servers/:id/files/upload", opts, async (request, reply) => {
     const { id } = request.params as { id: string };
     const serverId = Number(id);
-    const server = db.prepare("SELECT * FROM servers WHERE id = ?").get(serverId) as any;
+    const server = db.prepare("SELECT * FROM servers WHERE id = ?").get(serverId) as ServerRow | undefined;
     if (!server) return reply.status(404).send({ error: "Server not found" });
 
     try {
@@ -217,8 +220,8 @@ export default async function filesRoutes(app: FastifyInstance) {
       writeFileSync(fullPath, buffer);
 
       return { success: true, filename: filePath, size: buffer.length };
-    } catch (err: any) {
-      return reply.status(500).send({ error: err.message });
+    } catch (err: unknown) {
+      return reply.status(500).send({ error: (err as Error).message });
     }
   });
 
@@ -228,7 +231,7 @@ export default async function filesRoutes(app: FastifyInstance) {
     const filePath = (request.query as any).path;
     if (!filePath) return reply.status(400).send({ error: "path is required" });
 
-    const server = db.prepare("SELECT * FROM servers WHERE id = ?").get(serverId) as any;
+    const server = db.prepare("SELECT * FROM servers WHERE id = ?").get(serverId) as ServerRow | undefined;
     if (!server) return reply.status(404).send({ error: "Server not found" });
 
     try {
@@ -246,8 +249,8 @@ export default async function filesRoutes(app: FastifyInstance) {
         .header("Content-Type", "application/octet-stream")
         .header("Content-Disposition", `attachment; filename="${filename}"`)
         .send(content);
-    } catch (err: any) {
-      return reply.status(500).send({ error: err.message });
+    } catch (err: unknown) {
+      return reply.status(500).send({ error: (err as Error).message });
     }
   });
 }

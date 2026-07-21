@@ -3,6 +3,16 @@ import { authMiddleware, adminMiddleware } from "../middleware/auth.js";
 import db from "../config/database.js";
 import { loadRateLimits } from "../middleware/rate-limit.js";
 
+interface RateLimitRule {
+  id: number;
+  route: string;
+  method: string;
+  max_requests: number;
+  window_ms: number;
+  enabled: number;
+  description: string | null;
+}
+
 export default async function rateLimitRoutes(app: FastifyInstance) {
   const opts = { preHandler: [authMiddleware, adminMiddleware] };
 
@@ -12,7 +22,7 @@ export default async function rateLimitRoutes(app: FastifyInstance) {
   });
 
   app.post("/api/rate-limits", opts, async (request, reply) => {
-    const body = request.body as any;
+    const body = request.body as { route?: string; method?: string; max_requests?: number; window_ms?: number; description?: string };
     if (!body.route || !body.max_requests || !body.window_ms) {
       return reply.status(400).send({ error: "route, max_requests, and window_ms are required" });
     }
@@ -25,17 +35,17 @@ export default async function rateLimitRoutes(app: FastifyInstance) {
 
   app.put("/api/rate-limits/:id", opts, async (request, reply) => {
     const { id } = request.params as { id: string };
-    const existing = db.prepare("SELECT * FROM rate_limits WHERE id = ?").get(Number(id));
+    const existing = db.prepare("SELECT * FROM rate_limits WHERE id = ?").get(Number(id)) as RateLimitRule | undefined;
     if (!existing) return reply.status(404).send({ error: "Rule not found" });
-    const body = request.body as any;
+    const body = request.body as { route?: string; method?: string; max_requests?: number; window_ms?: number; enabled?: boolean; description?: string };
     db.prepare("UPDATE rate_limits SET route = ?, method = ?, max_requests = ?, window_ms = ?, enabled = ?, description = ? WHERE id = ?")
       .run(
-        body.route ?? (existing as any).route,
-        body.method ?? (existing as any).method,
-        body.max_requests ?? (existing as any).max_requests,
-        body.window_ms ?? (existing as any).window_ms,
-        body.enabled !== undefined ? (body.enabled ? 1 : 0) : (existing as any).enabled,
-        body.description !== undefined ? body.description : (existing as any).description,
+        body.route ?? existing.route,
+        body.method ?? existing.method,
+        body.max_requests ?? existing.max_requests,
+        body.window_ms ?? existing.window_ms,
+        body.enabled !== undefined ? (body.enabled ? 1 : 0) : existing.enabled,
+        body.description !== undefined ? body.description : existing.description,
         Number(id),
       );
     loadRateLimits();
