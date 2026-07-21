@@ -12,6 +12,20 @@ import { createReadStream, createWriteStream } from "fs";
 import { Readable } from "stream";
 import { mkdirSync, existsSync } from "fs";
 
+interface ServerRow {
+  id: number;
+  name: string;
+  container_id: string | null;
+  node_id: number;
+  port: number;
+  mc_version: string;
+  software: string;
+  ram_mb: number;
+  image: string;
+  eula_accepted: boolean;
+  status: string;
+}
+
 interface Backup {
   id: number;
   server_id: number;
@@ -50,13 +64,13 @@ export function getBackups(serverId: number): BackupWithUploads[] {
       FROM backup_uploads bu
       JOIN cloud_storage_configs csc ON csc.id = bu.storage_id
       WHERE bu.backup_id = ?
-    `).all(b.id) as any[];
+    `).all(b.id) as (BackupUpload & { provider: string; label: string })[];
   }
   return backups;
 }
 
 export async function createBackup(serverId: number): Promise<Backup> {
-  const server = db.prepare("SELECT * FROM servers WHERE id = ?").get(serverId) as any;
+  const server = db.prepare("SELECT * FROM servers WHERE id = ?").get(serverId) as ServerRow | undefined;
   if (!server) throw new Error("Server not found");
 
   const containerName = `biryani-mc-${server.id}`;
@@ -129,7 +143,7 @@ export async function restoreBackup(serverId: number, backupId: number): Promise
   const backupPath = path.join(BACKUP_DIR, backup.filename);
   if (!fs.existsSync(backupPath)) throw new Error("Backup file not found");
 
-  const server = db.prepare("SELECT * FROM servers WHERE id = ?").get(serverId) as any;
+  const server = db.prepare("SELECT * FROM servers WHERE id = ?").get(serverId) as ServerRow | undefined;
   if (!server) throw new Error("Server not found");
 
   const containerName = `biryani-mc-${server.id}`;
@@ -196,10 +210,15 @@ export function deleteBackup(backupId: number) {
   if (backup) {
     const backupPath = path.join(BACKUP_DIR, backup.filename);
     if (fs.existsSync(backupPath)) fs.unlinkSync(backupPath);
-    const uploads = db.prepare("SELECT bu.*, csc.config_json, csc.provider FROM backup_uploads bu JOIN cloud_storage_configs csc ON csc.id = bu.storage_id WHERE bu.backup_id = ?").all(backupId) as any[];
+    const uploads = db.prepare(`
+      SELECT bu.id as upload_id, bu.status, csc.id as storage_id, csc.config_json, csc.provider
+      FROM backup_uploads bu
+      JOIN cloud_storage_configs csc ON csc.id = bu.storage_id
+      WHERE bu.backup_id = ?
+    `).all(backupId) as { storage_id: number; config_json: string; provider: string; status: string }[];
     for (const u of uploads) {
       if (u.status === "uploaded") {
-        deleteFromCloud({ ...u, config_json: u.config_json } as any, backup.filename).catch(() => {});
+        deleteFromCloud({ id: u.storage_id, server_id: 0, provider: u.provider as CloudStorageConfig["provider"], label: "", config_json: u.config_json, enabled: 1, created_at: "" }, backup.filename).catch(() => {});
       }
     }
   }

@@ -163,4 +163,51 @@ export const schemas = {
       disk_percent: z.number().optional(),
     }).optional(),
   }),
+
+  updateTask: z.object({
+    name: z.string().min(1).optional(),
+    schedule: z.string().min(1).optional(),
+    command: z.string().optional(),
+    enabled: z.boolean().optional(),
+  }),
+
+  testNotification: z.object({
+    webhook_url: z.string().url("webhook_url is required for Discord"),
+  }),
+
+  createCloudConfig: z.object({
+    provider: z.enum(["s3", "gdrive", "dropbox"]),
+    label: z.string().min(1, "Label is required"),
+    config: z.record(z.string(), z.unknown()),
+  }),
+
+  updateCloudConfig: z.object({
+    label: z.string().min(1).optional(),
+    config: z.record(z.string(), z.unknown()).optional(),
+  }),
+
+  filePathQuery: z.object({
+    path: z.string().min(1, "path is required"),
+  }),
+
+  serverLogsQuery: z.object({
+    tail: z.coerce.number().int().min(1).max(10000).optional().default(100),
+  }),
+
+  metricsHistoryQuery: z.object({
+    range: z.enum(["1h", "6h", "24h", "7d"]).optional().default("1h"),
+  }),
+
+  modSearchQuery: z.object({
+    q: z.string().optional(),
+    version: z.string().optional(),
+    loader: z.string().optional(),
+    limit: z.coerce.number().int().min(1).max(100).optional(),
+  }),
+
+  pluginSearchQuery: z.object({
+    q: z.string().optional(),
+    version: z.string().optional(),
+    limit: z.coerce.number().int().min(1).max(100).optional(),
+  }),
 };
