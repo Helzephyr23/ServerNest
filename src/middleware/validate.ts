@@ -1,12 +1,11 @@
 import { FastifyRequest, FastifyReply } from "fastify";
-import { z, ZodType } from "zod";
+import { z, ZodError, ZodType } from "zod";
 
 export function validate(schema: ZodType) {
   return async (request: FastifyRequest, reply: FastifyReply) => {
     const result = schema.safeParse(request.body);
     if (!result.success) {
-      const issues = (result.error as any).issues || [];
-      const errors = issues.map((e: any) => `${e.path?.join(".") || "field"}: ${e.message}`).join(", ");
+      const errors = result.error.issues.map((e) => `${e.path.join(".") || "field"}: ${e.message}`).join(", ");
       return reply.status(400).send({ error: `Validation failed: ${errors}` });
     }
     request.body = result.data;
@@ -17,8 +16,7 @@ export function validateQuery(schema: ZodType) {
   return async (request: FastifyRequest, reply: FastifyReply) => {
     const result = schema.safeParse(request.query);
     if (!result.success) {
-      const issues = (result.error as any).issues || [];
-      const errors = issues.map((e: any) => `${e.path?.join(".") || "field"}: ${e.message}`).join(", ");
+      const errors = result.error.issues.map((e) => `${e.path.join(".") || "field"}: ${e.message}`).join(", ");
       return reply.status(400).send({ error: `Validation failed: ${errors}` });
     }
     request.query = result.data;
@@ -94,5 +92,75 @@ export const schemas = {
 
   updateUserPassword: z.object({
     password: z.string().min(6, "Password must be at least 6 characters").max(100),
+  }),
+
+  addPlayer: z.object({
+    name: z.string().min(1, "Name is required").max(16),
+  }),
+
+  addBanPlayer: z.object({
+    name: z.string().min(1, "Name is required").max(16),
+    reason: z.string().max(500).optional(),
+  }),
+
+  installMod: z.object({
+    versionId: z.string().min(1, "versionId is required"),
+  }),
+
+  installModsBatch: z.object({
+    versionIds: z.array(z.string().min(1)).min(1, "At least one versionId is required"),
+  }),
+
+  updateServer: z.object({
+    name: z.string().min(1).max(50).optional(),
+    mc_version: z.string().min(1).optional(),
+    software: z.string().optional(),
+    ram_mb: z.number().int().min(512).max(32768).optional(),
+    image: z.string().optional(),
+  }),
+
+  updateServerConfig: z.object({
+    key: z.string().min(1, "Key is required"),
+    value: z.string().min(1, "Value is required"),
+  }),
+
+  updateVersion: z.object({
+    version: z.string().min(1, "Version is required"),
+  }),
+
+  mkdirPath: z.object({
+    path: z.string().min(1, "Path is required"),
+  }),
+
+  twofaChallenge: z.object({
+    tempToken: z.string().min(1, "tempToken is required"),
+    code: z.string().min(1, "Code is required"),
+  }),
+
+  twofaVerify: z.object({
+    code: z.string().min(1, "Code is required"),
+  }),
+
+  twofaDisable: z.object({
+    password: z.string().min(1, "Password is required"),
+    code: z.string().min(1, "Code is required"),
+  }),
+
+  nodeHeartbeat: z.object({
+    metrics: z.object({
+      cpu_percent: z.number().optional(),
+      memory_percent: z.number().optional(),
+      disk_percent: z.number().optional(),
+    }).optional(),
+  }),
+
+  nodeHeartbeatAgent: z.object({
+    name: z.string().optional(),
+    api_key: z.string().min(1),
+    metrics: z.object({
+      cpu_percent: z.number().optional(),
+      memory_percent: z.number().optional(),
+      disk_percent: z.number().optional(),
+    }).optional(),
   }),
 };

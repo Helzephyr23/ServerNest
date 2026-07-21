@@ -19,14 +19,14 @@ export async function authMiddleware(request: FastifyRequest, reply: FastifyRepl
       }
       touchSession(decoded.jti);
     }
-    (request as any).user = { id: user.id, username: user.username, role: user.role };
+    request.user = { id: user.id, username: user.username, role: user.role };
   } catch {
     return reply.status(401).send({ error: "Invalid token" });
   }
 }
 
 export async function adminMiddleware(request: FastifyRequest, reply: FastifyReply) {
-  const user = (request as any).user;
+  const user = request.user;
   if (!user || user.role !== "admin") {
     return reply.status(403).send({ error: "Admin access required" });
   }

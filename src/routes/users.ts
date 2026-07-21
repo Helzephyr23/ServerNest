@@ -13,8 +13,8 @@ export default async function userRoutes(app: FastifyInstance) {
   app.post("/api/users", {
     preHandler: [adminMiddleware, validate(schemas.createUser)],
   }, async (request, reply) => {
-    const { username, password, role } = request.body as any;
-    if (listUsers().find((u: any) => u.username === username)) {
+    const { username, password, role } = request.body as { username: string; password: string; role?: string };
+    if (listUsers().find((u) => (u as { username: string }).username === username)) {
       return reply.status(400).send({ error: "Username already exists" });
     }
     const user = await createUser(username, password, role);
@@ -24,8 +24,8 @@ export default async function userRoutes(app: FastifyInstance) {
   app.put("/api/users/:id/role", {
     preHandler: [adminMiddleware, validate(schemas.updateUserRole)],
   }, async (request, reply) => {
-    const { id } = request.params as any;
-    const { role } = request.body as any;
+    const { id } = request.params as { id: string };
+    const { role } = request.body as { role: string };
     const user = getUserById(Number(id));
     if (!user) return reply.status(404).send({ error: "User not found" });
     updateUserRole(Number(id), role);
@@ -35,8 +35,8 @@ export default async function userRoutes(app: FastifyInstance) {
   app.put("/api/users/:id/password", {
     preHandler: [adminMiddleware, validate(schemas.updateUserPassword)],
   }, async (request, reply) => {
-    const { id } = request.params as any;
-    const { password } = request.body as any;
+    const { id } = request.params as { id: string };
+    const { password } = request.body as { password: string };
     const user = getUserById(Number(id));
     if (!user) return reply.status(404).send({ error: "User not found" });
     await updateUserPassword(Number(id), password);
@@ -46,14 +46,14 @@ export default async function userRoutes(app: FastifyInstance) {
   app.delete("/api/users/:id", {
     preHandler: [adminMiddleware],
   }, async (request, reply) => {
-    const { id } = request.params as any;
+    const { id } = request.params as { id: string };
     const user = getUserById(Number(id));
     if (!user) return reply.status(404).send({ error: "User not found" });
-    if (Number(id) === (request as any).user.id) {
+    if (Number(id) === request.user?.id) {
       return reply.status(400).send({ error: "Cannot delete yourself" });
     }
     if (user.role === "admin") {
-      const adminCount = (listUsers() as any[]).filter((u: any) => u.role === "admin").length;
+      const adminCount = (listUsers() as { role: string }[]).filter((u) => u.role === "admin").length;
       if (adminCount <= 1) {
         return reply.status(400).send({ error: "Cannot delete the last admin" });
       }

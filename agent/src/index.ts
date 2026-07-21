@@ -2,6 +2,38 @@ import express from "express";
 import Docker from "dockerode";
 import { createHash, randomBytes } from "crypto";
 
+type Request = express.Request;
+type Response = express.Response;
+
+function getParamId(req: Request): string {
+  return String(req.params.id);
+}
+
+const LOG_LEVELS = { debug: 0, info: 1, warn: 2, error: 3 } as const;
+type LogLevel = keyof typeof LOG_LEVELS;
+
+function createLogger(level: LogLevel = "info") {
+  const minLevel = LOG_LEVELS[level];
+  const log = (lvl: LogLevel, msg: string, extra?: Record<string, unknown>) => {
+    if (LOG_LEVELS[lvl] >= minLevel) {
+      const entry: Record<string, unknown> = { level: lvl, msg, time: new Date().toISOString() };
+      if (extra) Object.assign(entry, extra);
+      const line = JSON.stringify(entry);
+      if (lvl === "error") console.error(line);
+      else if (lvl === "warn") console.warn(line);
+      else console.log(line);
+    }
+  };
+  return {
+    debug: (msg: string, extra?: Record<string, unknown>) => log("debug", msg, extra),
+    info: (msg: string, extra?: Record<string, unknown>) => log("info", msg, extra),
+    warn: (msg: string, extra?: Record<string, unknown>) => log("warn", msg, extra),
+    error: (msg: string, extra?: Record<string, unknown>) => log("error", msg, extra),
+  };
+}
+
+const logger = createLogger((process.env.LOG_LEVEL as LogLevel) || "info");
+
 const app = express();
 const docker = new Docker({ socketPath: "/var/run/docker.sock" });
 
@@ -86,7 +118,7 @@ app.get("/containers", authMiddleware, async (req, res) => {
 
 app.get("/containers/:id/stats", authMiddleware, async (req, res) => {
   try {
-    const container = docker.getContainer(req.params.id);
+    const container = docker.getContainer(getParamId(req));
     const stats = await container.stats({ stream: false });
 
     const cpuDelta = stats.cpu_stats.cpu_usage.total_usage - (stats.precpu_stats.cpu_usage?.total_usage || 0);
@@ -128,7 +160,7 @@ app.post("/containers", authMiddleware, async (req, res) => {
 
 app.post("/containers/:id/start", authMiddleware, async (req, res) => {
   try {
-    const container = docker.getContainer(req.params.id);
+    const container = docker.getContainer(getParamId(req));
     await container.start();
     res.json({ success: true });
   } catch (err: any) {
@@ -138,7 +170,7 @@ app.post("/containers/:id/start", authMiddleware, async (req, res) => {
 
 app.post("/containers/:id/stop", authMiddleware, async (req, res) => {
   try {
-    const container = docker.getContainer(req.params.id);
+    const container = docker.getContainer(getParamId(req));
     await container.stop({ t: 30 });
     res.json({ success: true });
   } catch (err: any) {
@@ -148,7 +180,7 @@ app.post("/containers/:id/stop", authMiddleware, async (req, res) => {
 
 app.delete("/containers/:id", authMiddleware, async (req, res) => {
   try {
-    const container = docker.getContainer(req.params.id);
+    const container = docker.getContainer(getParamId(req));
     try { await container.stop({ t: 10 }); } catch {}
     await container.remove({ force: true });
     res.json({ success: true });
@@ -160,7 +192,7 @@ app.delete("/containers/:id", authMiddleware, async (req, res) => {
 app.get("/containers/:id/logs", authMiddleware, async (req, res) => {
   try {
     const tail = parseInt((req.query as any).tail || "100", 10);
-    const container = docker.getContainer(req.params.id);
+    const container = docker.getContainer(getParamId(req));
     const logStream = await container.logs({ stdout: true, stderr: true, tail, follow: false });
 
     const chunks: string[] = [];
@@ -184,7 +216,7 @@ app.get("/containers/:id/logs", authMiddleware, async (req, res) => {
 app.post("/containers/:id/exec", authMiddleware, async (req, res) => {
   try {
     const { cmd } = req.body;
-    const container = docker.getContainer(req.params.id);
+    const container = docker.getContainer(getParamId(req));
     const exec = await container.exec({
       Cmd: cmd,
       AttachStdout: true,
@@ -205,7 +237,7 @@ app.post("/containers/:id/exec", authMiddleware, async (req, res) => {
 
 app.post("/containers/:id/remove", authMiddleware, async (req, res) => {
   try {
-    const container = docker.getContainer(req.params.id);
+    const container = docker.getContainer(getParamId(req));
     try { await container.stop({ t: 5 }); } catch {}
     await container.remove({ force: true });
     res.json({ success: true });
@@ -225,7 +257,5 @@ app.post("/pull-image", authMiddleware, async (req, res) => {
 });
 
 app.listen(PORT, "0.0.0.0", () => {
-  console.log(`[Biryani Agent] Running on port ${PORT}`);
-  console.log(`[Biryani Agent] Name: ${NODE_NAME}`);
-  console.log(`[Biryani Agent] Panel URL: ${PANEL_URL || "not configured"}`);
+  logger.info("Agent started", { port: PORT, name: NODE_NAME, panelUrl: PANEL_URL || "not configured" });
 });

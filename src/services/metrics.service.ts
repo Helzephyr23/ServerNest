@@ -9,8 +9,24 @@ interface Metrics {
   network_tx: number;
 }
 
+interface ServerRow {
+  id: number;
+  container_id: string | null;
+  status: string;
+  ram_mb: number;
+}
+
+interface MetricRow {
+  id: number;
+  server_id: number;
+  cpu_percent: number;
+  memory_mb: number;
+  memory_limit_mb: number;
+  collected_at: string;
+}
+
 export async function getServerMetrics(serverId: number): Promise<Metrics | null> {
-  const server = db.prepare("SELECT * FROM servers WHERE id = ?").get(serverId) as any;
+  const server = db.prepare("SELECT * FROM servers WHERE id = ?").get(serverId) as ServerRow | undefined;
   if (!server || !server.container_id) return null;
 
   try {
@@ -57,7 +73,7 @@ export async function collectAllMetrics(): Promise<void> {
   }
 }
 
-export function getMetricsHistory(serverId: number, range: string): any[] {
+export function getMetricsHistory(serverId: number, range: string): MetricRow[] {
   let timeFilter: string;
   switch (range) {
     case "1h": timeFilter = "datetime('now', '-1 hour')"; break;
@@ -68,7 +84,7 @@ export function getMetricsHistory(serverId: number, range: string): any[] {
   }
   return db.prepare(
     `SELECT * FROM server_metrics WHERE server_id = ? AND collected_at >= ${timeFilter} ORDER BY collected_at ASC`
-  ).all(serverId) as any[];
+  ).all(serverId) as MetricRow[];
 }
 
 export async function getNodeMetrics(): Promise<{
@@ -77,7 +93,7 @@ export async function getNodeMetrics(): Promise<{
   total_memory_mb: number;
   used_memory_mb: number;
 }> {
-  const servers = db.prepare("SELECT * FROM servers").all() as any[];
+  const servers = db.prepare("SELECT * FROM servers").all() as ServerRow[];
   let totalMemory = 0;
   let usedMemory = 0;
 

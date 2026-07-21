@@ -204,11 +204,11 @@ export default async function serverRoutes(app: FastifyInstance) {
     }
   });
 
-  app.put("/api/servers/:id", opts, async (request, reply) => {
+  app.put("/api/servers/:id", { preHandler: [authMiddleware, validate(schemas.updateServer)] }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const server = getServerById(Number(id));
     if (!server) return reply.status(404).send({ error: "Server not found" });
-    updateServer(Number(id), request.body as any);
+    updateServer(Number(id), request.body as Record<string, unknown>);
     return { server: getServerById(Number(id)) };
   });
 
@@ -300,7 +300,7 @@ export default async function serverRoutes(app: FastifyInstance) {
     return { config: getServerConfig(Number(id)) };
   });
 
-  app.put("/api/servers/:id/config", { preHandler: [authMiddleware, adminMiddleware] }, async (request) => {
+  app.put("/api/servers/:id/config", { preHandler: [authMiddleware, adminMiddleware, validate(schemas.updateServerConfig)] }, async (request) => {
     const { id } = request.params as { id: string };
     const { key, value } = request.body as { key: string; value: string };
     setServerConfig(Number(id), key, value);
@@ -337,18 +337,17 @@ export default async function serverRoutes(app: FastifyInstance) {
     }
   });
 
-  app.post("/api/servers/:id/update-version", opts, async (request, reply) => {
+  app.post("/api/servers/:id/update-version", { preHandler: [authMiddleware, validate(schemas.updateVersion)] }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const { version } = request.body as { version: string };
-    if (!version) return reply.status(400).send({ error: "version is required" });
 
     const server = getServerById(Number(id));
     if (!server) return reply.status(404).send({ error: "Server not found" });
 
     try {
       const res = await fetch("https://launchermeta.mojang.com/mc/game/version_manifest.json");
-      const data = await res.json() as any;
-      const exists = (data.versions || []).some((v: any) => v.id === version);
+      const data = await res.json() as { versions?: { id: string }[] };
+      const exists = (data.versions || []).some((v) => v.id === version);
       if (!exists) return reply.status(400).send({ error: `Version "${version}" not found` });
     } catch {
       return reply.status(502).send({ error: "Failed to validate version" });
