@@ -1,5 +1,6 @@
 import { FastifyInstance } from "fastify";
 import { authMiddleware } from "../middleware/auth.js";
+import { validate, schemas } from "../middleware/validate.js";
 import {
   getAllTasks,
   getTasksForServer,
@@ -45,26 +46,19 @@ export default async function scheduleRoutes(app: FastifyInstance) {
     return { tasks: getTasksForServer(Number(id)) };
   });
 
-  app.post("/api/servers/:id/tasks", opts, async (request, reply) => {
+  app.post("/api/servers/:id/tasks", { preHandler: [authMiddleware, validate(schemas.createTask)] }, async (request, reply) => {
     const { id } = request.params as { id: string };
-    const { name, type, schedule, command } = request.body as any;
-    if (!name || !type || !schedule) {
-      return reply.status(400).send({ error: "name, type, and schedule are required" });
-    }
-    const validTypes = ["backup", "restart", "stop", "start", "command"];
-    if (!validTypes.includes(type)) {
-      return reply.status(400).send({ error: `type must be one of: ${validTypes.join(", ")}` });
-    }
+    const { name, type, schedule, command } = request.body as { name: string; type: "backup" | "restart" | "stop" | "start" | "command"; schedule: string; command?: string };
     const task = createTask({ server_id: Number(id), name, type, schedule, command });
     startTask(task, executeTask);
     return reply.status(201).send({ task });
   });
 
-  app.put("/api/tasks/:id", opts, async (request, reply) => {
+  app.put("/api/tasks/:id", { preHandler: [authMiddleware, validate(schemas.updateTask)] }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const existing = (await import("../services/schedule.service.js")).getTaskById(Number(id));
     if (!existing) return reply.status(404).send({ error: "Task not found" });
-    const { name, schedule, command, enabled } = request.body as any;
+    const { name, schedule, command, enabled } = request.body as { name?: string; schedule?: string; command?: string; enabled?: boolean };
     updateTask(Number(id), { name, schedule, command, enabled });
     const updated = (await import("../services/schedule.service.js")).getTaskById(Number(id))!;
     if (updated.enabled) {
@@ -90,8 +84,8 @@ export default async function scheduleRoutes(app: FastifyInstance) {
     try {
       await executeTask(existing);
       return { success: true };
-    } catch (err: any) {
-      return reply.status(500).send({ error: err.message });
+    } catch (err: unknown) {
+      return reply.status(500).send({ error: (err as Error).message });
     }
   });
 }

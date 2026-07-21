@@ -117,7 +117,7 @@ export async function downloadMod(
     writeFileSync(filePath, buffer);
 
     return { filename: file.filename, slug: version.project_id, version_number: version.version_number, success: true };
-  } catch (err: any) {
-    return { filename: "", slug: "", version_number: "", success: false, error: err.message };
+  } catch (err: unknown) {
+    return { filename: "", slug: "", version_number: "", success: false, error: (err as Error).message };
   }
 }

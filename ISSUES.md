@@ -6,9 +6,9 @@ This document tracks known bugs, limitations, and areas of technical debt in Bir
 
 ### Code Quality
 
-- **~29 `as any` usages** — Remaining occurrences are in external service clients (`cloud-storage.service.ts`), query parameter casts, and test files where full typing is low-priority.
-- **Missing Zod validation** — Remaining gaps: `schedule.ts`, `notifications.ts`, `cloud-storage.ts`, query parameter validation (no route validates query params with Zod).
+- **~4 `as any` usages** — Remaining occurrences are exclusively in test files (`__tests__/services/`) where full typing is low-priority. All route and service files are now clean.
 
 ### Infrastructure
 
-- **Unpinned dependencies** — `pnpm-lock.yaml` is versioned, but `package.json` version ranges are wide. Consider running `pnpm audit` before release.
+- **5 dependency vulnerabilities** — 2 high (`fast-uri` via fastify transitive deps), 1 high (`sharp` via next), 1 moderate (`postcss` via next), 1 moderate (`uuid` via dockerode). See `pnpm audit` output for remediation paths.
+- **Unpinned dependencies** — `pnpm-lock.yaml` is versioned, but `package.json` version ranges are wide.

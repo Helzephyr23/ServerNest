@@ -15,7 +15,7 @@ export default async function authRoutes(app: FastifyInstance) {
     if (!isFirstRun()) {
       return reply.status(400).send({ error: "Admin already exists" });
     }
-    const { username, password } = request.body as any;
+    const { username, password } = request.body as { username: string; password: string };
     const user = await createUser(username, password, "admin");
     const jti = createSession(user.id, request.headers["user-agent"], request.ip);
     const token = app.jwt.sign({ id: user.id, username: user.username, role: user.role, jti });
@@ -30,7 +30,7 @@ export default async function authRoutes(app: FastifyInstance) {
     preHandler: [rateLimit(10, 60000), validate(schemas.login)],
   }, async (request, reply) => {
     try {
-      const { username, password } = request.body as any;
+      const { username, password } = request.body as { username: string; password: string };
       const user = getUserByUsername(username);
       if (!user) {
         return reply.status(401).send({ error: "Invalid credentials" });
@@ -58,9 +58,9 @@ export default async function authRoutes(app: FastifyInstance) {
       const jti = createSession(user.id, request.headers["user-agent"], request.ip);
       const token = app.jwt.sign({ id: user.id, username: user.username, role: user.role, jti });
       return { token, user: { id: user.id, username: user.username, role: user.role } };
-    } catch (err: any) {
+    } catch (err: unknown) {
       request.log.error(err, "Login failed");
-      return reply.status(500).send({ error: err.message || "Internal server error" });
+      return reply.status(500).send({ error: (err as Error).message || "Internal server error" });
     }
   });
 
@@ -91,8 +91,8 @@ export default async function authRoutes(app: FastifyInstance) {
       const jti = createSession(user.id, request.headers["user-agent"], request.ip);
       const token = app.jwt.sign({ id: user.id, username: user.username, role: user.role, jti });
       return { token, user: { id: user.id, username: user.username, role: user.role } };
-    } catch (err: any) {
-      return reply.status(500).send({ error: err.message });
+    } catch (err: unknown) {
+      return reply.status(500).send({ error: (err as Error).message });
     }
   });
 
