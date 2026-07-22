@@ -61,7 +61,7 @@ class S3StorageProvider implements CloudStorageProvider {
     }));
     const writeStream = createWriteStream(localPath);
     await new Promise<void>((resolve, reject) => {
-      (response.Body as any).pipe(writeStream).on("finish", resolve).on("error", reject);
+      (response.Body as NodeJS.ReadableStream).pipe(writeStream).on("finish", resolve).on("error", reject);
     });
   }
 
@@ -196,7 +196,7 @@ class DropboxStorageProvider implements CloudStorageProvider {
 
   async download(remotePath: string, localPath: string): Promise<void> {
     const response = await this.dbx.filesDownload({ path: this.pathPrefix + remotePath });
-    const buf = Buffer.from((response.result as any).fileBinary);
+    const buf = Buffer.from((response.result as { fileBinary: string }).fileBinary);
     fs.writeFileSync(localPath, buf);
   }
 

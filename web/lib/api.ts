@@ -54,11 +54,23 @@ async function uploadFile<T>(path: string, file: File): Promise<T> {
   const formData = new FormData();
   formData.append("file", file);
 
-  const res = await fetch(`${API_BASE}${path}`, {
-    method: "POST",
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-    body: formData,
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 120000);
+
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}${path}`, {
+      method: "POST",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: formData,
+      signal: controller.signal,
+    });
+  } catch (err: any) {
+    clearTimeout(timeoutId);
+    if (err.name === "AbortError") throw new Error("Upload timed out");
+    throw new Error("Network error during upload");
+  }
+  clearTimeout(timeoutId);
 
   if (res.status === 401 && typeof window !== "undefined" && window.location.pathname !== "/login") {
     localStorage.removeItem("biryani_token");

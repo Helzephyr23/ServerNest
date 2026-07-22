@@ -11,6 +11,26 @@ import db from "../config/database.js";
 import fs from "fs";
 import path from "path";
 
+interface BackupRow {
+  id: number;
+  server_id: number;
+  filename: string;
+  size: number;
+  checksum: string | null;
+  created_at: string;
+}
+
+interface BackupUploadRow {
+  id: number;
+  backup_id: number;
+  storage_id: number;
+  status: string;
+  checksum: string | null;
+  error: string | null;
+  config_json: string;
+  provider: string;
+}
+
 export default async function backupRoutes(app: FastifyInstance) {
   const opts = { preHandler: [authMiddleware] };
 
@@ -24,8 +44,8 @@ export default async function backupRoutes(app: FastifyInstance) {
       const { id } = request.params as { id: string };
       const backup = await createBackup(Number(id));
       return reply.status(201).send({ backup });
-    } catch (err: any) {
-      return reply.status(500).send({ error: err.message });
+    } catch (err: unknown) {
+      return reply.status(500).send({ error: (err as Error).message });
     }
   });
 
@@ -34,8 +54,8 @@ export default async function backupRoutes(app: FastifyInstance) {
       const { id, backupId } = request.params as { id: string; backupId: string };
       await restoreBackup(Number(id), Number(backupId));
       return { success: true };
-    } catch (err: any) {
-      return reply.status(500).send({ error: err.message });
+    } catch (err: unknown) {
+      return reply.status(500).send({ error: (err as Error).message });
     }
   });
 
@@ -47,7 +67,7 @@ export default async function backupRoutes(app: FastifyInstance) {
 
   app.get("/api/servers/:id/backups/:backupId/download", opts, async (request, reply) => {
     const { id, backupId } = request.params as { id: string; backupId: string };
-    const backup = db.prepare("SELECT * FROM backups WHERE id = ? AND server_id = ?").get(Number(backupId), Number(id)) as any;
+    const backup = db.prepare("SELECT * FROM backups WHERE id = ? AND server_id = ?").get(Number(backupId), Number(id)) as BackupRow | undefined;
     if (!backup) return reply.status(404).send({ error: "Backup not found" });
 
     const localPath = path.resolve(`./data/backups/${backup.filename}`);
@@ -55,13 +75,13 @@ export default async function backupRoutes(app: FastifyInstance) {
       return reply.header("Content-Type", "application/gzip").send(fs.createReadStream(localPath));
     }
 
-    const upload = db.prepare("SELECT bu.*, csc.config_json, csc.provider FROM backup_uploads bu JOIN cloud_storage_configs csc ON csc.id = bu.storage_id WHERE bu.backup_id = ? AND bu.status = 'uploaded' LIMIT 1").get(Number(backupId)) as any;
+    const upload = db.prepare("SELECT bu.*, csc.config_json, csc.provider FROM backup_uploads bu JOIN cloud_storage_configs csc ON csc.id = bu.storage_id WHERE bu.backup_id = ? AND bu.status = 'uploaded' LIMIT 1").get(Number(backupId)) as BackupUploadRow | undefined;
     if (!upload) return reply.status(404).send({ error: "Backup file not available locally or in cloud storage" });
 
     const tmpDir = path.resolve("./data/backups/tmp");
     if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
     const tmpPath = path.join(tmpDir, backup.filename);
-    const cfg: CloudStorageConfig = { ...upload, config_json: upload.config_json };
+    const cfg = { ...upload, config_json: upload.config_json } as unknown as CloudStorageConfig;
     await downloadFromCloud(cfg, backup.filename, tmpPath);
     reply.header("Content-Type", "application/gzip");
     const stream = fs.createReadStream(tmpPath);

@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { AuthProvider, useAuth } from "@/lib/auth";
+import { useAuth } from "@/lib/auth";
 import { ToastProvider } from "@/components/toast";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { ConfirmProvider } from "@/components/confirm-dialog";
@@ -40,12 +40,10 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
-    <AuthProvider>
-      <ToastProvider>
-        <ConfirmProvider>
-          <AuthGuard>{children}</AuthGuard>
-        </ConfirmProvider>
-      </ToastProvider>
-    </AuthProvider>
+    <ToastProvider>
+      <ConfirmProvider>
+        <AuthGuard>{children}</AuthGuard>
+      </ConfirmProvider>
+    </ToastProvider>
   );
 }

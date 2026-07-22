@@ -51,7 +51,7 @@ export default async function serverRoutes(app: FastifyInstance) {
   });
 
   app.post("/api/servers", { preHandler: [authMiddleware, adminMiddleware, validate(schemas.createServer)] }, async (request, reply) => {
-    const { name, mc_version, software, ram_mb, image, eula_accepted } = request.body as any;
+    const { name, mc_version, software, ram_mb, image, eula_accepted } = request.body as { name: string; mc_version: string; software?: string; ram_mb?: number; image?: string; eula_accepted: boolean };
     const port = findAvailablePort();
     const server = createServer({
       name,
@@ -66,25 +66,25 @@ export default async function serverRoutes(app: FastifyInstance) {
   });
 
   app.post("/api/servers/import", { preHandler: [authMiddleware, adminMiddleware] }, async (request, reply) => {
-    let importedServer: any = null;
+    let importedServer: { id?: number; name?: string } | null = null;
     try {
       const data = await request.file();
       if (!data) return reply.status(400).send({ error: "No file uploaded" });
 
-      const fields = data.fields as any;
-      const name = fields.name?.value?.trim();
-      const software = fields.software?.value || "vanilla";
-      const mc_version = fields.mc_version?.value || "1.21.4";
-      const ram_mb = parseInt(fields.ram_mb?.value || "2048");
-      const eula_accepted = fields.eula_accepted?.value === "true";
+      const fields = data.fields as Record<string, { value: string }[] | undefined>;
+      const serverName = fields.name?.[0]?.value?.trim();
+      const software = fields.software?.[0]?.value || "vanilla";
+      const mc_version = fields.mc_version?.[0]?.value || "1.21.4";
+      const ram_mb = parseInt(fields.ram_mb?.[0]?.value || "2048");
+      const eula_accepted = fields.eula_accepted?.[0]?.value === "true";
 
-      if (!name) return reply.status(400).send({ error: "Server name is required" });
+      if (!serverName) return reply.status(400).send({ error: "Server name is required" });
       if (!eula_accepted) return reply.status(400).send({ error: "You must accept the Minecraft EULA" });
-      if (name.length > 50) return reply.status(400).send({ error: "Name must be 50 characters or less" });
+      if (serverName.length > 50) return reply.status(400).send({ error: "Name must be 50 characters or less" });
       if (isNaN(ram_mb) || ram_mb < 512 || ram_mb > 32768) return reply.status(400).send({ error: "RAM must be between 512 and 32768 MB" });
 
       const port = findAvailablePort();
-      importedServer = createServer({ name, software, mc_version, ram_mb, port, eula_accepted });
+      importedServer = createServer({ name: serverName, software, mc_version, ram_mb, port, eula_accepted });
       const serverDataDir = `${process.cwd()}/data/server-${importedServer.id}`;
       if (!existsSync(serverDataDir)) mkdirSync(serverDataDir, { recursive: true });
 
@@ -123,11 +123,11 @@ export default async function serverRoutes(app: FastifyInstance) {
         try { rmSync(tmpPath, { force: true }); } catch {}
       } else if (filename.endsWith(".tar.gz") || filename.endsWith(".tgz")) {
         const gunzip1 = zlib.createGunzip();
-        let g2: any = null;
+        let g2: ReturnType<typeof zlib.createGunzip> | null = null;
         let checked = false;
         const dedouble = new Transform({
-          transform(chunk: any, encoding: any, callback: any) {
-            const self = this as any;
+          transform(chunk: Buffer, encoding: BufferEncoding, callback: () => void) {
+            const self = this as Transform;
             if (!checked) {
               checked = true;
               if (chunk.length >= 2 && chunk[0] === 0x1f && chunk[1] === 0x8b) {
@@ -142,7 +142,7 @@ export default async function serverRoutes(app: FastifyInstance) {
             if (g2) { g2.write(chunk, encoding, callback); }
             else { self.push(chunk); callback(); }
           },
-          final(callback: any) {
+          final(callback: () => void) {
             if (g2) { g2.end(); callback(); }
             else { callback(); }
           }
@@ -193,22 +193,22 @@ export default async function serverRoutes(app: FastifyInstance) {
           .run(detected.version, importedServer.id);
       }
 
-      return reply.status(201).send({ server: getServerById(importedServer.id), detected });
-    } catch (err: any) {
+      return reply.status(201).send({ server: getServerById(importedServer.id!), detected });
+    } catch (err: unknown) {
       if (importedServer) {
         const dir = `${process.cwd()}/data/server-${importedServer.id}`;
         try { rmSync(dir, { recursive: true, force: true }); } catch {}
         try { db.prepare("DELETE FROM servers WHERE id = ?").run(importedServer.id); } catch {}
       }
-      return reply.status(500).send({ error: err.message });
+      return reply.status(500).send({ error: (err as Error).message });
     }
   });
 
-  app.put("/api/servers/:id", opts, async (request, reply) => {
+  app.put("/api/servers/:id", { preHandler: [authMiddleware, validate(schemas.updateServer)] }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const server = getServerById(Number(id));
     if (!server) return reply.status(404).send({ error: "Server not found" });
-    updateServer(Number(id), request.body as any);
+    updateServer(Number(id), request.body as Record<string, unknown>);
     return { server: getServerById(Number(id)) };
   });
 
@@ -235,8 +235,8 @@ export default async function serverRoutes(app: FastifyInstance) {
     try {
       const server = await cloneServer(Number(id));
       return reply.status(201).send({ server });
-    } catch (err: any) {
-      return reply.status(500).send({ error: err.message });
+    } catch (err: unknown) {
+      return reply.status(500).send({ error: (err as Error).message });
     }
   });
 
@@ -246,10 +246,10 @@ export default async function serverRoutes(app: FastifyInstance) {
       await startServer(Number(id));
       if (ioRef) ioRef.to("server-" + id).emit("server:status", { serverId: Number(id), status: "running" });
       return { success: true, status: "running" };
-    } catch (err: any) {
+    } catch (err: unknown) {
       const { id } = request.params as { id: string };
       if (ioRef) ioRef.to("server-" + id).emit("server:status", { serverId: Number(id), status: "error" });
-      return reply.status(500).send({ error: err.message });
+      return reply.status(500).send({ error: (err as Error).message });
     }
   });
 
@@ -259,8 +259,8 @@ export default async function serverRoutes(app: FastifyInstance) {
       await stopServer(Number(id));
       if (ioRef) ioRef.to("server-" + id).emit("server:status", { serverId: Number(id), status: "stopped" });
       return { success: true, status: "stopped" };
-    } catch (err: any) {
-      return reply.status(500).send({ error: err.message });
+    } catch (err: unknown) {
+      return reply.status(500).send({ error: (err as Error).message });
     }
   });
 
@@ -270,14 +270,15 @@ export default async function serverRoutes(app: FastifyInstance) {
       await restartServer(Number(id));
       if (ioRef) ioRef.to("server-" + id).emit("server:status", { serverId: Number(id), status: "running" });
       return { success: true, status: "running" };
-    } catch (err: any) {
-      return reply.status(500).send({ error: err.message });
+    } catch (err: unknown) {
+      return reply.status(500).send({ error: (err as Error).message });
     }
   });
 
-  app.get("/api/servers/:id/logs", opts, async (request) => {
+  app.get("/api/servers/:id/logs", { preHandler: [authMiddleware, validate(schemas.serverLogsQuery)] }, async (request) => {
     const { id } = request.params as { id: string };
-    const tail = Number((request.query as any).tail) || 100;
+    const { tail: tailParam } = request.query as { tail?: string };
+    const tail = Number(tailParam) || 100;
     const logs = await getServerLogs(Number(id), tail);
     return { logs };
   });
@@ -286,12 +287,12 @@ export default async function serverRoutes(app: FastifyInstance) {
     preHandler: [authMiddleware, validate(schemas.sendCommand)],
   }, async (request, reply) => {
     const { id } = request.params as { id: string };
-    const { command } = request.body as any;
+    const { command } = request.body as { command: string };
     try {
       await sendCommand(Number(id), command);
       return { success: true };
-    } catch (err: any) {
-      return reply.status(500).send({ error: err.message });
+    } catch (err: unknown) {
+      return reply.status(500).send({ error: (err as Error).message });
     }
   });
 
@@ -300,7 +301,7 @@ export default async function serverRoutes(app: FastifyInstance) {
     return { config: getServerConfig(Number(id)) };
   });
 
-  app.put("/api/servers/:id/config", { preHandler: [authMiddleware, adminMiddleware] }, async (request) => {
+  app.put("/api/servers/:id/config", { preHandler: [authMiddleware, adminMiddleware, validate(schemas.updateServerConfig)] }, async (request) => {
     const { id } = request.params as { id: string };
     const { key, value } = request.body as { key: string; value: string };
     setServerConfig(Number(id), key, value);
@@ -316,16 +317,16 @@ export default async function serverRoutes(app: FastifyInstance) {
 
   app.get("/api/servers/:id/metrics/history", opts, async (request, reply) => {
     const { id } = request.params as { id: string };
-    const range = (request.query as any).range || "1h";
-    const metrics = getMetricsHistory(Number(id), range);
+    const { range = "1h" } = request.query as { range?: string };
+    const metrics = getMetricsHistory(Number(id), range as "1h" | "6h" | "24h" | "7d");
     return { metrics };
   });
 
   app.get("/api/mc-versions", opts, async (_request, reply) => {
     try {
       const res = await fetch("https://launchermeta.mojang.com/mc/game/version_manifest.json");
-      const data = await res.json() as any;
-      const versions = (data.versions || []).map((v: any) => ({
+      const data = await res.json() as { versions?: { id: string; type: string; releaseTime: string }[]; latest?: Record<string, string> };
+      const versions = (data.versions || []).map((v) => ({
         id: v.id,
         type: v.type,
         releaseDate: v.releaseTime,
@@ -337,18 +338,17 @@ export default async function serverRoutes(app: FastifyInstance) {
     }
   });
 
-  app.post("/api/servers/:id/update-version", opts, async (request, reply) => {
+  app.post("/api/servers/:id/update-version", { preHandler: [authMiddleware, validate(schemas.updateVersion)] }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const { version } = request.body as { version: string };
-    if (!version) return reply.status(400).send({ error: "version is required" });
 
     const server = getServerById(Number(id));
     if (!server) return reply.status(404).send({ error: "Server not found" });
 
     try {
       const res = await fetch("https://launchermeta.mojang.com/mc/game/version_manifest.json");
-      const data = await res.json() as any;
-      const exists = (data.versions || []).some((v: any) => v.id === version);
+      const data = await res.json() as { versions?: { id: string }[] };
+      const exists = (data.versions || []).some((v) => v.id === version);
       if (!exists) return reply.status(400).send({ error: `Version "${version}" not found` });
     } catch {
       return reply.status(502).send({ error: "Failed to validate version" });

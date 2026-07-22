@@ -1,5 +1,6 @@
 import { FastifyInstance } from "fastify";
 import { authMiddleware } from "../middleware/auth.js";
+import { validate, schemas } from "../middleware/validate.js";
 import {
   getAllNotifications,
   createNotification,
@@ -14,17 +15,8 @@ export default async function notificationRoutes(app: FastifyInstance) {
     return { notifications: getAllNotifications() };
   });
 
-  app.post("/api/notifications", opts, async (request, reply) => {
-    const { type, webhook_url, email, events } = request.body as any;
-    if (!type || !events?.length) {
-      return reply.status(400).send({ error: "type and events are required" });
-    }
-    if (type === "discord" && !webhook_url) {
-      return reply.status(400).send({ error: "webhook_url is required for Discord" });
-    }
-    if (type === "email" && !email) {
-      return reply.status(400).send({ error: "email is required for email notifications" });
-    }
+  app.post("/api/notifications", { preHandler: [authMiddleware, validate(schemas.createNotification)] }, async (request, reply) => {
+    const { type, webhook_url, email, events } = request.body as { type: "discord" | "email"; webhook_url?: string; email?: string; events: string[] };
     const notification = createNotification({ type, webhook_url, email, events });
     return reply.status(201).send({ notification });
   });
@@ -35,14 +27,13 @@ export default async function notificationRoutes(app: FastifyInstance) {
     return { success: true };
   });
 
-  app.post("/api/notifications/test", opts, async (request, reply) => {
+  app.post("/api/notifications/test", { preHandler: [authMiddleware, validate(schemas.testNotification)] }, async (request, reply) => {
     const { webhook_url } = request.body as { webhook_url: string };
-    if (!webhook_url) return reply.status(400).send({ error: "webhook_url is required" });
     try {
       await sendDiscordNotification(webhook_url, "Test Notification", "This is a test notification from Biryani.", 0x5865f2);
       return { success: true };
-    } catch (err: any) {
-      return reply.status(500).send({ error: err.message });
+    } catch (err: unknown) {
+      return reply.status(500).send({ error: (err as Error).message });
     }
   });
 }

@@ -1,11 +1,12 @@
 import { FastifyInstance } from "fastify";
 import { authMiddleware } from "../middleware/auth.js";
+import { validate, schemas } from "../middleware/validate.js";
 import db from "../config/database.js";
 import { testCloudConnection, CloudStorageConfig } from "../services/cloud-storage.service.js";
 
 const SENSITIVE_KEYS = ["accessKeyId", "secretAccessKey", "refreshToken", "accessToken", "clientSecret"];
 
-function maskConfig(config: any): any {
+function maskConfig(config: Record<string, unknown>): Record<string, unknown> {
   const masked = { ...config };
   for (const key of SENSITIVE_KEYS) {
     if (masked[key]) masked[key] = "********";
@@ -29,24 +30,18 @@ export default async function cloudStorageRoutes(app: FastifyInstance) {
     };
   });
 
-  app.post("/api/servers/:id/cloud-storage", opts, async (request, reply) => {
+  app.post("/api/servers/:id/cloud-storage", { preHandler: [authMiddleware, validate(schemas.createCloudConfig)] }, async (request, reply) => {
     const { id } = request.params as { id: string };
-    const body = request.body as any;
-    if (!body.provider || !body.label || !body.config) {
-      return reply.status(400).send({ error: "provider, label, and config are required" });
-    }
-    if (!["s3", "gdrive", "dropbox"].includes(body.provider)) {
-      return reply.status(400).send({ error: "provider must be s3, gdrive, or dropbox" });
-    }
+    const { provider, label, config } = request.body as { provider: string; label: string; config: Record<string, unknown> };
     const result = db
       .prepare("INSERT INTO cloud_storage_configs (server_id, provider, label, config_json) VALUES (?, ?, ?, ?)")
-      .run(Number(id), body.provider, body.label, JSON.stringify(body.config));
+      .run(Number(id), provider, label, JSON.stringify(config));
     return reply.status(201).send({ id: result.lastInsertRowid });
   });
 
-  app.put("/api/servers/:id/cloud-storage/:configId", opts, async (request, reply) => {
+  app.put("/api/servers/:id/cloud-storage/:configId", { preHandler: [authMiddleware, validate(schemas.updateCloudConfig)] }, async (request, reply) => {
     const { id, configId } = request.params as { id: string; configId: string };
-    const body = request.body as any;
+    const body = request.body as { label?: string; config?: Record<string, unknown> };
     const existing = db
       .prepare("SELECT * FROM cloud_storage_configs WHERE id = ? AND server_id = ?")
       .get(Number(configId), Number(id)) as CloudStorageConfig | undefined;

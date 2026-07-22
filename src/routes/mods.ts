@@ -1,22 +1,30 @@
 import { FastifyInstance } from "fastify";
 import { authMiddleware } from "../middleware/auth.js";
+import { validate, schemas } from "../middleware/validate.js";
 import { searchMods, searchPlugins, getProject, getProjectVersions, downloadMod } from "../services/modrinth.service.js";
 import { getServerById } from "../services/server.service.js";
 import db from "../config/database.js";
 import { readdirSync, statSync, unlinkSync, existsSync } from "fs";
 import { join } from "path";
 
+interface InstalledModRow {
+  slug: string;
+  filename: string;
+  version: string;
+  mod_name: string;
+}
+
 export default async function modsRoutes(app: FastifyInstance) {
   const opts = { preHandler: [authMiddleware] };
 
   app.get("/api/mods/search", opts, async (request) => {
-    const { q, version, loader, limit } = request.query as any;
+    const { q, version, loader, limit } = request.query as { q?: string; version?: string; loader?: string; limit?: string };
     const mods = await searchMods(q || "", version, loader, limit ? Number(limit) : 20);
     return { mods };
   });
 
   app.get("/api/mods/plugins", opts, async (request) => {
-    const { q, version, limit } = request.query as any;
+    const { q, version, limit } = request.query as { q?: string; version?: string; limit?: string };
     const plugins = await searchPlugins(q || "", version, limit ? Number(limit) : 20);
     return { plugins };
   });
@@ -32,7 +40,7 @@ export default async function modsRoutes(app: FastifyInstance) {
   });
 
   app.get("/api/mods/:slug/versions", opts, async (request) => {
-    const { version, loader } = request.query as any;
+    const { version, loader } = request.query as { version?: string; loader?: string };
     const { slug } = request.params as { slug: string };
     const versions = await getProjectVersions(slug, version, loader);
     return { versions };
@@ -59,10 +67,9 @@ export default async function modsRoutes(app: FastifyInstance) {
     }
   });
 
-  app.post("/api/servers/:id/mods/install", opts, async (request, reply) => {
+  app.post("/api/servers/:id/mods/install", { preHandler: [authMiddleware, validate(schemas.installMod)] }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const { versionId } = request.body as { versionId: string };
-    if (!versionId) return reply.status(400).send({ error: "versionId is required" });
 
     const server = getServerById(Number(id));
     if (!server) return reply.status(404).send({ error: "Server not found" });
@@ -81,12 +88,9 @@ export default async function modsRoutes(app: FastifyInstance) {
     return { success: true, filename: result.filename };
   });
 
-  app.post("/api/servers/:id/mods/install-batch", opts, async (request, reply) => {
+  app.post("/api/servers/:id/mods/install-batch", { preHandler: [authMiddleware, validate(schemas.installModsBatch)] }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const { versionIds } = request.body as { versionIds: string[] };
-    if (!versionIds || !Array.isArray(versionIds) || versionIds.length === 0) {
-      return reply.status(400).send({ error: "versionIds array is required" });
-    }
 
     const server = getServerById(Number(id));
     if (!server) return reply.status(404).send({ error: "Server not found" });
@@ -113,8 +117,8 @@ export default async function modsRoutes(app: FastifyInstance) {
     const server = getServerById(Number(id));
     if (!server) return reply.status(404).send({ error: "Server not found" });
 
-    const dbMods = db.prepare("SELECT slug, filename, version, mod_name FROM installed_mods WHERE server_id = ? AND slug IS NOT NULL AND slug != ''").all(Number(id)) as { slug: string; filename: string; version: string; mod_name: string }[];
-    const updates: any[] = [];
+    const dbMods = db.prepare("SELECT slug, filename, version, mod_name FROM installed_mods WHERE server_id = ? AND slug IS NOT NULL AND slug != ''").all(Number(id)) as InstalledModRow[];
+    const updates: Record<string, unknown>[] = [];
 
     for (const mod of dbMods) {
       try {
@@ -161,8 +165,8 @@ export default async function modsRoutes(app: FastifyInstance) {
         .run(result.filename, result.version_number, Number(id), filename);
 
       return { success: true, filename: result.filename, version: result.version_number };
-    } catch (err: any) {
-      return reply.status(500).send({ error: err.message });
+    } catch (err: unknown) {
+      return reply.status(500).send({ error: (err as Error).message });
     }
   });
 
@@ -176,8 +180,8 @@ export default async function modsRoutes(app: FastifyInstance) {
       unlinkSync(filePath);
       db.prepare("DELETE FROM installed_mods WHERE server_id = ? AND filename = ?").run(Number(id), filename);
       return { success: true };
-    } catch (err: any) {
-      return reply.status(500).send({ error: err.message });
+    } catch (err: unknown) {
+      return reply.status(500).send({ error: (err as Error).message });
     }
   });
 }

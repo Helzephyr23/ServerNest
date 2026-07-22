@@ -94,7 +94,7 @@ app.log.info("Database migrated");
 await app.listen({ port: env.API_PORT, host: "0.0.0.0" });
 app.log.info(`Biryani API running on port ${env.API_PORT}`);
 
-const io = new SocketIOServer(app.server as any, {
+const io = new SocketIOServer(app.server as ReturnType<typeof http.createServer>, {
   cors: {
     origin: corsOrigin === true ? "*" : corsOrigin === false ? false : corsOrigin,
     credentials: true,
@@ -115,9 +115,9 @@ startAllTasks(async (task) => {
       case "command": if (task.command) await sendCommand(task.server_id, task.command); break;
     }
     await notify("task_complete", "Task Complete", `Scheduled task "${task.name}" completed successfully`, 0x00ff00);
-  } catch (err: any) {
-    app.log.error(`[Scheduler] Task ${task.name} failed: ${err.message}`);
-    await notify("task_failed", "Task Failed", `Scheduled task "${task.name}" failed: ${err.message}`, 0xff0000);
+  } catch (err: unknown) {
+    app.log.error(`[Scheduler] Task ${task.name} failed: ${(err as Error).message}`);
+    await notify("task_failed", "Task Failed", `Scheduled task "${task.name}" failed: ${(err as Error).message}`, 0xff0000);
   }
 });
 
@@ -136,7 +136,7 @@ setInterval(async () => {
 
 setInterval(async () => {
   try {
-    const servers = db.prepare("SELECT id, container_id, status FROM servers WHERE status IN ('running', 'starting')").all() as any[];
+    const servers = db.prepare("SELECT id, container_id, status FROM servers WHERE status IN ('running', 'starting')").all() as { id: number; container_id: string | null; status: string }[];
     for (const server of servers) {
       if (!server.container_id) {
         db.prepare("UPDATE servers SET status = 'stopped' WHERE id = ?").run(server.id);
@@ -164,7 +164,7 @@ io.use(async (socket, next) => {
     const token = socket.handshake.auth.token;
     if (!token) return next(new Error("No token"));
     const decoded = app.jwt.verify<{ id: number; username: string }>(token);
-    (socket as any).user = decoded;
+    socket.data.user = decoded;
     next();
   } catch {
     next(new Error("Invalid token"));
@@ -172,19 +172,20 @@ io.use(async (socket, next) => {
 });
 
 // Track active container attachments per socket
-const activeAttachments = new Map<string, { stream: any; outputInterval: NodeJS.Timeout }>();
+const activeAttachments = new Map<string, { stream: NodeJS.ReadableStream & { destroy(): void }; outputInterval: NodeJS.Timeout }>();
 
 io.on("connection", (socket) => {
-  app.log.info(`Client connected: ${(socket as any).user.username}`);
+  const user = socket.data.user as { id: number; username: string };
+  app.log.info(`Client connected: ${user.username}`);
 
   socket.on("console:subscribe", async (serverId: number) => {
     socket.join(`server-${serverId}`);
   });
 
   socket.on("console:attach", async (serverId: number) => {
-    const key = `${(socket as any).user.id}-${serverId}`;
+    const key = `${user.id}-${serverId}`;
     try {
-      const server = db.prepare("SELECT * FROM servers WHERE id = ?").get(serverId) as any;
+      const server = db.prepare("SELECT * FROM servers WHERE id = ?").get(serverId) as { id: number; container_id: string | null } | undefined;
       if (!server || !server.container_id) {
         socket.emit("console:error", { serverId, error: "Server not running" });
         return;
@@ -210,16 +211,16 @@ io.on("connection", (socket) => {
         socket.emit("console:detached", { serverId });
       });
 
-      activeAttachments.set(key, { stream: logStream, outputInterval: null as any });
+      activeAttachments.set(key, { stream: logStream as NodeJS.ReadableStream & { destroy(): void }, outputInterval: null as unknown as NodeJS.Timeout });
       socket.emit("console:attached", { serverId });
-    } catch (err: any) {
-      socket.emit("console:error", { serverId, error: err.message });
+    } catch (err: unknown) {
+      socket.emit("console:error", { serverId, error: (err as Error).message });
     }
   });
 
   socket.on("console:command", async ({ serverId, command }: { serverId: number; command: string }) => {
     try {
-      const server = db.prepare("SELECT * FROM servers WHERE id = ?").get(serverId) as any;
+      const server = db.prepare("SELECT * FROM servers WHERE id = ?").get(serverId) as { id: number; container_id: string | null } | undefined;
       if (!server || !server.container_id) {
         socket.emit("console:error", { serverId, error: "Server not running" });
         return;
@@ -236,13 +237,13 @@ io.on("connection", (socket) => {
         (data) => socket.emit("console:output", { serverId, data }),
         (data) => socket.emit("console:output", { serverId, data }),
       );
-    } catch (err: any) {
-      socket.emit("console:error", { serverId, error: err.message });
+    } catch (err: unknown) {
+      socket.emit("console:error", { serverId, error: (err as Error).message });
     }
   });
 
   socket.on("console:detach", (serverId: number) => {
-    const key = `${(socket as any).user.id}-${serverId}`;
+    const key = `${user.id}-${serverId}`;
     const attachment = activeAttachments.get(key);
     if (attachment) {
       attachment.stream?.destroy();
@@ -253,7 +254,7 @@ io.on("connection", (socket) => {
 
   socket.on("console:unsubscribe", (serverId: number) => {
     socket.leave(`server-${serverId}`);
-    const key = `${(socket as any).user.id}-${serverId}`;
+    const key = `${user.id}-${serverId}`;
     const attachment = activeAttachments.get(key);
     if (attachment) {
       attachment.stream?.destroy();
@@ -263,12 +264,12 @@ io.on("connection", (socket) => {
 
   socket.on("disconnect", () => {
     for (const [key, attachment] of activeAttachments) {
-      if (key.startsWith(`${(socket as any).user.id}-`)) {
+      if (key.startsWith(`${user.id}-`)) {
         attachment.stream?.destroy();
         activeAttachments.delete(key);
       }
     }
-    app.log.info(`Client disconnected: ${(socket as any).user.username}`);
+    app.log.info(`Client disconnected: ${user.username}`);
   });
 });
 
