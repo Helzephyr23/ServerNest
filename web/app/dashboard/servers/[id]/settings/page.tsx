@@ -60,7 +60,7 @@ export default function ServerSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [needsRestart, setNeedsRestart] = useState(false);
-  const { server } = useServer();
+  const { server, refresh } = useServer();
   const [search, setSearch] = useState("");
 
   const fetchProps = () => {
@@ -110,7 +110,7 @@ const handleVersionUpdate = async (version: string) => {
   try {
     await api.post(`/api/servers/${id}/update-version`, { version });
     success(`Server version updated to ${version}`);
-    window.location.reload();
+    refresh();
   } catch (err: any) {
     toastError("Failed to update version", err.message);
   } finally {

@@ -3,7 +3,7 @@ import { authMiddleware } from "../middleware/auth.js";
 import { validate, schemas } from "../middleware/validate.js";
 import docker, { dockerStreamDemux } from "../config/docker.js";
 import db from "../config/database.js";
-import { join, normalize, relative } from "path";
+import { join, normalize } from "path";
 import { existsSync, mkdirSync, writeFileSync, readFileSync } from "fs";
 
 function sanitizePath(userPath: string): string {

@@ -21,7 +21,7 @@ export default async function notificationRoutes(app: FastifyInstance) {
     return reply.status(201).send({ notification });
   });
 
-  app.delete("/api/notifications/:id", opts, async (request, reply) => {
+  app.delete("/api/notifications/:id", opts, async (request) => {
     const { id } = request.params as { id: string };
     deleteNotification(Number(id));
     return { success: true };

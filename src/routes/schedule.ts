@@ -10,7 +10,7 @@ import {
   startTask,
   stopTask,
 } from "../services/schedule.service.js";
-import { startServer, stopServer, restartServer, getServerLogs, sendCommand } from "../services/server.service.js";
+import { startServer, stopServer, restartServer, sendCommand } from "../services/server.service.js";
 import { createBackup } from "../services/backup.service.js";
 import type { ScheduledTask } from "../services/schedule.service.js";
 

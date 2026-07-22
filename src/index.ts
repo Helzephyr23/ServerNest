@@ -121,20 +121,20 @@ startAllTasks(async (task) => {
   }
 });
 
-setInterval(() => {
-  markStaleNodesOffline();
-}, 60000);
-
-setInterval(() => {
-  rotateAllBackups(10);
-}, 3600000);
-
-setInterval(async () => {
+const metricInterval = setInterval(async () => {
   const { collectAllMetrics } = await import("./services/metrics.service.js");
   await collectAllMetrics();
 }, 60000);
 
-setInterval(async () => {
+const staleNodeInterval = setInterval(() => {
+  markStaleNodesOffline();
+}, 60000);
+
+const backupInterval = setInterval(() => {
+  rotateAllBackups(10);
+}, 3600000);
+
+const serverCheckInterval = setInterval(async () => {
   try {
     const servers = db.prepare("SELECT id, container_id, status FROM servers WHERE status IN ('running', 'starting')").all() as { id: number; container_id: string | null; status: string }[];
     for (const server of servers) {
@@ -272,5 +272,25 @@ io.on("connection", (socket) => {
     app.log.info(`Client disconnected: ${user.username}`);
   });
 });
+
+function gracefulShutdown(signal: string) {
+  app.log.info(`Received ${signal}, shutting down gracefully...`);
+  clearInterval(metricInterval);
+  clearInterval(staleNodeInterval);
+  clearInterval(backupInterval);
+  clearInterval(serverCheckInterval);
+  for (const [, attachment] of activeAttachments) {
+    attachment.stream?.destroy();
+  }
+  activeAttachments.clear();
+  io.close();
+  app.close().then(() => {
+    app.log.info("Server closed");
+    process.exit(0);
+  }).catch(() => process.exit(1));
+}
+
+process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 
 export { app, io };

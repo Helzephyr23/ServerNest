@@ -104,12 +104,6 @@ export default function BackupsPage() {
     }
   };
 
-  const latestUpload = (uploads: any[]) => {
-    if (!uploads?.length) return null;
-    const u = uploads[0];
-    return { ...u, label: PROVIDER_LABELS[u.provider] || u.provider, icon: PROVIDER_ICONS[u.provider] || "☁️" };
-  };
-
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -140,7 +134,6 @@ export default function BackupsPage() {
       ) : (
         <div className="space-y-2">
           {backups.map((backup) => {
-            const ul = latestUpload(backup.uploads);
             return (
               <Card key={backup.id}>
                 <CardContent className="flex items-center justify-between p-4">

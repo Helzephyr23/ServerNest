@@ -1,12 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 
 export default function Home() {
   const router = useRouter();
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     api.get("/api/auth/status").then(({ firstRun }) => {
@@ -14,15 +13,26 @@ export default function Home() {
         router.replace("/setup");
       } else {
         const token = localStorage.getItem("biryani_token");
-        if (token) {
-          router.replace("/dashboard");
-        } else {
+        if (!token) {
+          router.replace("/login");
+          return;
+        }
+        try {
+          const payload = JSON.parse(atob(token.split(".")[1]));
+          if (payload.exp && payload.exp * 1000 < Date.now()) {
+            localStorage.removeItem("biryani_token");
+            router.replace("/login");
+          } else {
+            router.replace("/dashboard");
+          }
+        } catch {
+          localStorage.removeItem("biryani_token");
           router.replace("/login");
         }
       }
     }).catch(() => {
       router.replace("/login");
-    }).finally(() => setLoading(false));
+    });
   }, [router]);
 
   return (
