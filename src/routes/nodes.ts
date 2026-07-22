@@ -59,9 +59,8 @@ export default async function nodeRoutes(app: FastifyInstance) {
   });
 
   app.post("/api/nodes/heartbeat", { preHandler: [authMiddleware, validate(schemas.nodeHeartbeatAgent)] }, async (request, reply) => {
-    const { name, api_key, metrics } = request.body as {
+    const { name, metrics } = request.body as {
       name?: string;
-      api_key: string;
       metrics?: { cpu_percent?: number; memory_percent?: number; disk_percent?: number };
     };
     const node = name ? getNodeById(Number(name)) : undefined;

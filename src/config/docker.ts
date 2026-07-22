@@ -1,5 +1,4 @@
 import Docker from "dockerode";
-import { env } from "./env.js";
 
 const docker = process.env.DOCKER_HOST
   ? new Docker({ host: process.env.DOCKER_HOST })

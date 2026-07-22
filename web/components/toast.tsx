@@ -37,10 +37,11 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
   const addToast = useCallback((title: string, message?: string, type: Toast["type"] = "info") => {
     const id = ++toastId;
+    const duration = type === "error" ? 8000 : 5000;
     setToasts((prev) => [...prev, { id, title, message, type }]);
     setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id));
-    }, 5000);
+    }, duration);
   }, []);
 
   const removeToast = useCallback((id: number) => {

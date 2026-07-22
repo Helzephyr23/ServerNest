@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useCallback } from "react";
-import { useParams, useRouter, usePathname } from "next/navigation";
+import { useCallback } from "react";
+import { useParams, usePathname } from "next/navigation";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -20,7 +20,6 @@ const TABS = [
 ];
 
 function ServerLayoutInner({ children }: { children: React.ReactNode }) {
-  const router = useRouter();
   const pathname = usePathname();
   const params = useParams();
   const id = params.id as string;
@@ -29,7 +28,7 @@ function ServerLayoutInner({ children }: { children: React.ReactNode }) {
   const handleAction = useCallback(async (action: "start" | "stop" | "restart") => {
     try {
       await api.post(`/api/servers/${id}/${action}`);
-    } catch {}
+    } catch { /* action failed, refresh will show updated state */ }
     refresh();
   }, [id, refresh]);
 

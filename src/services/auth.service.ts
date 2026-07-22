@@ -125,9 +125,7 @@ export function touchSession(jti: string): void {
 // ── TOTP Secret Encryption ──
 
 const ALGORITHM = "aes-256-gcm";
-const KEY_LENGTH = 32;
 const IV_LENGTH = 16;
-const TAG_LENGTH = 16;
 
 function deriveEncryptionKey(): Buffer {
   return crypto.createHash("sha256").update(env.JWT_SECRET).digest();
