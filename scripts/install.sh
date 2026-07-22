@@ -24,7 +24,7 @@ fi
 if [ ! -f .env ]; then
   cp .env.example .env
   JWT_SECRET=$(openssl rand -hex 32 2>/dev/null || head -c 32 /dev/urandom | base64)
-  sed -i.bak "s/change-me-to-a-random-string/$JWT_SECRET/" .env
+  sed -i.bak "s/change-me-in-production/$JWT_SECRET/" .env
   rm -f .env.bak
   echo "Created .env with secure JWT_SECRET"
 fi
