@@ -88,14 +88,22 @@ export default function TasksPage() {
   };
 
   const handleToggle = async (task: any) => {
-    await api.put(`/api/tasks/${task.id}`, { enabled: !task.enabled });
-    fetchData();
+    try {
+      await api.put(`/api/tasks/${task.id}`, { enabled: !task.enabled });
+      fetchData();
+    } catch (err: any) {
+      toastError("Failed to update task", err.message);
+    }
   };
 
   const handleDelete = async (id: number) => {
     if (await showConfirm({ title: "Delete Task", message: "Delete this task?" })) {
-      await api.delete(`/api/tasks/${id}`);
-      fetchData();
+      try {
+        await api.delete(`/api/tasks/${id}`);
+        fetchData();
+      } catch (err: any) {
+        toastError("Failed to delete task", err.message);
+      }
     }
   };
 

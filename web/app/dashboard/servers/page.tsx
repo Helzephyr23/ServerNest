@@ -6,9 +6,11 @@ import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useConfirm } from "@/components/confirm-dialog";
+import { useToast } from "@/components/toast";
 
 export default function ServersPage() {
   const { confirm: showConfirm } = useConfirm();
+  const { error: toastError } = useToast();
   const [servers, setServers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -22,14 +24,22 @@ export default function ServersPage() {
   useEffect(() => { fetchServers(); }, []);
 
   const handleAction = async (id: number, action: "start" | "stop" | "restart") => {
-    await api.post(`/api/servers/${id}/${action}`);
-    fetchServers();
+    try {
+      await api.post(`/api/servers/${id}/${action}`);
+      fetchServers();
+    } catch (err: any) {
+      toastError("Action failed", err.message);
+    }
   };
 
   const handleDelete = async (id: number, name: string) => {
     if (!(await showConfirm({ title: "Delete Server", message: `Delete server "${name}"? This cannot be undone.` }))) return;
-    await api.delete(`/api/servers/${id}`);
-    fetchServers();
+    try {
+      await api.delete(`/api/servers/${id}`);
+      fetchServers();
+    } catch (err: any) {
+      toastError("Delete failed", err.message);
+    }
   };
 
   return (

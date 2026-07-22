@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { api } from "./api";
+import { disconnectSocket } from "./socket";
 
 interface User {
   id: number;
@@ -62,6 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = () => {
+    disconnectSocket();
     localStorage.removeItem("biryani_token");
     setUser(null);
     window.location.href = "/login";
