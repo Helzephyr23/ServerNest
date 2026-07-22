@@ -2,10 +2,10 @@
 
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams } from "next/navigation";
-import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { io, Socket } from "socket.io-client";
+import { getSocket } from "@/lib/socket";
+import type { Socket } from "socket.io-client";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebLinksAddon } from "@xterm/addon-web-links";
@@ -88,32 +88,24 @@ export default function ConsolePage() {
   }, []);
 
   useEffect(() => {
-    const token = localStorage.getItem("biryani_token");
-    const socket = io(typeof window !== "undefined" && window.location.hostname !== "localhost"
-      ? `${window.location.protocol}//${window.location.hostname}:3001`
-      : "http://localhost:3001",
-    {
-      auth: { token },
-      transports: ["websocket", "polling"],
-    });
-
+    const socket = getSocket() as Socket;
     socketRef.current = socket;
 
-    socket.on("connect", () => {
+    const handleConnect = () => {
       setConnected(true);
       socket.emit("console:subscribe", Number(id));
       socket.emit("console:attach", Number(id));
-    });
+    };
 
-    socket.on("console:attached", () => {
+    const handleAttached = () => {
       setAttached(true);
       if (termRef.current) {
         termRef.current.writeln("\r\n\x1b[32m✓ Connected to server console\x1b[0m");
         writePrompt(termRef.current);
       }
-    });
+    };
 
-    socket.on("console:output", ({ data }: { data: string }) => {
+    const handleOutput = ({ data }: { data: string }) => {
       if (!termRef.current) return;
       const term = termRef.current;
       const bufLen = cmdBufferRef.current.length;
@@ -127,30 +119,46 @@ export default function ConsolePage() {
       if (bufLen > 0) {
         term.write("\x1b[36m>\x1b[0m " + cmdBufferRef.current);
       }
-    });
+    };
 
-    socket.on("console:error", ({ error }: { error: string }) => {
+    const handleError = ({ error }: { error: string }) => {
       if (termRef.current) {
         termRef.current.writeln(`\r\n\x1b[31m✗ Error: ${error}\x1b[0m`);
         writePrompt(termRef.current);
       }
-    });
+    };
 
-    socket.on("console:detached", () => {
+    const handleDetached = () => {
       setAttached(false);
       if (termRef.current) {
         termRef.current.writeln("\r\n\x1b[33m⚠ Disconnected from server console\x1b[0m");
       }
-    });
+    };
 
-    socket.on("disconnect", () => {
+    const handleDisconnect = () => {
       setConnected(false);
       setAttached(false);
-    });
+    };
+
+    socket.on("connect", handleConnect);
+    socket.on("console:attached", handleAttached);
+    socket.on("console:output", handleOutput);
+    socket.on("console:error", handleError);
+    socket.on("console:detached", handleDetached);
+    socket.on("disconnect", handleDisconnect);
+
+    if (socket.connected) {
+      handleConnect();
+    }
 
     return () => {
+      socket.off("connect", handleConnect);
+      socket.off("console:attached", handleAttached);
+      socket.off("console:output", handleOutput);
+      socket.off("console:error", handleError);
+      socket.off("console:detached", handleDetached);
+      socket.off("disconnect", handleDisconnect);
       socket.emit("console:unsubscribe", Number(id));
-      socket.disconnect();
       termRef.current?.dispose();
       termRef.current = null;
     };

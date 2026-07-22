@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { createTestDb, seedServer } from "../helpers.js";
+import { createTestDb } from "../helpers.js";
 
 const testDb = createTestDb();
 

@@ -18,9 +18,8 @@ import {
   findAvailablePort,
 } from "../services/server.service.js";
 import { getServerMetrics, getMetricsHistory } from "../services/metrics.service.js";
-import { getImageName } from "../config/docker.js";
 import docker from "../config/docker.js";
-import { rmSync, existsSync, mkdirSync, readdirSync, readFileSync, createWriteStream, statSync, createReadStream } from "fs";
+import { rmSync, existsSync, mkdirSync, readdirSync, readFileSync, createWriteStream, statSync } from "fs";
 import os from "os";
 import { join } from "path";
 import { pipeline } from "stream/promises";
@@ -315,7 +314,7 @@ export default async function serverRoutes(app: FastifyInstance) {
     return { metrics };
   });
 
-  app.get("/api/servers/:id/metrics/history", opts, async (request, reply) => {
+  app.get("/api/servers/:id/metrics/history", opts, async (request) => {
     const { id } = request.params as { id: string };
     const { range = "1h" } = request.query as { range?: string };
     const metrics = getMetricsHistory(Number(id), range as "1h" | "6h" | "24h" | "7d");

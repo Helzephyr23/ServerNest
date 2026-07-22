@@ -81,6 +81,7 @@ export default function MarketplacePage() {
 
   const installMod = async (versionId: string) => {
     if (!selectedServer) return;
+    setInstallingMod(versionsModal?.slug || null);
     setInstallStatus("Installing...");
     try {
       const { filename } = await api.post(`/api/servers/${selectedServer}/mods/install`, { versionId });
@@ -91,6 +92,7 @@ export default function MarketplacePage() {
       setInstallStatus(`Error: ${err.message}`);
       setTimeout(() => setInstallStatus(""), 5000);
     }
+    setInstallingMod(null);
   };
 
   const batchInstall = async () => {
@@ -117,7 +119,7 @@ export default function MarketplacePage() {
         if (v && v.length > 0) {
           versionIds.push({ slug, versionId: v[0].id });
         }
-      } catch {}
+      } catch { /* skip failed version fetch */ }
     }
 
     if (versionIds.length === 0) {

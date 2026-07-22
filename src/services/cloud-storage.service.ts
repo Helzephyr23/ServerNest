@@ -1,5 +1,4 @@
 import fs from "fs";
-import path from "path";
 import { createReadStream, createWriteStream } from "fs";
 
 export interface CloudStorageConfig {
@@ -25,7 +24,7 @@ class S3StorageProvider implements CloudStorageProvider {
   private prefix: string;
 
   constructor(config: any) {
-    const { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, HeadBucketCommand } = require("@aws-sdk/client-s3");
+    const { S3Client } = require("@aws-sdk/client-s3");
     this.bucket = config.bucket;
     this.prefix = (config.prefix || "").replace(/\/?$/, "/");
     this.s3 = new S3Client({
@@ -99,7 +98,7 @@ class GoogleDriveStorageProvider implements CloudStorageProvider {
     this.folderId = config.folderId;
   }
 
-  private async ensureFolder(name: string): Promise<string> {
+  private async ensureFolder(_name: string): Promise<string> {
     if (!this.folderId) {
       const res = await this.drive.files.list({
         q: "name='BiryaniBackups' and mimeType='application/vnd.google-apps.folder' and trashed=false",
