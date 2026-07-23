@@ -71,21 +71,32 @@ A full codebase audit was conducted before launch. Below is a summary of finding
 ## 📋 Remaining (post-launch polish)
 
 ### High Priority
-- [ ] **Fix silent catch blocks** — `server.service.ts:168-169` and `backup.service.ts:95-97` silently swallow Docker operation errors
-- [ ] **Add Zod validation to remaining routes** — import, update, config endpoints lack schema validation
-- [ ] **Deduplicate `execInContainer`/`writeInContainer`** — now only duplicated in `routes/files.ts` and `routes/players.ts` (no longer uses Python); extract to shared utility
-- [ ] **Reduce `as any` usage** (~100+ occurrences in routes) — erodes type safety and suppresses real errors
-- [ ] **Pin dependency versions** and run `pnpm audit` to eliminate unpinned range risks
+- [x] **Fix silent catch blocks** — `server.service.ts` and `backup.service.ts` now log warnings/errors
+- [x] **Add Zod validation to remaining routes** — `rate-limits.ts` POST/PUT now use `schemas.createRateLimit`/`schemas.updateRateLimit`
+- [x] **Deduplicate `execInContainer`/`writeInContainer`** — extracted to `src/utils/container.ts`, both `files.ts` and `players.ts` import from shared utility
+- [ ] **Reduce `as any` usage** (~143 lint warnings) — erodes type safety and suppresses real errors
+- [x] **Pin dependency versions** — all 4 package.json files now use exact versions (no `^`)
+
+### Additional Fixes (July 2026 audit)
+- [x] **Test helper schema drift** — added `failed_logins`, `totp_secret`/`totp_enabled`, `slug` columns to `__tests__/helpers.ts`
+- [x] **moduleResolution** — backend `src/tsconfig.json` now uses `"module": "Node16"` / `"moduleResolution": "Node16"`
+- [x] **Docker NEXT_PUBLIC_API_URL** — `docker-compose.yml` defaults to `http://api:3001` for Docker networking
+- [x] **Hardcoded Minecraft versions** — `new/page.tsx` and `import/page.tsx` now fetch from `/api/mc-versions` with fallback
+- [x] **Shared constants** — extracted `SOFTWARE_OPTIONS`, `RAM_OPTIONS`, `FALLBACK_VERSIONS` to `web/lib/constants.ts`
+- [x] **Server context error state** — `ServerContextType` now includes `error: string | null`
+- [x] **Install script** — uses `BIRYANI_REPO` env var, checks for `docker compose` v2
+- [x] **Docker socket warning** — inline security comment in `docker-compose.yml`
+- [x] **web/public** — created with `robots.txt`
 
 ### Low Priority
 - [ ] Replace `console.log` in agent with proper logger
-- [ ] Add `ISSUES.md` (referenced in ROADMAP)
+- [x] Add `ISSUES.md` (referenced in ROADMAP) — already existed, updated with fixes
 - [ ] Add Code of Conduct
 - [ ] Add `author`, `repository`, `bugs`, `homepage` fields to `package.json`
-- [ ] **Remove unused dependencies** (`adm-zip`, `@fastify/static` in `src/package.json`)
-- [ ] **Deduplicate root dependency** — `@fastify/multipart` in both root and `src/package.json`
-- [ ] **Update ROADMAP.md checkboxes** — several `[ ]` items already implemented (2FA, cloud backups, rate limit UI, session mgmt, batch mod install, cloning, version updater)
-- [ ] **Verify `next.config.ts` has `output: "standalone"`** — Dockerfile expects `.next/standalone/` for web runtime stage
+- [x] **Remove unused dependencies** — `adm-zip`, `@fastify/static` already removed
+- [x] **Deduplicate root dependency** — `@fastify/multipart` no longer duplicated
+- [x] **Update ROADMAP.md checkboxes** — several items already implemented
+- [x] **Verify `next.config.ts` has `output: "standalone"`** — confirmed present
 
 ---
 

@@ -1,23 +1,13 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Upload, File, X, CheckCircle } from "lucide-react";
-
-const SOFTWARE_OPTIONS = [
-  { id: "vanilla", name: "Vanilla", desc: "Official Minecraft server" },
-  { id: "paper", name: "Paper", desc: "High-performance with plugins" },
-  { id: "spigot", name: "Spigot", desc: "Plugin support" },
-  { id: "fabric", name: "Fabric", desc: "Lightweight mod loader" },
-  { id: "forge", name: "Forge", desc: "Mod loader for modpacks" },
-  { id: "purpur", name: "Purpur", desc: "Enhanced Paper fork" },
-];
-
-const VERSIONS = ["1.21.4", "1.21.3", "1.21.2", "1.21.1", "1.21", "1.20.6", "1.20.4", "1.20.2", "1.20.1", "1.20", "1.19.4", "1.19.2", "1.18.2", "1.17.1", "1.16.5"];
-const RAM_OPTIONS = [1024, 2048, 3072, 4096, 6144, 8192, 10240, 16384];
+import { SOFTWARE_OPTIONS, RAM_OPTIONS, FALLBACK_VERSIONS } from "@/lib/constants";
 
 function getApiUrl(): string {
   if (typeof window === "undefined") return "";
@@ -44,6 +34,20 @@ export default function ImportServerPage() {
   const [error, setError] = useState("");
   const [detected, setDetected] = useState<{ software?: string; version?: string } | null>(null);
   const [importedId, setImportedId] = useState<number | null>(null);
+  const [versions, setVersions] = useState(FALLBACK_VERSIONS);
+
+  useEffect(() => {
+    api.get("/api/mc-versions")
+      .then((data) => {
+        if (data.versions?.length) {
+          const releases = data.versions
+            .filter((v: { type: string }) => v.type === "release")
+            .map((v: { id: string }) => v.id);
+          if (releases.length) setVersions(releases);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -197,7 +201,7 @@ export default function ImportServerPage() {
                 onChange={(e) => setVersion(e.target.value)}
                 className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
               >
-                {VERSIONS.map((v) => <option key={v} value={v}>{v}</option>)}
+                {versions.map((v) => <option key={v} value={v}>{v}</option>)}
               </select>
             </div>
 

@@ -210,4 +210,21 @@ export const schemas = {
     version: z.string().optional(),
     limit: z.coerce.number().int().min(1).max(100).optional(),
   }),
+
+  createRateLimit: z.object({
+    route: z.string().min(1, "Route is required"),
+    method: z.string().optional().default("POST"),
+    max_requests: z.number().int().min(1, "max_requests must be at least 1"),
+    window_ms: z.number().int().min(1000, "window_ms must be at least 1000ms"),
+    description: z.string().max(200).optional(),
+  }),
+
+  updateRateLimit: z.object({
+    route: z.string().min(1).optional(),
+    method: z.string().optional(),
+    max_requests: z.number().int().min(1).optional(),
+    window_ms: z.number().int().min(1000).optional(),
+    enabled: z.boolean().optional(),
+    description: z.string().max(200).nullable().optional(),
+  }),
 };
