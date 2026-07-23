@@ -14,10 +14,10 @@
     "test:watch": "pnpm --filter @biryani/api test:watch"
   },
   "devDependencies": {
-    "@eslint/js": "^8.57.0",
+    "@eslint/js": "8.57.1",
     "concurrently": "9.2.4",
     "typescript": "5.9.3",
-    "typescript-eslint": "^8.0.0"
+    "typescript-eslint": "8.65.0"
   },
   "engines": {
     "node": ">=20.0.0"

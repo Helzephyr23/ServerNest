@@ -1,5 +1,6 @@
 import { FastifyInstance } from "fastify";
 import { authMiddleware, adminMiddleware } from "../middleware/auth.js";
+import { validate, schemas } from "../middleware/validate.js";
 import db from "../config/database.js";
 import { loadRateLimits } from "../middleware/rate-limit.js";
 
@@ -21,19 +22,16 @@ export default async function rateLimitRoutes(app: FastifyInstance) {
     return { rules };
   });
 
-  app.post("/api/rate-limits", opts, async (request, reply) => {
-    const body = request.body as { route?: string; method?: string; max_requests?: number; window_ms?: number; description?: string };
-    if (!body.route || !body.max_requests || !body.window_ms) {
-      return reply.status(400).send({ error: "route, max_requests, and window_ms are required" });
-    }
+  app.post("/api/rate-limits", { preHandler: [authMiddleware, adminMiddleware, validate(schemas.createRateLimit)] }, async (request, reply) => {
+    const body = request.body as { route: string; method: string; max_requests: number; window_ms: number; description?: string };
     const result = db
       .prepare("INSERT INTO rate_limits (route, method, max_requests, window_ms, description) VALUES (?, ?, ?, ?, ?)")
-      .run(body.route, body.method || "POST", body.max_requests, body.window_ms, body.description || null);
+      .run(body.route, body.method, body.max_requests, body.window_ms, body.description || null);
     loadRateLimits();
     return reply.status(201).send({ id: result.lastInsertRowid });
   });
 
-  app.put("/api/rate-limits/:id", opts, async (request, reply) => {
+  app.put("/api/rate-limits/:id", { preHandler: [authMiddleware, adminMiddleware, validate(schemas.updateRateLimit)] }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const existing = db.prepare("SELECT * FROM rate_limits WHERE id = ?").get(Number(id)) as RateLimitRule | undefined;
     if (!existing) return reply.status(404).send({ error: "Rule not found" });

@@ -16,12 +16,14 @@ interface Server {
 interface ServerContextType {
   server: Server | null;
   loading: boolean;
+  error: string | null;
   refresh: () => void;
 }
 
 const ServerContext = createContext<ServerContextType>({
   server: null,
   loading: true,
+  error: null,
   refresh: () => {},
 });
 
@@ -34,14 +36,17 @@ export function ServerProvider({ children }: { children: ReactNode }) {
   const id = params.id as string;
   const [server, setServer] = useState<Server | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const fetch = useCallback(async () => {
     if (!id) return;
     try {
       const data = await api.get(`/api/servers/${id}`);
       setServer(data.server);
-    } catch {
+      setError(null);
+    } catch (err) {
       setServer(null);
+      setError((err as Error).message || "Failed to load server");
     } finally {
       setLoading(false);
     }
@@ -57,7 +62,7 @@ export function ServerProvider({ children }: { children: ReactNode }) {
   }, [server?.status, fetch]);
 
   return (
-    <ServerContext.Provider value={{ server, loading, refresh: fetch }}>
+    <ServerContext.Provider value={{ server, loading, error, refresh: fetch }}>
       {children}
     </ServerContext.Provider>
   );

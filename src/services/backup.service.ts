@@ -217,7 +217,9 @@ export function deleteBackup(backupId: number) {
     `).all(backupId) as { storage_id: number; config_json: string; provider: string; status: string }[];
     for (const u of uploads) {
       if (u.status === "uploaded") {
-        deleteFromCloud({ id: u.storage_id, server_id: 0, provider: u.provider as CloudStorageConfig["provider"], label: "", config_json: u.config_json, enabled: 1, created_at: "" }, backup.filename).catch(() => {});
+        deleteFromCloud({ id: u.storage_id, server_id: 0, provider: u.provider as CloudStorageConfig["provider"], label: "", config_json: u.config_json, enabled: 1, created_at: "" }, backup.filename).catch((err) => {
+          console.error(`[backup] Failed to delete "${backup.filename}" from cloud:`, err.message);
+        });
       }
     }
   }
