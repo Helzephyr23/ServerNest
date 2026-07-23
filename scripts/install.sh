@@ -4,9 +4,14 @@ set -e
 echo "🍛 Installing Biryani - Minecraft Server Panel"
 echo "=============================================="
 
+REPO_URL="${BIRYANI_REPO:-https://github.com/Helzephyr23/biryani.git}"
+
 # Check prerequisites
 command -v docker >/dev/null 2>&1 || { echo "Error: Docker is required. Install it from https://docker.com"; exit 1; }
 command -v git >/dev/null 2>&1 || { echo "Error: Git is required."; exit 1; }
+
+# Check for docker compose v2
+docker compose version >/dev/null 2>&1 || { echo "Error: Docker Compose v2 is required. Install Docker Compose plugin: https://docs.docker.com/compose/install"; exit 1; }
 
 # Clone repo
 INSTALL_DIR="${BIRYANI_DIR:-$HOME/biryani}"
@@ -16,7 +21,7 @@ if [ -d "$INSTALL_DIR" ]; then
   git pull
 else
   echo "Cloning Biryani to $INSTALL_DIR..."
-  git clone https://github.com/Helzephyr23/biryani.git "$INSTALL_DIR"
+  git clone "$REPO_URL" "$INSTALL_DIR"
   cd "$INSTALL_DIR"
 fi
 

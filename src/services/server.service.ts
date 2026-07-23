@@ -165,7 +165,9 @@ export async function startServer(id: number): Promise<string | null> {
   try {
     const existing = docker.getContainer(containerName);
     await existing.remove({ force: true });
-  } catch {}
+  } catch (err) {
+    console.warn(`[server] Could not remove old container "${containerName}": ${(err as Error).message}`);
+  }
 
   const image = server.image || "itzg/minecraft-server";
   try {
@@ -206,7 +208,9 @@ export async function stopServer(id: number): Promise<void> {
     const container = docker.getContainer(containerName);
     await container.stop({ t: 30 });
     await container.remove({ force: true });
-  } catch {}
+  } catch (err) {
+    console.warn(`[server] Error stopping container "${containerName}": ${(err as Error).message}`);
+  }
 
   db.prepare("UPDATE servers SET status = 'stopped', container_id = NULL WHERE id = ?").run(id);
   notify("server_stopped", "Server Stopped", `Server "${server.name}" has been stopped`, 0xffaa00);
@@ -234,7 +238,8 @@ export async function getServerLogs(id: number, tail: number = 100): Promise<str
       pos += 8 + size;
     }
     return output.trim();
-  } catch {
+  } catch (err) {
+    console.error(`[server] Failed to fetch logs for server ${id}:`, err);
     return "";
   }
 }

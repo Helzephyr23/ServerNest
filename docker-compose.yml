@@ -24,7 +24,7 @@ services:
       - SERVER_PORT_RANGE_END=25665
     volumes:
       - biryani-data:/app/data
-      - /var/run/docker.sock:/var/run/docker.sock
+      - /var/run/docker.sock:/var/run/docker.sock # WARNING: Grants container root access to host Docker daemon. Use rootless Docker or a socket proxy in production.
     deploy:
       resources:
         limits:
@@ -44,7 +44,7 @@ services:
       context: .
       target: web-runtime
       args:
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://127.0.0.1:3001}
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://api:3001}
     restart: unless-stopped
     networks:
       - biryani

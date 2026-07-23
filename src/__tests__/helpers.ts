@@ -10,6 +10,8 @@ export function createTestDb(): Database.Database {
       username TEXT UNIQUE NOT NULL,
       password_hash TEXT NOT NULL,
       role TEXT NOT NULL DEFAULT 'admin',
+      totp_secret TEXT,
+      totp_enabled INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
     CREATE TABLE IF NOT EXISTS nodes (
@@ -89,6 +91,7 @@ export function createTestDb(): Database.Database {
       filename TEXT NOT NULL,
       version TEXT,
       source TEXT NOT NULL DEFAULT 'modrinth',
+      slug TEXT,
       installed_at TEXT NOT NULL DEFAULT (datetime('now')),
       FOREIGN KEY (server_id) REFERENCES servers(id) ON DELETE CASCADE
     );
@@ -143,6 +146,14 @@ export function createTestDb(): Database.Database {
       completed_at TEXT,
       FOREIGN KEY (backup_id) REFERENCES backups(id) ON DELETE CASCADE,
       FOREIGN KEY (storage_id) REFERENCES cloud_storage_configs(id) ON DELETE CASCADE
+    );
+    CREATE TABLE IF NOT EXISTS failed_logins (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id     INTEGER NOT NULL,
+      attempts    INTEGER NOT NULL DEFAULT 1,
+      last_attempt TEXT NOT NULL DEFAULT (datetime('now')),
+      locked_until TEXT,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     );
   `);
 
