@@ -4,6 +4,7 @@ import cors from "@fastify/cors";
 import jwt from "@fastify/jwt";
 import multipart from "@fastify/multipart";
 import helmet from "@fastify/helmet";
+import cookie from "@fastify/cookie";
 import { Server as SocketIOServer } from "socket.io";
 import { env, checkJwtSecret } from "./config/env.js";
 import { migrate } from "./config/database.js";
@@ -43,6 +44,7 @@ const app = Fastify({
 const corsOrigin = process.env.CORS_ORIGIN || (env.NODE_ENV === "production" ? false : true);
 await app.register(cors, { origin: corsOrigin, credentials: true });
 await app.register(jwt, { secret: env.JWT_SECRET, sign: { expiresIn: env.JWT_EXPIRES_IN } });
+await app.register(cookie);
 await app.register(multipart, { limits: { fileSize: 2048 * 1024 * 1024 } });
 
 await app.register(helmet, {
@@ -161,7 +163,19 @@ const serverCheckInterval = setInterval(async () => {
 
 io.use(async (socket, next) => {
   try {
-    const token = socket.handshake.auth.token;
+    let token: string | undefined;
+
+    const auth = socket.handshake.auth?.token;
+    if (auth) {
+      token = auth;
+    } else {
+      const cookieHeader = socket.handshake.headers?.cookie;
+      if (cookieHeader) {
+        const match = cookieHeader.match(/biryani_token=([^;]+)/);
+        if (match) token = match[1];
+      }
+    }
+
     if (!token) return next(new Error("No token"));
     const decoded = app.jwt.verify<{ id: number; username: string }>(token);
     socket.data.user = decoded;

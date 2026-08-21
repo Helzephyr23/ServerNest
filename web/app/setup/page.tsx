@@ -35,8 +35,7 @@ export default function SetupPage() {
     }
     setLoading(true);
     try {
-      const { token } = await api.post("/api/auth/setup", { username, password });
-      localStorage.setItem("biryani_token", token);
+      await api.post("/api/auth/setup", { username, password });
       router.push("/dashboard");
     } catch (err: any) {
       setError(err.message || "Setup failed");
