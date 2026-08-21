@@ -31,20 +31,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem("biryani_token");
-    if (token) {
-      api.get("/api/auth/me")
-        .then((response: any) => {
-          setUser(response?.user || null);
-        })
-        .catch(() => {
-          localStorage.removeItem("biryani_token");
-          setUser(null);
-        })
-        .finally(() => setLoading(false));
-    } else {
-      setLoading(false);
-    }
+    api.get("/api/auth/me")
+      .then((response: any) => {
+        setUser(response?.user || null);
+      })
+      .catch(() => {
+        setUser(null);
+      })
+      .finally(() => setLoading(false));
   }, []);
 
   const login = async (username: string, password: string) => {
@@ -52,19 +46,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (res.requiresTotp) {
       return { requiresTotp: true, tempToken: res.tempToken };
     }
-    localStorage.setItem("biryani_token", res.token);
     setUser(res.user);
   };
 
   const verifyTotp = async (tempToken: string, code: string) => {
     const res = await api.post("/api/auth/2fa/challenge", { tempToken, code });
-    localStorage.setItem("biryani_token", res.token);
     setUser(res.user);
   };
 
-  const logout = () => {
+  const logout = async () => {
     disconnectSocket();
-    localStorage.removeItem("biryani_token");
+    try {
+      await api.post("/api/auth/logout");
+    } catch {}
     setUser(null);
     window.location.href = "/login";
   };

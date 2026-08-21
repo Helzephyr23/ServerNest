@@ -9,6 +9,16 @@ import { rateLimit } from "../middleware/rate-limit.js";
 import { validate, schemas } from "../middleware/validate.js";
 
 export default async function authRoutes(app: FastifyInstance) {
+  function setAuthCookie(reply: any, token: string) {
+    reply.setCookie("biryani_token", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      path: "/",
+      maxAge: 24 * 60 * 60,
+    });
+  }
+
   app.post("/api/auth/setup", {
     preHandler: [rateLimit(5, 60000), validate(schemas.setup)],
   }, async (request, reply) => {
@@ -19,6 +29,7 @@ export default async function authRoutes(app: FastifyInstance) {
     const user = await createUser(username, password, "admin");
     const jti = createSession(user.id, request.headers["user-agent"], request.ip);
     const token = app.jwt.sign({ id: user.id, username: user.username, role: user.role, jti });
+    setAuthCookie(reply, token);
     return { token, user: { id: user.id, username: user.username, role: user.role } };
   });
 
@@ -57,6 +68,7 @@ export default async function authRoutes(app: FastifyInstance) {
 
       const jti = createSession(user.id, request.headers["user-agent"], request.ip);
       const token = app.jwt.sign({ id: user.id, username: user.username, role: user.role, jti });
+      setAuthCookie(reply, token);
       return { token, user: { id: user.id, username: user.username, role: user.role } };
     } catch (err: unknown) {
       request.log.error(err, "Login failed");
@@ -90,6 +102,7 @@ export default async function authRoutes(app: FastifyInstance) {
 
       const jti = createSession(user.id, request.headers["user-agent"], request.ip);
       const token = app.jwt.sign({ id: user.id, username: user.username, role: user.role, jti });
+      setAuthCookie(reply, token);
       return { token, user: { id: user.id, username: user.username, role: user.role } };
     } catch (err: unknown) {
       return reply.status(500).send({ error: (err as Error).message });
@@ -151,7 +164,8 @@ export default async function authRoutes(app: FastifyInstance) {
   app.get("/api/auth/me", {
     preHandler: [async (req, reply) => {
       try {
-        const token = req.headers.authorization?.replace("Bearer ", "");
+        const token = req.cookies?.biryani_token
+          ?? req.headers.authorization?.replace("Bearer ", "");
         if (!token) return reply.status(401).send({ error: "No token" });
         const decoded = app.jwt.verify<{ id: number; username: string; role: string }>(token);
         req.user = decoded;
@@ -161,5 +175,10 @@ export default async function authRoutes(app: FastifyInstance) {
     }]
   }, async (request) => {
     return { user: request.user };
+  });
+
+  app.post("/api/auth/logout", async (request, reply) => {
+    reply.clearCookie("biryani_token", { path: "/" });
+    return { success: true };
   });
 }

@@ -87,7 +87,7 @@ export default function BackupsPage() {
     setDownloading(backupId);
     try {
       const res = await fetch(`/api/servers/${id}/backups/${backupId}/download`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem("biryani_token")}` },
+        credentials: "include",
       });
       if (!res.ok) throw new Error("Download failed");
       const blob = await res.blob();

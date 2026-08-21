@@ -12,23 +12,13 @@ export default function Home() {
       if (firstRun) {
         router.replace("/setup");
       } else {
-        const token = localStorage.getItem("biryani_token");
-        if (!token) {
-          router.replace("/login");
-          return;
-        }
-        try {
-          const payload = JSON.parse(atob(token.split(".")[1]));
-          if (payload.exp && payload.exp * 1000 < Date.now()) {
-            localStorage.removeItem("biryani_token");
-            router.replace("/login");
-          } else {
+        api.get("/api/auth/me")
+          .then(() => {
             router.replace("/dashboard");
-          }
-        } catch {
-          localStorage.removeItem("biryani_token");
-          router.replace("/login");
-        }
+          })
+          .catch(() => {
+            router.replace("/login");
+          });
       }
     }).catch(() => {
       router.replace("/login");

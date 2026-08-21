@@ -1,15 +1,8 @@
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 const TIMEOUT_MS = 15000;
 
-function getToken(): string | null {
-  if (typeof window === "undefined") return null;
-  return localStorage.getItem("biryani_token");
-}
-
 async function request<T>(method: string, path: string, body?: any): Promise<T> {
-  const token = getToken();
   const headers: Record<string, string> = {};
-  if (token) headers["Authorization"] = `Bearer ${token}`;
   if (body !== undefined) headers["Content-Type"] = "application/json";
 
   const controller = new AbortController();
@@ -21,6 +14,7 @@ async function request<T>(method: string, path: string, body?: any): Promise<T> 
       method,
       headers,
       body: body !== undefined ? JSON.stringify(body) : undefined,
+      credentials: "include",
       signal: controller.signal,
     });
   } catch (err: any) {
@@ -31,7 +25,6 @@ async function request<T>(method: string, path: string, body?: any): Promise<T> 
   clearTimeout(timeoutId);
 
   if (res.status === 401 && typeof window !== "undefined" && window.location.pathname !== "/login") {
-    localStorage.removeItem("biryani_token");
     window.location.href = "/login";
     throw new Error("Unauthorized");
   }
@@ -50,7 +43,6 @@ async function request<T>(method: string, path: string, body?: any): Promise<T> 
 }
 
 async function uploadFile<T>(path: string, file: File): Promise<T> {
-  const token = getToken();
   const formData = new FormData();
   formData.append("file", file);
 
@@ -61,8 +53,8 @@ async function uploadFile<T>(path: string, file: File): Promise<T> {
   try {
     res = await fetch(`${API_BASE}${path}`, {
       method: "POST",
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
       body: formData,
+      credentials: "include",
       signal: controller.signal,
     });
   } catch (err: any) {
@@ -73,7 +65,6 @@ async function uploadFile<T>(path: string, file: File): Promise<T> {
   clearTimeout(timeoutId);
 
   if (res.status === 401 && typeof window !== "undefined" && window.location.pathname !== "/login") {
-    localStorage.removeItem("biryani_token");
     window.location.href = "/login";
     throw new Error("Unauthorized");
   }
