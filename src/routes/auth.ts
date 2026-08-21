@@ -2,7 +2,7 @@ import { FastifyInstance } from "fastify";
 import {
   getUserByUsername, getUserById, createUser, verifyPassword, isFirstRun, createSession,
   isTotpEnabled, setupTotp, verifyTotpCode, enableTotp, disableTotp, getUserTotpStatus,
-  isAccountLocked, recordFailedLogin, clearFailedLogins,
+  isAccountLocked, recordFailedLogin, clearFailedLogins, revokeSessionByJti,
 } from "../services/auth.service.js";
 import { authMiddleware } from "../middleware/auth.js";
 import { rateLimit } from "../middleware/rate-limit.js";
@@ -188,6 +188,18 @@ export default async function authRoutes(app: FastifyInstance) {
   });
 
   app.post("/api/auth/logout", async (request, reply) => {
+    // Best-effort: revoke the server-side session tied to this token so it
+    // disappears from the active sessions list and stops being accepted.
+    const token = request.cookies?.biryani_token
+      ?? request.headers.authorization?.replace("Bearer ", "");
+    if (token) {
+      try {
+        const decoded = request.server.jwt.verify<{ jti?: string }>(token);
+        if (decoded.jti) revokeSessionByJti(decoded.jti);
+      } catch {
+        // Invalid or expired token — nothing left to revoke.
+      }
+    }
     reply.clearCookie("biryani_token", { path: "/" });
     return { success: true };
   });
