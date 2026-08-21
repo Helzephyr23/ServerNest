@@ -1,6 +1,6 @@
 import { FastifyInstance } from "fastify";
 import { authMiddleware, adminMiddleware } from "../middleware/auth.js";
-import { validate, schemas } from "../middleware/validate.js";
+import { validate, validateQuery, schemas } from "../middleware/validate.js";
 import {
   getAllServers,
   getServerById,
@@ -274,7 +274,7 @@ export default async function serverRoutes(app: FastifyInstance) {
     }
   });
 
-  app.get("/api/servers/:id/logs", { preHandler: [authMiddleware, validate(schemas.serverLogsQuery)] }, async (request) => {
+  app.get("/api/servers/:id/logs", { preHandler: [authMiddleware, validateQuery(schemas.serverLogsQuery)] }, async (request) => {
     const { id } = request.params as { id: string };
     const { tail: tailParam } = request.query as { tail?: string };
     const tail = Number(tailParam) || 100;

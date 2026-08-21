@@ -16,3 +16,5 @@ package-lock.json
 *.tsbuildinfo
 .vscode/
 .idea/
+
+coverage/
