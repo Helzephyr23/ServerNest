@@ -98,7 +98,7 @@ app.log.info(`Biryani API running on port ${env.API_PORT}`);
 
 const io = new SocketIOServer(app.server as ReturnType<typeof http.createServer>, {
   cors: {
-    origin: corsOrigin === true ? "*" : corsOrigin === false ? false : corsOrigin,
+    origin: corsOrigin === true ? true : corsOrigin === false ? false : corsOrigin,
     credentials: true,
   },
 });
@@ -213,7 +213,7 @@ io.on("connection", (socket) => {
       }
 
       const logStream = await container.logs({
-        follow: true, stdout: true, stderr: true, tail: 100, timestamps: false,
+        follow: true, stdout: true, stderr: true, tail: 500, timestamps: false,
       });
 
       dockerStreamDemux(logStream,
@@ -225,6 +225,8 @@ io.on("connection", (socket) => {
         socket.emit("console:detached", { serverId });
       });
 
+      const existing = activeAttachments.get(key);
+      if (existing?.stream) existing.stream.destroy();
       activeAttachments.set(key, { stream: logStream as NodeJS.ReadableStream & { destroy(): void }, outputInterval: null as unknown as NodeJS.Timeout });
       socket.emit("console:attached", { serverId });
     } catch (err: unknown) {
