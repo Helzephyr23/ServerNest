@@ -54,9 +54,9 @@ A full codebase audit was conducted before launch. Below is a summary of finding
 - [x] **Add `helmet` (fastify-helmet)** — registered in `src/index.ts`, replaced manual headers
 
 ### Infrastructure
-- [x] **Add CI/CD pipeline (GitHub Actions)** — created `.github/workflows/ci.yml` (lint → typecheck → test → build)
+- [x] **Add CI/CD pipeline (GitHub Actions)** — created `.github/workflows/ci.yml` (audit → lint → typecheck → test → build, plus Docker image build job)
 - [x] **Pin dependency versions** — all `^` ranges replaced with exact versions across all 4 package.json files. Removed unused `adm-zip`, `@fastify/static` and duplicated root `@fastify/multipart`
-- [x] **Run `pnpm audit`** — 7/8 vulns fixed. 1 moderate remaining (`postcss@8.4.31` inside `next@15.5.20`, upstream dep; will resolve when Next.js updates its bundled postcss)
+- [x] **Run `pnpm audit`** — 0 known vulnerabilities (Aug 2026): all 28 findings resolved via scoped pnpm overrides + `next` bumped to 15.5.21; audit step added to CI (`--audit-level high`)
 
 ### Code Quality
 - [x] **Replace Python JSON manipulation in `players.ts`** — now reads via `cat`, modifies in Node.js, writes via `tee`; no Python dependency
