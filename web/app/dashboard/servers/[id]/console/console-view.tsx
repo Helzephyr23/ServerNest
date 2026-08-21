@@ -18,6 +18,7 @@ export default function ConsoleView() {
   const { server } = useServer();
   const [connected, setConnected] = useState(false);
   const [attached, setAttached] = useState(false);
+  const attachedRef = useRef(false);
   const termRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
   const socketRef = useRef<Socket | null>(null);
@@ -168,6 +169,16 @@ export default function ConsoleView() {
     const cleanup = initTerminal();
     return cleanup;
   }, [initTerminal, server?.status]);
+
+  useEffect(() => {
+    attachedRef.current = attached;
+  }, [attached]);
+
+  useEffect(() => {
+    if (server?.status === "running" && socketRef.current?.connected && !attachedRef.current) {
+      socketRef.current.emit("console:attach", Number(id));
+    }
+  }, [server?.status, id]);
 
   useEffect(() => {
     const term = termRef.current;
