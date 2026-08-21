@@ -1,9 +1,18 @@
 import db from "../config/database.js";
 import argon2 from "argon2";
 import crypto from "crypto";
-import * as otplib from "otplib";
-import qrcode from "qrcode";
 import { env } from "../config/env.js";
+
+// TOTP libraries are loaded lazily on first use — otplib and qrcode are only
+// needed when 2FA is actually configured, not at panel startup (LOW-002).
+let totpLibs: Promise<{ otplib: typeof import("otplib"); qrcode: typeof import("qrcode") }> | null = null;
+function loadTotpLibs() {
+  totpLibs ??= Promise.all([import("otplib"), import("qrcode")]).then(([otplibMod, qrcodeMod]) => ({
+    otplib: otplibMod,
+    qrcode: qrcodeMod.default ?? qrcodeMod,
+  }));
+  return totpLibs;
+}
 
 const MAX_LOGIN_ATTEMPTS = 10;
 const LOCKOUT_DURATION_MS = 15 * 60 * 1000;
@@ -168,6 +177,7 @@ export function isTotpEnabled(userId: number): boolean {
 }
 
 export async function setupTotp(userId: number): Promise<{ secret: string; uri: string; qr: string }> {
+  const { otplib, qrcode } = await loadTotpLibs();
   const secret = otplib.generateSecret();
   const user = db.prepare("SELECT username FROM users WHERE id = ?").get(userId) as { username: string } | undefined;
   const uri = otplib.generateURI({ issuer: "Biryani", label: user?.username || "user", secret });
@@ -177,11 +187,12 @@ export async function setupTotp(userId: number): Promise<{ secret: string; uri: 
   return { secret, uri, qr };
 }
 
-export function verifyTotpCode(code: string, userId: number): boolean {
+export async function verifyTotpCode(code: string, userId: number): Promise<boolean> {
   const user = db.prepare("SELECT totp_secret FROM users WHERE id = ?").get(userId) as UserWithTotp | undefined;
   if (!user?.totp_secret) return false;
   try {
     const plaintext = decryptSecret(user.totp_secret);
+    const { otplib } = await loadTotpLibs();
     return otplib.verifySync({ token: code, secret: plaintext }).valid;
   } catch {
     return false;
