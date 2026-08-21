@@ -30,7 +30,8 @@ export default async function notificationRoutes(app: FastifyInstance) {
   app.post("/api/notifications/test", { preHandler: [authMiddleware, validate(schemas.testNotification)] }, async (request, reply) => {
     const { webhook_url } = request.body as { webhook_url: string };
     try {
-      await sendDiscordNotification(webhook_url, "Test Notification", "This is a test notification from Biryani.", 0x5865f2);
+      const ok = await sendDiscordNotification(webhook_url, "Test Notification", "This is a test notification from Biryani.", 0x5865f2);
+      if (!ok) return reply.status(502).send({ error: "Failed to reach Discord webhook" });
       return { success: true };
     } catch (err: unknown) {
       return reply.status(500).send({ error: (err as Error).message });

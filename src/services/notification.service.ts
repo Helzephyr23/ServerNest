@@ -35,9 +35,9 @@ export function deleteNotification(id: number) {
   db.prepare("DELETE FROM notifications WHERE id = ?").run(id);
 }
 
-export async function sendDiscordNotification(webhookUrl: string, title: string, message: string, color: number = 0x00ff00) {
+export async function sendDiscordNotification(webhookUrl: string, title: string, message: string, color: number = 0x00ff00): Promise<boolean> {
   try {
-    await fetch(webhookUrl, {
+    const res = await fetch(webhookUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -49,8 +49,10 @@ export async function sendDiscordNotification(webhookUrl: string, title: string,
         }],
       }),
     });
+    return res.ok;
   } catch (err) {
     logger.error("Failed to send Discord notification:", err);
+    return false;
   }
 }
 

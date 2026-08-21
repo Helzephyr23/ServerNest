@@ -1,6 +1,6 @@
 import { FastifyInstance } from "fastify";
 import { authMiddleware } from "../middleware/auth.js";
-import { validate, schemas } from "../middleware/validate.js";
+import { validate, validateQuery, schemas } from "../middleware/validate.js";
 import db from "../config/database.js";
 import { execInContainer, writeInContainer } from "../utils/container.js";
 import { join, normalize } from "path";
@@ -54,7 +54,7 @@ export default async function filesRoutes(app: FastifyInstance) {
     }
   });
 
-  app.delete("/api/servers/:id/files", { preHandler: [authMiddleware, validate(schemas.filePathQuery)] }, async (request, reply) => {
+  app.delete("/api/servers/:id/files", { preHandler: [authMiddleware, validateQuery(schemas.filePathQuery)] }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const serverId = Number(id);
     const { path: filePath } = request.query as { path: string };
@@ -168,7 +168,7 @@ export default async function filesRoutes(app: FastifyInstance) {
     }
   });
 
-  app.get("/api/servers/:id/files/download", { preHandler: [authMiddleware, validate(schemas.filePathQuery)] }, async (request, reply) => {
+  app.get("/api/servers/:id/files/download", { preHandler: [authMiddleware, validateQuery(schemas.filePathQuery)] }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const serverId = Number(id);
     const { path: filePath } = request.query as { path: string };
