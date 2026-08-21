@@ -1,5 +1,16 @@
 import fs from "fs";
 import { createReadStream, createWriteStream } from "fs";
+import { createRequire } from "module";
+
+const nodeRequire = createRequire(import.meta.url);
+
+// Resolves CommonJS-only SDK packages from this ESM module.
+// Overridable so tests can substitute lightweight fakes.
+export let _loadSdk: (id: string) => any = (id: string) => nodeRequire(id);
+
+export function _setSdkLoader(loader: (id: string) => any): void {
+  _loadSdk = loader;
+}
 
 export interface CloudStorageConfig {
   id: number;
@@ -24,7 +35,7 @@ class S3StorageProvider implements CloudStorageProvider {
   private prefix: string;
 
   constructor(config: any) {
-    const { S3Client } = require("@aws-sdk/client-s3");
+    const { S3Client } = _loadSdk("@aws-sdk/client-s3");
     this.bucket = config.bucket;
     this.prefix = (config.prefix || "").replace(/\/?$/, "/");
     this.s3 = new S3Client({
@@ -39,7 +50,7 @@ class S3StorageProvider implements CloudStorageProvider {
   }
 
   async upload(localPath: string, remotePath: string): Promise<void> {
-    const { Upload } = require("@aws-sdk/lib-storage");
+    const { Upload } = _loadSdk("@aws-sdk/lib-storage");
     const fileStream = createReadStream(localPath);
     const upload = new Upload({
       client: this.s3,
@@ -53,7 +64,7 @@ class S3StorageProvider implements CloudStorageProvider {
   }
 
   async download(remotePath: string, localPath: string): Promise<void> {
-    const { GetObjectCommand } = require("@aws-sdk/client-s3");
+    const { GetObjectCommand } = _loadSdk("@aws-sdk/client-s3");
     const response = await this.s3.send(new GetObjectCommand({
       Bucket: this.bucket,
       Key: this.prefix + remotePath,
@@ -65,7 +76,7 @@ class S3StorageProvider implements CloudStorageProvider {
   }
 
   async delete(remotePath: string): Promise<void> {
-    const { DeleteObjectCommand } = require("@aws-sdk/client-s3");
+    const { DeleteObjectCommand } = _loadSdk("@aws-sdk/client-s3");
     await this.s3.send(new DeleteObjectCommand({
       Bucket: this.bucket,
       Key: this.prefix + remotePath,
@@ -73,7 +84,7 @@ class S3StorageProvider implements CloudStorageProvider {
   }
 
   async testConnection(): Promise<boolean> {
-    const { HeadBucketCommand } = require("@aws-sdk/client-s3");
+    const { HeadBucketCommand } = _loadSdk("@aws-sdk/client-s3");
     try {
       await this.s3.send(new HeadBucketCommand({ Bucket: this.bucket }));
       return true;
@@ -88,7 +99,7 @@ class GoogleDriveStorageProvider implements CloudStorageProvider {
   private folderId: string | undefined;
 
   constructor(config: any) {
-    const { google } = require("googleapis");
+    const { google } = _loadSdk("googleapis");
     const auth = new google.auth.OAuth2({
       clientId: config.clientId,
       clientSecret: config.clientSecret,
@@ -179,7 +190,7 @@ class DropboxStorageProvider implements CloudStorageProvider {
   private pathPrefix: string;
 
   constructor(config: any) {
-    const { Dropbox } = require("dropbox");
+    const { Dropbox } = _loadSdk("dropbox");
     this.dbx = new Dropbox({ accessToken: config.accessToken });
     this.pathPrefix = (config.path || "/BiryaniBackups").replace(/\/?$/, "/");
   }
