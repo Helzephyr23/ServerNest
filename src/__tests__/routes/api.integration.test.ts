@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import Fastify from "fastify";
 import jwt from "@fastify/jwt";
+import cookie from "@fastify/cookie";
 
 const testDb = vi.hoisted(() => {
   const Database = require("better-sqlite3");
@@ -56,6 +57,7 @@ import serverRoutes from "../../routes/servers.js";
 
 async function buildApp() {
   const app = Fastify({ logger: false });
+  await app.register(cookie);
   await app.register(jwt, { secret: "integration-test-secret-key", sign: { expiresIn: "1d" } });
   await app.register(authRoutes);
   await app.register(serverRoutes);

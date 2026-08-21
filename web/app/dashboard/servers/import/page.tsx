@@ -93,8 +93,8 @@ export default function ImportServerPage() {
       try {
         res = await fetch(`${apiUrl}/api/servers/import`, {
           method: "POST",
-          headers: { Authorization: `Bearer ${localStorage.getItem("biryani_token")}` },
           body: formData,
+          credentials: "include",
           signal: controller.signal,
         });
       } catch (err: any) {
