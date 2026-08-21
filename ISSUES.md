@@ -8,7 +8,7 @@
 
 | Check | Status |
 | ----- | ------ |
-| Tests | 179 passing (unit + integration) |
+| Tests | 250 passing (179 api + 40 web + 31 agent) |
 | Typecheck | Clean across all workspaces |
 | Lint | 0 errors (~147 `no-explicit-any` warnings) |
 | Test DB schema | Single source: `src/__tests__/schema.ts` |
@@ -73,18 +73,6 @@ No client-side debounce or rate limit on form submissions. A user or script can 
 
 ---
 
-## Feature Work
-
-### FEAT-001: No frontend tests exist
-
-There are zero test files in `web/`. No component tests, no page tests, no utility function tests, no E2E tests.
-
-### FEAT-002: No agent tests exist
-
-There are zero test files in `agent/`. The agent has 7 TypeScript compilation errors and no tests.
-
----
-
 ## Test Coverage Gaps
 
 ### Services with Zero Test Coverage
@@ -127,8 +115,8 @@ There are zero test files in `agent/`. The agent has 7 TypeScript compilation er
 
 ## Suggested Priority
 
-1. **FEAT-001 / FEAT-002** — frontend and agent test suites (biggest structural gap)
-2. **Service unit tests** — cloud-storage, metrics, modrinth (0% coverage)
-3. **LOW-002** — lazy-load heavy API dependencies
-4. **SEC-005** — socket proxy / rootless Docker when deployment allows
-5. **SEC-003 / SEC-004 / SEC-007** — CSP and login UX polish
+1. **Service unit tests** — cloud-storage, metrics, modrinth (0% coverage)
+2. **LOW-002** — lazy-load heavy API dependencies
+3. **SEC-005** — socket proxy / rootless Docker when deployment allows
+4. **SEC-003 / SEC-004 / SEC-007** — CSP and login UX polish
+5. **Component tests (web)** — auth context expiry timers, login form, dashboard guards (needs jsdom + testing-library)
