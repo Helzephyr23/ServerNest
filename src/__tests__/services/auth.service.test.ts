@@ -33,11 +33,13 @@ vi.mock("../../config/env.js", () => ({
 const {
   getUserByUsername, getUserById, createUser, verifyPassword, isFirstRun,
   setupTotp, verifyTotpCode, isTotpEnabled, enableTotp,
+  createSession, getSessions, getSessionByJti, revokeSessionByJti,
 } = await import("../../services/auth.service.js");
 
 describe("auth.service", () => {
   beforeEach(() => {
     testDb.exec("DELETE FROM users");
+    testDb.exec("DELETE FROM sessions");
     vi.clearAllMocks();
   });
 
@@ -111,6 +113,37 @@ describe("auth.service", () => {
     it("should return false when users exist", async () => {
       await createUser("admin", "password123");
       expect(isFirstRun()).toBe(false);
+    });
+  });
+
+  describe("Sessions", () => {
+    it("createSession registers an active session resolvable by jti", async () => {
+      const admin = await createUser("admin", "password123");
+      const jti = createSession(admin.id, "test-agent", "127.0.0.1");
+      expect(getSessions(admin.id)).toHaveLength(1);
+      expect(getSessionByJti(jti)?.user_id).toBe(admin.id);
+    });
+
+    it("revokeSessionByJti removes the session from the active list and blocks jti lookup", async () => {
+      const admin = await createUser("admin", "password123");
+      const jti = createSession(admin.id);
+      revokeSessionByJti(jti);
+      expect(getSessions(admin.id)).toHaveLength(0);
+      expect(getSessionByJti(jti)).toBeUndefined();
+    });
+
+    it("revokeSessionByJti only affects the targeted session", async () => {
+      const admin = await createUser("admin", "password123");
+      const keep = createSession(admin.id, "keep-browser");
+      const drop = createSession(admin.id, "drop-browser");
+      revokeSessionByJti(drop);
+      const remaining = getSessions(admin.id);
+      expect(remaining).toHaveLength(1);
+      expect(remaining[0].jti).toBe(keep);
+    });
+
+    it("revoking an unknown jti is a harmless no-op", () => {
+      expect(() => revokeSessionByJti("does-not-exist")).not.toThrow();
     });
   });
 

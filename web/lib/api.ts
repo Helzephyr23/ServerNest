@@ -1,4 +1,6 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
+// All REST calls are same-origin: the Next.js server proxies /api/* to the
+// Fastify API (see next.config.ts rewrites). This keeps cookies first-party
+// so the panel works from any host (localhost, LAN IP, Tailscale, etc.).
 const TIMEOUT_MS = 15000;
 
 async function request<T>(method: string, path: string, body?: any): Promise<T> {
@@ -10,7 +12,7 @@ async function request<T>(method: string, path: string, body?: any): Promise<T> 
 
   let res: Response;
   try {
-    res = await fetch(`${API_BASE}${path}`, {
+    res = await fetch(path, {
       method,
       headers,
       body: body !== undefined ? JSON.stringify(body) : undefined,
@@ -51,7 +53,7 @@ async function uploadFile<T>(path: string, file: File): Promise<T> {
 
   let res: Response;
   try {
-    res = await fetch(`${API_BASE}${path}`, {
+    res = await fetch(path, {
       method: "POST",
       body: formData,
       credentials: "include",

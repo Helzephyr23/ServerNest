@@ -119,6 +119,10 @@ export function revokeSession(sessionId: number): void {
   db.prepare("UPDATE sessions SET expired = 1 WHERE id = ?").run(sessionId);
 }
 
+export function revokeSessionByJti(jti: string): void {
+  db.prepare("UPDATE sessions SET expired = 1 WHERE jti = ?").run(jti);
+}
+
 export function revokeAllUserSessions(userId: number, excludeJti?: string): void {
   if (excludeJti) {
     db.prepare("UPDATE sessions SET expired = 1 WHERE user_id = ? AND jti != ?").run(userId, excludeJti);

@@ -309,7 +309,7 @@ All API endpoints are prefixed with `/api` and require JWT authentication (via `
 | `NODE_NAME` | `master` | Name for this node |
 | `NODE_API_KEY` | - | API key for agent authentication |
 | `GRPC_PORT` | `50051` | Agent gRPC/Express port |
-| `NEXT_PUBLIC_API_URL` | `http://127.0.0.1:3001` | Frontend API base URL (used by the web container) |
+| `NEXT_PUBLIC_SOCKET_URL` | - | Optional Socket.IO origin override (REST is always same-origin via the Next.js proxy) |
 
 ---
 
