@@ -10,12 +10,8 @@ import { Upload, File, X, CheckCircle } from "lucide-react";
 import { SOFTWARE_OPTIONS, RAM_OPTIONS, FALLBACK_VERSIONS } from "@/lib/constants";
 
 function getApiUrl(): string {
-  if (typeof window === "undefined") return "";
-  const envUrl = process.env.NEXT_PUBLIC_API_URL;
-  if (envUrl) return envUrl;
-  if (window.location.port === "3000") {
-    return `${window.location.protocol}//${window.location.hostname}:3001`;
-  }
+  // Same-origin upload via the Next.js /api proxy keeps auth cookies first-party,
+  // so imports work from any host (localhost, LAN/Tailscale IP, domain).
   return "";
 }
 

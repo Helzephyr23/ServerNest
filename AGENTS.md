@@ -62,7 +62,7 @@ biryani/
 │   │       └── nodes/page.tsx
 │   ├── components/ui/      # shadcn/ui components
 │   └── lib/
-│       ├── api.ts          # API client wrapper (NEXT_PUBLIC_API_URL)
+│       ├── api.ts          # API client wrapper (same-origin, Next proxies /api/*)
 │       └── auth.tsx        # Auth context provider
 ├── Dockerfile              # Multi-stage build
 ├── docker-compose.yml      # Single biryani service

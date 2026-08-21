@@ -44,7 +44,7 @@ services:
       context: .
       target: web-runtime
       args:
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://api:3001}
+        NEXT_PUBLIC_SOCKET_URL: ${NEXT_PUBLIC_SOCKET_URL:-}
     restart: unless-stopped
     networks:
       - biryani

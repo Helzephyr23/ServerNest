@@ -125,6 +125,37 @@ describe("Auth API Integration", () => {
     });
   });
 
+  describe("auth cookie flags", () => {
+    function getAuthCookie(res: any): string {
+      const raw = res.headers["set-cookie"];
+      const list = Array.isArray(raw) ? raw : [raw];
+      return list.find((c: string) => c.startsWith("biryani_token="));
+    }
+
+    it("sets the auth cookie without Secure over plain http", async () => {
+      await app.inject({ method: "POST", url: "/api/auth/setup", payload: { username: "admin", password: "password123" } });
+      const res = await app.inject({ method: "POST", url: "/api/auth/login", payload: { username: "admin", password: "password123" } });
+      expect(res.statusCode).toBe(200);
+      const cookie = getAuthCookie(res);
+      expect(cookie).toBeDefined();
+      expect(cookie).toContain("HttpOnly");
+      expect(cookie).not.toContain("Secure");
+    });
+
+    it("marks the auth cookie Secure when forwarded via https", async () => {
+      await app.inject({ method: "POST", url: "/api/auth/setup", payload: { username: "admin", password: "password123" } });
+      const res = await app.inject({
+        method: "POST", url: "/api/auth/login",
+        payload: { username: "admin", password: "password123" },
+        headers: { "x-forwarded-proto": "https" },
+      });
+      expect(res.statusCode).toBe(200);
+      const cookie = getAuthCookie(res);
+      expect(cookie).toBeDefined();
+      expect(cookie).toContain("Secure");
+    });
+  });
+
   describe("GET /api/auth/me", () => {
     it("should return user with valid token", async () => {
       const setupRes = await app.inject({ method: "POST", url: "/api/auth/setup", payload: { username: "admin", password: "password123" } });

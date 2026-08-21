@@ -80,7 +80,7 @@ A full codebase audit was conducted before launch. Below is a summary of finding
 ### Additional Fixes (July 2026 audit)
 - [x] **Test helper schema drift** — added `failed_logins`, `totp_secret`/`totp_enabled`, `slug` columns to `__tests__/helpers.ts`
 - [x] **moduleResolution** — backend `src/tsconfig.json` now uses `"module": "Node16"` / `"moduleResolution": "Node16"`
-- [x] **Docker NEXT_PUBLIC_API_URL** — `docker-compose.yml` defaults to `http://api:3001` for Docker networking
+- [x] **Docker NEXT_PUBLIC_API_URL** — removed; REST is now same-origin via the Next.js `/api` proxy (works from any host). Optional `NEXT_PUBLIC_SOCKET_URL` override remains for exotic topologies
 - [x] **Hardcoded Minecraft versions** — `new/page.tsx` and `import/page.tsx` now fetch from `/api/mc-versions` with fallback
 - [x] **Shared constants** — extracted `SOFTWARE_OPTIONS`, `RAM_OPTIONS`, `FALLBACK_VERSIONS` to `web/lib/constants.ts`
 - [x] **Server context error state** — `ServerContextType` now includes `error: string | null`

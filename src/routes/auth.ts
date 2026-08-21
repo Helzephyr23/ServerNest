@@ -1,4 +1,4 @@
-import { FastifyInstance } from "fastify";
+import { FastifyInstance, FastifyRequest } from "fastify";
 import {
   getUserByUsername, getUserById, createUser, verifyPassword, isFirstRun, createSession,
   isTotpEnabled, setupTotp, verifyTotpCode, enableTotp, disableTotp, getUserTotpStatus,
@@ -9,10 +9,14 @@ import { rateLimit } from "../middleware/rate-limit.js";
 import { validate, schemas } from "../middleware/validate.js";
 
 export default async function authRoutes(app: FastifyInstance) {
-  function setAuthCookie(reply: any, token: string) {
+  function setAuthCookie(request: FastifyRequest, reply: any, token: string) {
+    // Detect the real scheme so Secure is only set when actually served over
+    // HTTPS — plain-HTTP deployments (LAN/Tailscale IP) must still get the cookie.
+    const forwarded = request.headers["x-forwarded-proto"];
+    const proto = typeof forwarded === "string" ? forwarded.split(",")[0].trim() : request.protocol;
     reply.setCookie("biryani_token", token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: proto === "https",
       sameSite: "strict",
       path: "/",
       maxAge: 24 * 60 * 60,
@@ -29,7 +33,7 @@ export default async function authRoutes(app: FastifyInstance) {
     const user = await createUser(username, password, "admin");
     const jti = createSession(user.id, request.headers["user-agent"], request.ip);
     const token = app.jwt.sign({ id: user.id, username: user.username, role: user.role, jti });
-    setAuthCookie(reply, token);
+    setAuthCookie(request, reply, token);
     return { token, user: { id: user.id, username: user.username, role: user.role } };
   });
 
@@ -68,7 +72,7 @@ export default async function authRoutes(app: FastifyInstance) {
 
       const jti = createSession(user.id, request.headers["user-agent"], request.ip);
       const token = app.jwt.sign({ id: user.id, username: user.username, role: user.role, jti });
-      setAuthCookie(reply, token);
+      setAuthCookie(request, reply, token);
       return { token, user: { id: user.id, username: user.username, role: user.role } };
     } catch (err: unknown) {
       request.log.error(err, "Login failed");
@@ -102,7 +106,7 @@ export default async function authRoutes(app: FastifyInstance) {
 
       const jti = createSession(user.id, request.headers["user-agent"], request.ip);
       const token = app.jwt.sign({ id: user.id, username: user.username, role: user.role, jti });
-      setAuthCookie(reply, token);
+      setAuthCookie(request, reply, token);
       return { token, user: { id: user.id, username: user.username, role: user.role } };
     } catch (err: unknown) {
       return reply.status(500).send({ error: (err as Error).message });
