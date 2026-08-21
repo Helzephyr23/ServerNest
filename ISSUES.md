@@ -1,7 +1,7 @@
 # Biryani - Pre-Release Audit Report
 
 **Date:** 2025-07-21
-**Updated:** 2026-07-23 (post-audit fixes applied)
+**Updated:** 2026-08-21 (httpOnly cookie auth migration + dependency audit, 0 known vulnerabilities)
 **Status:** Launch-ready — all critical/high issues resolved
 
 ---
@@ -191,17 +191,21 @@
 
 ## 4. Security Concerns
 
-### SEC-001: JWT stored in localStorage (XSS-vulnerable)
+### SEC-001: JWT stored in localStorage (XSS-vulnerable) ✅ FIXED
 
-**File:** `web/lib/api.ts:6`
+**File:** `web/lib/api.ts`
 
 `localStorage.getItem("biryani_token")` means the JWT is accessible to any JavaScript on the page. If XSS is achieved, the token is trivially exfiltrated. httpOnly cookies would be more secure.
 
+> **Fix applied:** JWT migrated to httpOnly cookie (`biryani_token`, `SameSite=Strict`, `Secure` in production, 24h max-age). Set by `/api/auth/setup|login|2fa/challenge`, cleared by new `POST /api/auth/logout`. All localStorage token operations removed from the web app; fetch calls use `credentials: "include"`. Socket.IO authenticates via cookie (`withCredentials`). `Authorization: Bearer` still accepted server-side for API consumers.
+
 ---
 
-### SEC-002: No server-side auth on page routes
+### SEC-002: No server-side auth on page routes ✅ FIXED
 
 All authentication is client-side only. The `/dashboard/*` routes have no server-side middleware or layout check. The Next.js pages are `"use client"` only, meaning SSR does not provide protection either.
+
+> **Fix applied:** `web/middleware.ts` added — Next.js middleware intercepts `/dashboard/:path*`, redirects to `/login` when no `biryani_token` cookie is present. Actual token validation remains enforced by the API's `authMiddleware` on every request.
 
 ---
 
@@ -416,19 +420,23 @@ Tests run but there is no coverage threshold enforcement or coverage artifact up
 
 ---
 
-### LOW-004: No Docker build verification in CI
+### LOW-004: No Docker build verification in CI ✅ FIXED
 
 **File:** `.github/workflows/ci.yml`
 
 CI runs `pnpm build` but never tests that the Dockerfile builds successfully. A Dockerfile regression would only be caught on actual deployment.
 
+> **Fix applied:** `docker` job added to CI — builds the full multi-stage image with Buildx on every push/PR.
+
 ---
 
-### LOW-005: No dependency vulnerability scanning in CI
+### LOW-005: No dependency vulnerability scanning in CI ✅ FIXED
 
 **File:** `.github/workflows/ci.yml`
 
 No `pnpm audit`, Snyk, or CodeQL step. Dependency vulnerabilities are not caught before release.
+
+> **Fix applied:** `pnpm audit --prod --audit-level high` step added to CI after install. Additionally, a manual audit was performed: all 28 known vulnerabilities (19 high, 9 moderate) resolved via scoped pnpm overrides and next 15.5.21 bump — current count is 0.
 
 ---
 
@@ -531,15 +539,13 @@ The `web/` directory now has a `public/` folder with `robots.txt` (disallows all
 
 ### Remaining Items (post-launch)
 
-- **SEC-001**: JWT in localStorage (requires auth refactor to httpOnly cookies)
-- **SEC-002**: No server-side auth on page routes (requires Next.js middleware)
 - **SEC-003**: CSP only in production (required by Next.js dev mode)
 - **SEC-004**: `unsafe-inline` in CSP (required by Tailwind CSS)
 - **SEC-007**: No client-side rate limit feedback
 - **MED-003**: Integration test schema drift (third location)
 - **MED-004**: Integration test only registers 2 of 15 route modules
 - **LOW-002**: Heavy dependencies loaded eagerly
-- **LOW-003/004/005**: CI enhancements (coverage, Docker build, audit)
+- **LOW-003**: Test coverage reporting in CI
 - **LOW-008**: Proactive expired session handling
 - **FEAT-001**: No frontend tests
 - **FEAT-002**: No agent tests
