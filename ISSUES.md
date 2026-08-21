@@ -8,7 +8,7 @@
 
 | Check | Status |
 | ----- | ------ |
-| Tests | 306 passing (235 api + 40 web + 31 agent) |
+| Tests | 340 passing (269 api + 40 web + 31 agent) |
 | Typecheck | Clean across all workspaces |
 | Lint | 0 errors (~147 `no-explicit-any` warnings) |
 | Test DB schema | Single source: `src/__tests__/schema.ts` |
@@ -73,14 +73,6 @@ No client-side debounce or rate limit on form submissions. A user or script can 
 | `notification.service.ts` | 4 functions | 2 functions (sendDiscordNotification, notify)       | ~67%     |
 | `schedule.service.ts`     | 7 functions | 2 functions (startTask, stopTask)                   | ~78%     |
 
-### Middleware with No Tests
-
-| Middleware                           | File                           | Status                                   |
-| ------------------------------------ | ------------------------------ | ---------------------------------------- |
-| `authMiddleware` / `adminMiddleware` | `src/middleware/auth.ts`       | No dedicated tests                       |
-| `rateLimit` / `loadRateLimits`       | `src/middleware/rate-limit.ts` | Only `typeof` check (1 trivial test)     |
-| `validate` / `validateQuery`         | `src/middleware/validate.ts`   | Schemas tested, middleware functions not |
-
 ### Missing Integration Test Scenarios
 
 1. Full auth lifecycle: Setup → Login → Session → Revoke → Verify 401
@@ -95,8 +87,7 @@ No client-side debounce or rate limit on form submissions. A user or script can 
 
 ## Suggested Priority
 
-1. **Middleware tests** — auth, rate-limit, validate middleware functions
-2. **Integration scenarios** — the 7 end-to-end flows listed above
-3. **SEC-005** — socket proxy / rootless Docker when deployment allows
-4. **SEC-003 / SEC-004 / SEC-007** — CSP and login UX polish
-5. **Component tests (web)** — auth context expiry timers, login form, dashboard guards (needs jsdom + testing-library)
+1. **Integration scenarios** — the 7 end-to-end flows listed above
+2. **SEC-005** — socket proxy / rootless Docker when deployment allows
+3. **SEC-003 / SEC-004 / SEC-007** — CSP and login UX polish
+4. **Component tests (web)** — auth context expiry timers, login form, dashboard guards (needs jsdom + testing-library)
