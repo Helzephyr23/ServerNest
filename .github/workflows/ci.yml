@@ -23,6 +23,7 @@ jobs:
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test
+      - run: pnpm --filter @biryani/api run test:coverage
       - run: pnpm build
 
   docker:
