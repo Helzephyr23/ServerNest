@@ -174,7 +174,17 @@ export default async function authRoutes(app: FastifyInstance) {
       }
     }]
   }, async (request) => {
-    return { user: request.user };
+    const token = request.cookies?.biryani_token
+      ?? request.headers.authorization?.replace("Bearer ", "");
+    let expiresAt: number | null = null;
+    if (token) {
+      try {
+        const decoded = app.jwt.verify<{ exp?: number }>(token);
+        if (typeof decoded.exp === "number") expiresAt = decoded.exp * 1000;
+      } catch {}
+    }
+    const { id, username, role } = request.user!;
+    return { user: { id, username, role }, expiresAt };
   });
 
   app.post("/api/auth/logout", async (request, reply) => {

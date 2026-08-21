@@ -225,6 +225,17 @@ describe("All Routes Integration", () => {
     return JSON.parse(res.payload).server.id as number;
   }
 
+  describe("Auth session expiry", () => {
+    it("exposes expiresAt and a clean user object from /api/auth/me", async () => {
+      const res = await app.inject({ method: "GET", url: "/api/auth/me", headers: admin() });
+      expect(res.statusCode).toBe(200);
+      const body = JSON.parse(res.payload);
+      expect(body.expiresAt).toBeTypeOf("number");
+      expect(body.expiresAt).toBeGreaterThan(Date.now());
+      expect(body.user).toEqual({ id: adminId, username: "admin", role: "admin" });
+    });
+  });
+
   describe("Users API", () => {
     it("lists users for admin", async () => {
       const res = await app.inject({ method: "GET", url: "/api/users", headers: admin() });
