@@ -11,6 +11,7 @@
 | Tests | 179 passing (unit + integration) |
 | Typecheck | Clean across all workspaces |
 | Lint | 0 errors (~147 `no-explicit-any` warnings) |
+| Test DB schema | Single source: `src/__tests__/schema.ts` |
 | CI | lint → typecheck → tests → coverage → build → Docker image → `pnpm audit` |
 | Known dependency vulnerabilities | 0 |
 
@@ -60,19 +61,7 @@ No client-side debounce or rate limit on form submissions. A user or script can 
 
 ---
 
-## Medium
-
-### MED-003: Three separate test DB schemas with drift
-
-**Files:** `src/__tests__/helpers.ts`, `src/__tests__/routes/api.integration.test.ts`, `src/__tests__/services/node.service.test.ts`
-
-Three locations define the test database schema manually, kept in sync by hand. They have already drifted — the integration test is missing `failed_logins`, `cloud_storage_configs`, `backup_uploads`, `server_metrics`, and `slug` on `installed_mods`.
-
-**Fix:** Extract a single shared schema builder and use it everywhere. Do this before writing more tests.
-
----
-
-## Low
+## Security (remaining)
 
 ### LOW-002: `src/package.json` heavy dependencies loaded eagerly
 
@@ -138,9 +127,8 @@ There are zero test files in `agent/`. The agent has 7 TypeScript compilation er
 
 ## Suggested Priority
 
-1. **MED-003** — consolidate test DB schemas first, so new tests don't deepen the drift
-2. **FEAT-001 / FEAT-002** — frontend and agent test suites (biggest structural gap)
-3. **Service unit tests** — cloud-storage, metrics, modrinth (0% coverage)
-4. **LOW-002** — lazy-load heavy API dependencies
-5. **SEC-005** — socket proxy / rootless Docker when deployment allows
-6. **SEC-003 / SEC-004 / SEC-007** — CSP and login UX polish
+1. **FEAT-001 / FEAT-002** — frontend and agent test suites (biggest structural gap)
+2. **Service unit tests** — cloud-storage, metrics, modrinth (0% coverage)
+3. **LOW-002** — lazy-load heavy API dependencies
+4. **SEC-005** — socket proxy / rootless Docker when deployment allows
+5. **SEC-003 / SEC-004 / SEC-007** — CSP and login UX polish
