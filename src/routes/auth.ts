@@ -93,7 +93,7 @@ export default async function authRoutes(app: FastifyInstance) {
         return reply.status(401).send({ error: "Invalid temp token" });
       }
 
-      if (!verifyTotpCode(code, decoded.id)) {
+      if (!(await verifyTotpCode(code, decoded.id))) {
         return reply.status(401).send({ error: "Invalid authentication code" });
       }
 
@@ -134,7 +134,7 @@ export default async function authRoutes(app: FastifyInstance) {
     const user = request.user!;
     const { code } = request.body as { code: string };
 
-    if (!verifyTotpCode(code, user.id)) {
+    if (!(await verifyTotpCode(code, user.id))) {
       return reply.status(401).send({ error: "Invalid code" });
     }
 
@@ -153,7 +153,7 @@ export default async function authRoutes(app: FastifyInstance) {
       return reply.status(401).send({ error: "Invalid password" });
     }
 
-    if (!verifyTotpCode(code, user.id)) {
+    if (!(await verifyTotpCode(code, user.id))) {
       return reply.status(401).send({ error: "Invalid code" });
     }
 

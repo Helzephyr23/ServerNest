@@ -3,6 +3,18 @@ import { createTestDb } from "../helpers.js";
 
 const testDb = createTestDb();
 
+const otplibMocks = vi.hoisted(() => ({
+  generateSecret: vi.fn(() => "MOCKSECRET234567"),
+  generateURI: vi.fn(() => "otpauth://totp/Biryani:admin?secret=MOCKSECRET234567"),
+  verifySync: vi.fn(),
+}));
+vi.mock("otplib", () => otplibMocks);
+
+const qrcodeMocks = vi.hoisted(() => ({
+  toDataURL: vi.fn(async () => "data:image/png;base64,QRDATA"),
+}));
+vi.mock("qrcode", () => ({ default: qrcodeMocks }));
+
 vi.mock("../../config/database.js", () => ({ default: testDb, migrate: vi.fn() }));
 vi.mock("../../config/docker.js", () => ({
   default: { ping: vi.fn(), pull: vi.fn(), getContainer: vi.fn(), createContainer: vi.fn() },
@@ -18,11 +30,15 @@ vi.mock("../../config/env.js", () => ({
   },
 }));
 
-const { getUserByUsername, getUserById, createUser, verifyPassword, isFirstRun } = await import("../../services/auth.service.js");
+const {
+  getUserByUsername, getUserById, createUser, verifyPassword, isFirstRun,
+  setupTotp, verifyTotpCode, isTotpEnabled, enableTotp,
+} = await import("../../services/auth.service.js");
 
 describe("auth.service", () => {
   beforeEach(() => {
     testDb.exec("DELETE FROM users");
+    vi.clearAllMocks();
   });
 
   describe("createUser", () => {
@@ -95,6 +111,59 @@ describe("auth.service", () => {
     it("should return false when users exist", async () => {
       await createUser("admin", "password123");
       expect(isFirstRun()).toBe(false);
+    });
+  });
+
+  describe("TOTP", () => {
+    it("setupTotp generates a secret, otpauth uri and qr data url", async () => {
+      const admin = await createUser("admin", "password123");
+      const result = await setupTotp(admin.id);
+      expect(result.secret).toBe("MOCKSECRET234567");
+      expect(result.uri).toContain("Biryani:admin");
+      expect(result.qr).toBe("data:image/png;base64,QRDATA");
+      expect(otplibMocks.generateURI).toHaveBeenCalledWith(
+        expect.objectContaining({ issuer: "Biryani", label: "admin", secret: "MOCKSECRET234567" })
+      );
+    });
+
+    it("setupTotp persists the secret encrypted, not in plaintext", async () => {
+      const admin = await createUser("admin", "password123");
+      const result = await setupTotp(admin.id);
+      const row = testDb.prepare("SELECT totp_secret FROM users WHERE id = ?").get(admin.id) as { totp_secret: string };
+      expect(row.totp_secret).toBeTruthy();
+      expect(row.totp_secret).not.toBe(result.secret);
+      expect(row.totp_secret).not.toContain("MOCKSECRET");
+    });
+
+    it("verifyTotpCode accepts a code otplib validates against the stored secret", async () => {
+      const admin = await createUser("admin", "password123");
+      await setupTotp(admin.id);
+      otplibMocks.verifySync.mockReturnValueOnce({ valid: true });
+      await expect(verifyTotpCode("123456", admin.id)).resolves.toBe(true);
+      const secretArg = otplibMocks.verifySync.mock.calls[0][0] as { token: string; secret: string };
+      expect(secretArg.token).toBe("123456");
+      expect(secretArg.secret).toBe("MOCKSECRET234567");
+    });
+
+    it("verifyTotpCode rejects a code otplib marks invalid", async () => {
+      const admin = await createUser("admin", "password123");
+      await setupTotp(admin.id);
+      otplibMocks.verifySync.mockReturnValueOnce({ valid: false });
+      await expect(verifyTotpCode("000000", admin.id)).resolves.toBe(false);
+    });
+
+    it("verifyTotpCode returns false when 2FA was never set up", async () => {
+      const admin = await createUser("admin", "password123");
+      await expect(verifyTotpCode("123456", admin.id)).resolves.toBe(false);
+      expect(otplibMocks.verifySync).not.toHaveBeenCalled();
+    });
+
+    it("isTotpEnabled reflects enablement only after enableTotp", async () => {
+      const admin = await createUser("admin", "password123");
+      await setupTotp(admin.id);
+      expect(isTotpEnabled(admin.id)).toBe(false);
+      enableTotp(admin.id);
+      expect(isTotpEnabled(admin.id)).toBe(true);
     });
   });
 });

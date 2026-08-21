@@ -8,7 +8,7 @@
 
 | Check | Status |
 | ----- | ------ |
-| Tests | 300 passing (229 api + 40 web + 31 agent) |
+| Tests | 306 passing (235 api + 40 web + 31 agent) |
 | Typecheck | Clean across all workspaces |
 | Lint | 0 errors (~147 `no-explicit-any` warnings) |
 | Test DB schema | Single source: `src/__tests__/schema.ts` |
@@ -61,18 +61,6 @@ No client-side debounce or rate limit on form submissions. A user or script can 
 
 ---
 
-## Low Priority
-
-### LOW-002: `src/package.json` heavy dependencies loaded eagerly
-
-**File:** `src/package.json`
-
-`otplib` and `qrcode` are loaded eagerly at startup in `auth.service.ts:4-5` even if 2FA is never configured. Dynamic imports would reduce startup time and Docker image size.
-
-> Note: `googleapis`, `dropbox`, and the AWS SDKs were previously eager too, but `cloud-storage.service.ts` now loads them lazily through an injectable `_loadSdk` seam (`createRequire(import.meta.url)`), which also fixed a latent production crash — bare `require()` is undefined under `"type": "module"` ESM.
-
----
-
 ## Test Coverage Gaps
 
 ### Services with Partial Coverage
@@ -107,9 +95,8 @@ No client-side debounce or rate limit on form submissions. A user or script can 
 
 ## Suggested Priority
 
-1. **LOW-002** — lazy-load `otplib`/`qrcode` in auth.service
-2. **SEC-005** — socket proxy / rootless Docker when deployment allows
-3. **SEC-003 / SEC-004 / SEC-007** — CSP and login UX polish
-4. **Middleware tests** — auth, rate-limit, validate middleware functions
-5. **Integration scenarios** — the 7 end-to-end flows listed above
-6. **Component tests (web)** — auth context expiry timers, login form, dashboard guards (needs jsdom + testing-library)
+1. **Middleware tests** — auth, rate-limit, validate middleware functions
+2. **Integration scenarios** — the 7 end-to-end flows listed above
+3. **SEC-005** — socket proxy / rootless Docker when deployment allows
+4. **SEC-003 / SEC-004 / SEC-007** — CSP and login UX polish
+5. **Component tests (web)** — auth context expiry timers, login form, dashboard guards (needs jsdom + testing-library)
