@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { createTestDb, seedServer } from "../helpers.js";
 
 const testDb = createTestDb();
@@ -20,6 +20,7 @@ vi.mock("../../config/env.js", () => ({
 
 const {
   getAllTasks, getTasksForServer, getTaskById, createTask, updateTask, deleteTask, parseSchedule,
+  startTask, stopTask, startAllTasks,
 } = await import("../../services/schedule.service.js");
 
 describe("schedule.service", () => {
@@ -115,6 +116,50 @@ describe("schedule.service", () => {
 
     it("should parse specific time schedule", () => {
       expect(parseSchedule("0 3 * * *")).toBeGreaterThan(0);
+    });
+  });
+
+  describe("startTask / stopTask", () => {
+    beforeEach(() => { vi.useFakeTimers(); vi.clearAllTimers(); });
+    afterEach(() => { vi.useRealTimers(); });
+
+    it("should call the executor on each interval tick", async () => {
+      const task = createTask({ server_id: serverId, name: "T1", type: "backup", schedule: "*/30 * * * *" });
+      const executor = vi.fn().mockResolvedValue(undefined);
+      startTask(task, executor);
+      expect(executor).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(30 * 60 * 1000);
+      expect(executor).toHaveBeenCalledTimes(1);
+      stopTask(task.id);
+    });
+
+    it("should stop a running task", async () => {
+      const task = createTask({ server_id: serverId, name: "T1", type: "backup", schedule: "*/30 * * * *" });
+      const executor = vi.fn().mockResolvedValue(undefined);
+      startTask(task, executor);
+      stopTask(task.id);
+      vi.advanceTimersByTime(30 * 60 * 1000);
+      expect(executor).not.toHaveBeenCalled();
+    });
+
+    it("should not throw when stopping a task that was never started", () => {
+      expect(() => stopTask(9999)).not.toThrow();
+    });
+  });
+
+  describe("startAllTasks", () => {
+    beforeEach(() => { vi.useFakeTimers(); vi.clearAllTimers(); });
+    afterEach(() => { vi.useRealTimers(); });
+
+    it("should start all enabled tasks", async () => {
+      const t1 = createTask({ server_id: serverId, name: "T1", type: "backup", schedule: "*/30 * * * *" });
+      const t2 = createTask({ server_id: serverId, name: "T2", type: "restart", schedule: "*/30 * * * *" });
+      updateTask(t2.id, { enabled: false });
+      const executor = vi.fn().mockResolvedValue(undefined);
+      startAllTasks(executor);
+      vi.advanceTimersByTime(30 * 60 * 1000);
+      expect(executor).toHaveBeenCalledTimes(1);
+      stopTask(t1.id);
     });
   });
 });
