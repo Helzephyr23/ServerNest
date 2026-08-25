@@ -272,6 +272,44 @@ describe("All Routes Integration", () => {
       expect(res.statusCode).toBe(404);
     });
 
+    it("blocks demoting the only admin", async () => {
+      const res = await app.inject({
+        method: "PUT", url: `/api/users/${adminId}/role`, headers: admin(),
+        payload: { role: "user" },
+      });
+      expect(res.statusCode).toBe(400);
+      expect(JSON.parse(res.payload).error).toBe("Cannot demote the last admin");
+      // Role is untouched.
+      const list = JSON.parse((await app.inject({ method: "GET", url: "/api/users", headers: admin() })).payload);
+      expect(list.users.find((u: { id: number }) => u.id === adminId).role).toBe("admin");
+    });
+
+    it("allows demoting an admin when another admin exists", async () => {
+      await app.inject({
+        method: "POST", url: "/api/users", headers: admin(),
+        payload: { username: "secondadmin", password: "password123", role: "admin" },
+      });
+      const res = await app.inject({
+        method: "PUT", url: `/api/users/${adminId}/role`, headers: admin(),
+        payload: { role: "user" },
+      });
+      expect(res.statusCode).toBe(200);
+      // Roles are read from the DB on every request, so the demoted admin's
+      // existing token loses admin power immediately.
+      const demoted = await app.inject({ method: "GET", url: "/api/users", headers: admin() });
+      expect(demoted.statusCode).toBe(403);
+      // The remaining admin can still administer users.
+      const loginRes = await app.inject({
+        method: "POST", url: "/api/auth/login",
+        payload: { username: "secondadmin", password: "password123" },
+      });
+      const secondToken = JSON.parse(loginRes.payload).token;
+      const listRes = await app.inject({ method: "GET", url: "/api/users", headers: { authorization: `Bearer ${secondToken}` } });
+      expect(listRes.statusCode).toBe(200);
+      const list = JSON.parse(listRes.payload);
+      expect(list.users.find((u: { id: number }) => u.id === adminId).role).toBe("user");
+    });
+
     it("returns 404 when changing password of missing user", async () => {
       const res = await app.inject({
         method: "PUT", url: "/api/users/9999/password", headers: admin(),
