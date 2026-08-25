@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/components/toast";
 import { useServer } from "@/lib/server-context";
+import { RAM_OPTIONS } from "@/lib/constants";
 
 const PROPERTY_LABELS: Record<string, string> = {
   "server-name": "Server Name",
@@ -62,6 +63,7 @@ export default function ServerSettingsPage() {
   const [needsRestart, setNeedsRestart] = useState(false);
   const { server, refresh } = useServer();
   const [search, setSearch] = useState("");
+  const [updatingRam, setUpdatingRam] = useState(false);
 
   const fetchProps = () => {
     api.get(`/api/servers/${id}/properties`)
@@ -115,6 +117,19 @@ const handleVersionUpdate = async (version: string) => {
     toastError("Failed to update version", err.message);
   } finally {
     setUpdatingVersion(false);
+  }
+};
+
+const handleRamChange = async (ramMb: number) => {
+  setUpdatingRam(true);
+  try {
+    await api.put(`/api/servers/${id}`, { ram_mb: ramMb });
+    success(`RAM updated to ${ramMb >= 1024 ? `${ramMb / 1024} GB` : `${ramMb} MB`}`);
+    refresh();
+  } catch (err: any) {
+    toastError("Failed to update RAM", err.message);
+  } finally {
+    setUpdatingRam(false);
   }
 };
 
@@ -186,6 +201,37 @@ if (loading) {
             </select>
             {updatingVersion && <p className="text-sm text-yellow-500">Updating...</p>}
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Memory (RAM)</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="mb-3 text-sm text-muted-foreground">
+            Current: <span className="font-medium text-foreground">{server && server.ram_mb >= 1024 ? `${server.ram_mb / 1024} GB` : `${server?.ram_mb ?? 0} MB`}</span>
+          </p>
+          <div className="flex gap-2">
+            <select
+              id="ram-select"
+              className="flex h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              value={server?.ram_mb || 2048}
+              onChange={(e) => handleRamChange(Number(e.target.value))}
+            >
+              {RAM_OPTIONS.map((r) => (
+                <option key={r} value={r}>
+                  {r >= 1024 ? `${r / 1024} GB` : `${r} MB`}
+                </option>
+              ))}
+            </select>
+            {updatingRam && <p className="text-sm text-yellow-500">Updating...</p>}
+          </div>
+          {server?.status === "running" && (
+            <p className="mt-2 text-sm text-yellow-500">
+              Restart the server for RAM changes to take effect
+            </p>
+          )}
         </CardContent>
       </Card>
 

@@ -242,6 +242,49 @@ describe("All Routes Integration", () => {
     return JSON.parse(res.payload).server.id as number;
   }
 
+  describe("Server RAM update", () => {
+    it("updates ram_mb via PUT /api/servers/:id", async () => {
+      const serverId = await createServer("RAM Test");
+      const res = await app.inject({
+        method: "PUT", url: `/api/servers/${serverId}`, headers: admin(),
+        payload: { ram_mb: 4096 },
+      });
+      expect(res.statusCode).toBe(200);
+      const { server } = JSON.parse(res.payload);
+      expect(server.ram_mb).toBe(4096);
+    });
+
+    it("rejects ram_mb below minimum (512)", async () => {
+      const serverId = await createServer("RAM Min Test");
+      const res = await app.inject({
+        method: "PUT", url: `/api/servers/${serverId}`, headers: admin(),
+        payload: { ram_mb: 256 },
+      });
+      expect(res.statusCode).toBe(400);
+    });
+
+    it("rejects ram_mb above maximum (32768)", async () => {
+      const serverId = await createServer("RAM Max Test");
+      const res = await app.inject({
+        method: "PUT", url: `/api/servers/${serverId}`, headers: admin(),
+        payload: { ram_mb: 65536 },
+      });
+      expect(res.statusCode).toBe(400);
+    });
+
+    it("accepts all valid RAM_OPTIONS values", async () => {
+      const serverId = await createServer("RAM Valid Test");
+      for (const ram of [1024, 2048, 3072, 4096, 6144, 8192, 10240, 16384]) {
+        const res = await app.inject({
+          method: "PUT", url: `/api/servers/${serverId}`, headers: admin(),
+          payload: { ram_mb: ram },
+        });
+        expect(res.statusCode).toBe(200);
+        expect(JSON.parse(res.payload).server.ram_mb).toBe(ram);
+      }
+    });
+  });
+
   describe("Auth session expiry", () => {
     it("exposes expiresAt and a clean user object from /api/auth/me", async () => {
       const res = await app.inject({ method: "GET", url: "/api/auth/me", headers: admin() });
