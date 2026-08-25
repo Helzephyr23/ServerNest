@@ -78,6 +78,7 @@ export default function UsersPage() {
   };
 
   const adminCount = users.filter((u: any) => u.role === "admin").length;
+  const operatorCount = users.filter((u: any) => u.role === "operator").length;
 
   return (
     <div className="space-y-6">
@@ -91,7 +92,7 @@ export default function UsersPage() {
         </Button>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Total Users</CardTitle></CardHeader>
           <CardContent><p className="text-2xl font-bold">{users.length}</p></CardContent>
@@ -101,8 +102,12 @@ export default function UsersPage() {
           <CardContent><p className="text-2xl font-bold text-primary">{adminCount}</p></CardContent>
         </Card>
         <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Operators</CardTitle></CardHeader>
+          <CardContent><p className="text-2xl font-bold text-blue-600">{operatorCount}</p></CardContent>
+        </Card>
+        <Card>
           <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Users</CardTitle></CardHeader>
-          <CardContent><p className="text-2xl font-bold">{users.length - adminCount}</p></CardContent>
+          <CardContent><p className="text-2xl font-bold">{users.length - adminCount - operatorCount}</p></CardContent>
         </Card>
       </div>
 
@@ -132,6 +137,10 @@ export default function UsersPage() {
                   <label className="flex items-center gap-2 text-sm">
                     <input type="radio" name="role" value="admin" checked={form.role === "admin"} onChange={(e) => setForm({ ...form, role: e.target.value })} />
                     Admin
+                  </label>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input type="radio" name="role" value="operator" checked={form.role === "operator"} onChange={(e) => setForm({ ...form, role: e.target.value })} />
+                    Operator
                   </label>
                 </div>
               </div>
@@ -178,7 +187,9 @@ export default function UsersPage() {
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
                         <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                          user.role === "admin" ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
+                          user.role === "admin" ? "bg-primary/10 text-primary" :
+                          user.role === "operator" ? "bg-blue-500/10 text-blue-600" :
+                          "bg-muted text-muted-foreground"
                         }`}>
                           {user.role}
                         </span>
@@ -188,6 +199,7 @@ export default function UsersPage() {
                           className="rounded border bg-background px-2 py-1 text-xs"
                         >
                           <option value="user">user</option>
+                          <option value="operator">operator</option>
                           <option value="admin">admin</option>
                         </select>
                       </div>

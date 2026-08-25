@@ -1,5 +1,5 @@
 import { FastifyInstance } from "fastify";
-import { authMiddleware } from "../middleware/auth.js";
+import { authMiddleware, operatorOrAboveMiddleware } from "../middleware/auth.js";
 import { validate, validateQuery, schemas } from "../middleware/validate.js";
 import db from "../config/database.js";
 import { execInContainer, writeInContainer } from "../utils/container.js";
@@ -115,7 +115,7 @@ export default async function filesRoutes(app: FastifyInstance) {
     }
   });
 
-  app.put("/api/servers/:id/properties", { preHandler: [authMiddleware, validate(schemas.updateProperties)] }, async (request, reply) => {
+  app.put("/api/servers/:id/properties", { preHandler: [authMiddleware, operatorOrAboveMiddleware, validate(schemas.updateProperties)] }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const serverId = Number(id);
     const { properties, reload } = request.body as { properties: Record<string, string>; reload?: boolean };

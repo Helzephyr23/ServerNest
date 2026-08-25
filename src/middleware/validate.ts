@@ -83,11 +83,11 @@ export const schemas = {
   createUser: z.object({
     username: z.string().min(3, "Username must be at least 3 characters").max(30),
     password: z.string().min(6, "Password must be at least 6 characters").max(100),
-    role: z.enum(["admin", "user"]).optional().default("user"),
+    role: z.enum(["admin", "operator", "user"]).optional().default("user"),
   }),
 
   updateUserRole: z.object({
-    role: z.enum(["admin", "user"]),
+    role: z.enum(["admin", "operator", "user"]),
   }),
 
   updateUserPassword: z.object({

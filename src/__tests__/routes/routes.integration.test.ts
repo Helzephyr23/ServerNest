@@ -213,6 +213,15 @@ describe("All Routes Integration", () => {
     });
     userToken = JSON.parse(loginRes.payload).token;
     userId = JSON.parse(loginRes.payload).user.id;
+    await app.inject({
+      method: "POST", url: "/api/users", headers: { authorization: `Bearer ${adminToken}` },
+      payload: { username: "operator", password: "password123", role: "operator" },
+    });
+    const opLoginRes = await app.inject({
+      method: "POST", url: "/api/auth/login",
+      payload: { username: "operator", password: "password123" },
+    });
+    operatorToken = JSON.parse(opLoginRes.payload).token;
   });
 
   afterEach(async () => {
@@ -221,6 +230,8 @@ describe("All Routes Integration", () => {
 
   const admin = () => ({ authorization: `Bearer ${adminToken}` });
   const plain = () => ({ authorization: `Bearer ${userToken}` });
+  const op = () => ({ authorization: `Bearer ${operatorToken}` });
+  let operatorToken = "";
 
   async function createServer(name = "Test Server") {
     const res = await app.inject({
@@ -989,6 +1000,72 @@ describe("All Routes Integration", () => {
       svcCreateBackup.mockRejectedValue(new Error("fail"));
       const fail = await app.inject({ method: "POST", url: "/api/tasks/1/run", headers: admin() });
       expect(fail.statusCode).toBe(500);
+    });
+  });
+
+  describe("Operator role access", () => {
+    it("allows operator to read server properties", async () => {
+      const serverId = await createServer();
+      execInContainer.mockResolvedValueOnce("motd=hello");
+      const res = await app.inject({ method: "GET", url: `/api/servers/${serverId}/properties`, headers: op() });
+      expect(res.statusCode).toBe(200);
+    });
+
+    it("allows operator to update server properties", async () => {
+      const serverId = await createServer();
+      writeInContainer.mockResolvedValue("");
+      execInContainer.mockResolvedValue("");
+      const res = await app.inject({
+        method: "PUT", url: `/api/servers/${serverId}/properties`, headers: op(),
+        payload: { properties: { motd: "operator" } },
+      });
+      expect(res.statusCode).toBe(200);
+    });
+
+    it("allows operator to manage files", async () => {
+      const serverId = await createServer();
+      execInContainer.mockResolvedValueOnce("total 0\n-rw-r--r-- 1 root 0 2026-01-01 00:00 server.properties");
+      const list = await app.inject({ method: "GET", url: `/api/servers/${serverId}/files`, headers: op() });
+      expect(list.statusCode).toBe(200);
+    });
+
+    it("allows operator to create backups", async () => {
+      const serverId = await createServer();
+      svcCreateBackup.mockResolvedValue({ id: 1, filename: "b.tar.gz" });
+      const res = await app.inject({ method: "POST", url: `/api/servers/${serverId}/backups`, headers: op() });
+      expect(res.statusCode).toBe(201);
+    });
+
+    it("blocks operator from listing users", async () => {
+      const res = await app.inject({ method: "GET", url: "/api/users", headers: op() });
+      expect(res.statusCode).toBe(403);
+    });
+
+    it("blocks operator from creating servers", async () => {
+      const res = await app.inject({
+        method: "POST", url: "/api/servers", headers: op(),
+        payload: { name: "Op Server", mc_version: "1.21.4", eula_accepted: true },
+      });
+      expect(res.statusCode).toBe(403);
+    });
+
+    it("blocks operator from deleting servers", async () => {
+      const serverId = await createServer();
+      const res = await app.inject({ method: "DELETE", url: `/api/servers/${serverId}`, headers: op() });
+      expect(res.statusCode).toBe(403);
+    });
+
+    it("blocks operator from creating nodes", async () => {
+      const res = await app.inject({
+        method: "POST", url: "/api/nodes", headers: op(),
+        payload: { name: "worker", hostname: "10.0.0.5", api_key: "key" },
+      });
+      expect(res.statusCode).toBe(403);
+    });
+
+    it("blocks operator from managing rate limits", async () => {
+      const res = await app.inject({ method: "GET", url: "/api/rate-limits", headers: op() });
+      expect(res.statusCode).toBe(403);
     });
   });
 });
