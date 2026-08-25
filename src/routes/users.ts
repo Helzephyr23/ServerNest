@@ -28,6 +28,12 @@ export default async function userRoutes(app: FastifyInstance) {
     const { role } = request.body as { role: string };
     const user = getUserById(Number(id));
     if (!user) return reply.status(404).send({ error: "User not found" });
+    if ((user as { role: string }).role === "admin" && role !== "admin") {
+      const adminCount = (listUsers() as { role: string }[]).filter((u) => u.role === "admin").length;
+      if (adminCount <= 1) {
+        return reply.status(400).send({ error: "Cannot demote the last admin" });
+      }
+    }
     updateUserRole(Number(id), role);
     return { success: true };
   });
