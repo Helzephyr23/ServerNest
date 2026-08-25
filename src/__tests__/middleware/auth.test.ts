@@ -23,7 +23,7 @@ vi.mock("../../config/env.js", () => ({
 const { applyTestSchema } = await import("../schema.js");
 applyTestSchema(testDb);
 
-const { authMiddleware, adminMiddleware } = await import("../../middleware/auth.js");
+const { authMiddleware, adminMiddleware, operatorOrAboveMiddleware } = await import("../../middleware/auth.js");
 const { createUser } = await import("../../services/auth.service.js");
 
 async function buildApp() {
@@ -32,6 +32,7 @@ async function buildApp() {
   await app.register(jwt, { secret: "middleware-test-secret", sign: { expiresIn: "1d" } });
   app.get("/guarded", { preHandler: [authMiddleware] }, async (request) => ({ user: request.user }));
   app.get("/admin-only", { preHandler: [authMiddleware, adminMiddleware] }, async () => ({ ok: true }));
+  app.get("/operator-or-above", { preHandler: [authMiddleware, operatorOrAboveMiddleware] }, async () => ({ ok: true }));
   return app;
 }
 
@@ -144,5 +145,47 @@ describe("adminMiddleware", () => {
     const res = await app.inject({ method: "GET", url: "/admin-only", headers: { authorization: `Bearer ${token}` } });
     expect(res.statusCode).toBe(200);
     expect(JSON.parse(res.payload).ok).toBe(true);
+  });
+});
+
+describe("operatorOrAboveMiddleware", () => {
+  let app: ReturnType<typeof Fastify>;
+
+  beforeEach(async () => {
+    testDb.exec("DELETE FROM users");
+    testDb.exec("DELETE FROM sessions");
+    app = await buildApp();
+    await app.ready();
+  });
+
+  it("lets admin users through", async () => {
+    const admin = await createUser("admin", "password123", "admin");
+    const token = app.jwt.sign({ id: admin.id, username: "admin", role: "admin" });
+    const res = await app.inject({ method: "GET", url: "/operator-or-above", headers: { authorization: `Bearer ${token}` } });
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.payload).ok).toBe(true);
+  });
+
+  it("lets operator users through", async () => {
+    const operator = await createUser("operator", "password123", "operator");
+    const token = app.jwt.sign({ id: operator.id, username: "operator", role: "operator" });
+    const res = await app.inject({ method: "GET", url: "/operator-or-above", headers: { authorization: `Bearer ${token}` } });
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.payload).ok).toBe(true);
+  });
+
+  it("blocks regular users with 403", async () => {
+    const user = await createUser("regular", "password123", "user");
+    const token = app.jwt.sign({ id: user.id, username: "regular", role: "user" });
+    const res = await app.inject({ method: "GET", url: "/operator-or-above", headers: { authorization: `Bearer ${token}` } });
+    expect(res.statusCode).toBe(403);
+    expect(JSON.parse(res.payload).error).toBe("Admin or operator access required");
+  });
+
+  it("blocks users with unknown role", async () => {
+    const user = await createUser("weird", "password123", "user");
+    const token = app.jwt.sign({ id: user.id, username: "weird", role: "hacker" });
+    const res = await app.inject({ method: "GET", url: "/operator-or-above", headers: { authorization: `Bearer ${token}` } });
+    expect(res.statusCode).toBe(403);
   });
 });

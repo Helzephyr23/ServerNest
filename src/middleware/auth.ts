@@ -32,3 +32,10 @@ export async function adminMiddleware(request: FastifyRequest, reply: FastifyRep
     return reply.status(403).send({ error: "Admin access required" });
   }
 }
+
+export async function operatorOrAboveMiddleware(request: FastifyRequest, reply: FastifyReply) {
+  const user = request.user;
+  if (!user || (user.role !== "admin" && user.role !== "operator")) {
+    return reply.status(403).send({ error: "Admin or operator access required" });
+  }
+}
