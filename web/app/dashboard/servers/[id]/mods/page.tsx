@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import Link from "next/link";
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm-dialog";
@@ -37,6 +38,7 @@ export default function ModsPage() {
 
   useEffect(() => { fetchMods(); }, [id]);
   useEffect(() => { if (server?.status) fetchMods(); }, [server?.status]);
+  useEffect(() => { if (!loading && server?.software !== "vanilla") handleCheckUpdates(); }, [loading, server?.software]);
 
   const handleCheckUpdates = async () => {
     setCheckingUpdates(true);
@@ -79,8 +81,30 @@ export default function ModsPage() {
 
   if (loading) {
     return (
-      <div className="flex justify-center py-12">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="space-y-1">
+            <Skeleton className="h-6 w-32" />
+            <Skeleton className="h-4 w-24" />
+          </div>
+          <div className="flex gap-2">
+            <Skeleton className="h-9 w-32" />
+            <Skeleton className="h-9 w-36" />
+          </div>
+        </div>
+        <Card>
+          <CardContent className="p-0">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="flex items-center justify-between px-4 py-3 border-b last:border-b-0">
+                <div className="flex-1 space-y-1">
+                  <Skeleton className="h-4 w-48" />
+                  <Skeleton className="h-3 w-16" />
+                </div>
+                <Skeleton className="h-7 w-16" />
+              </div>
+            ))}
+          </CardContent>
+        </Card>
       </div>
     );
   }

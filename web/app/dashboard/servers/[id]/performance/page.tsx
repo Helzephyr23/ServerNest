@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import { api } from "@/lib/api";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useServer } from "@/lib/server-context";
 
 const Charts = dynamic(() => import("./charts"), {
@@ -80,8 +81,16 @@ export default function PerformancePage() {
 
   if (loading) {
     return (
-      <div className="flex justify-center py-12">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+      <div className="space-y-6">
+        <div className="flex gap-2">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-8 w-20 rounded-md" />
+          ))}
+        </div>
+        <div className="grid gap-6 md:grid-cols-2">
+          <Skeleton className="h-64 rounded-lg" />
+          <Skeleton className="h-64 rounded-lg" />
+        </div>
       </div>
     );
   }

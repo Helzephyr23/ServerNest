@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface OverviewData {
   nodes: any[];
@@ -19,42 +20,94 @@ export default function DashboardPage() {
   const [data, setData] = useState<OverviewData | null>(null);
   const [servers, setServers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [updateCounts, setUpdateCounts] = useState<Record<number, number>>({});
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  useEffect(() => {
-    Promise.all([
-      api.get("/api/overview"),
-      api.get("/api/servers"),
-    ]).then(([overview, serverRes]) => {
+  const fetchDashboard = useCallback(async () => {
+    try {
+      const [overview, serverRes] = await Promise.all([
+        api.get("/api/overview"),
+        api.get("/api/servers"),
+      ]);
       const safeData: OverviewData = {
         nodes: Array.isArray(overview?.nodes) ? overview.nodes : [],
         metrics: overview?.metrics || {
-          total_servers: 0,
-          running_servers: 0,
-          total_memory_mb: 0,
-          used_memory_mb: 0,
+          total_servers: 0, running_servers: 0, total_memory_mb: 0, used_memory_mb: 0,
         },
       };
       setData(safeData);
-      setServers(Array.isArray(serverRes?.servers) ? serverRes.servers : []);
-    })
-    .catch(() => {
-        setData({
-          nodes: [],
-          metrics: {
-            total_servers: 0,
-            running_servers: 0,
-            total_memory_mb: 0,
-            used_memory_mb: 0,
-          },
-        });
-      })
-    .finally(() => setLoading(false));
+      const list = Array.isArray(serverRes?.servers) ? serverRes.servers : [];
+      setServers(list);
+      const counts: Record<number, number> = {};
+      await Promise.all(
+        list.map(async (s: any) => {
+          try {
+            const { count } = await api.get(`/api/servers/${s.id}/mods/update-count`);
+            if (count > 0) counts[s.id] = count;
+          } catch {}
+        })
+      );
+      setUpdateCounts(counts);
+      setLastUpdated(new Date());
+    } catch {
+      setData({
+        nodes: [],
+        metrics: { total_servers: 0, running_servers: 0, total_memory_mb: 0, used_memory_mb: 0 },
+      });
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchDashboard();
+
+    const startPolling = () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      intervalRef.current = setInterval(fetchDashboard, 30_000);
+    };
+
+    const handleVisibility = () => {
+      if (document.hidden) {
+        if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null; }
+      } else {
+        fetchDashboard();
+        startPolling();
+      }
+    };
+
+    startPolling();
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, [fetchDashboard]);
 
   if (loading) {
     return (
-      <div className="flex justify-center py-12">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+      <div className="space-y-6">
+        <div>
+          <Skeleton className="h-8 w-48 mb-2" />
+          <Skeleton className="h-4 w-32" />
+        </div>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Card key={i}>
+              <CardHeader className="pb-2"><Skeleton className="h-4 w-24" /></CardHeader>
+              <CardContent><Skeleton className="h-8 w-16" /></CardContent>
+            </Card>
+          ))}
+        </div>
+        <Card>
+          <CardHeader><Skeleton className="h-5 w-20" /></CardHeader>
+          <CardContent className="space-y-3">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <Skeleton key={i} className="h-20 w-full rounded-lg" />
+            ))}
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -65,7 +118,14 @@ export default function DashboardPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold">Dashboard</h1>
-        <p className="text-muted-foreground">Welcome to Biryani</p>
+        <p className="text-muted-foreground">
+          Welcome to Biryani
+          {lastUpdated && (
+            <span className="ml-2 text-xs">
+              Updated {lastUpdated.toLocaleTimeString()}
+            </span>
+          )}
+        </p>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -126,7 +186,14 @@ export default function DashboardPage() {
                 <Link key={server.id} href={`/dashboard/servers/${server.id}`} className="block rounded-lg border p-3 transition-colors hover:bg-accent">
                   <div className="flex items-center justify-between mb-2">
                     <p className="font-medium">{server.name}</p>
-                    <span className="rounded-full bg-green-500/10 px-2 py-0.5 text-xs text-green-500">Running</span>
+                    <div className="flex items-center gap-1">
+                      {updateCounts[server.id] > 0 && (
+                        <span className="rounded-full bg-yellow-500/10 px-1.5 py-0.5 text-[10px] font-medium text-yellow-500">
+                          {updateCounts[server.id]} update{updateCounts[server.id] > 1 ? "s" : ""}
+                        </span>
+                      )}
+                      <span className="rounded-full bg-green-500/10 px-2 py-0.5 text-xs text-green-500">Running</span>
+                    </div>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>

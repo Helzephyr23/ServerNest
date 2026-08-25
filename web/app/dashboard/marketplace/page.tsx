@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/components/toast";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function MarketplacePage() {
   const { success, error: toastError } = useToast();
@@ -218,8 +219,28 @@ export default function MarketplacePage() {
       )}
 
       {loading ? (
-        <div className="flex justify-center py-12">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Card key={i} className="flex flex-col">
+              <CardHeader className="flex flex-row items-start gap-3 pb-3">
+                <Skeleton className="h-12 w-12 rounded-lg shrink-0" />
+                <div className="flex-1">
+                  <Skeleton className="h-5 w-32 mb-1" />
+                  <Skeleton className="h-3 w-24" />
+                </div>
+              </CardHeader>
+              <CardContent className="flex flex-1 flex-col">
+                <Skeleton className="h-3 w-full mb-1" />
+                <Skeleton className="h-3 w-3/4 mb-3" />
+                <div className="flex gap-1 mb-3">
+                  <Skeleton className="h-5 w-16 rounded-full" />
+                  <Skeleton className="h-5 w-12 rounded-full" />
+                  <Skeleton className="h-5 w-14 rounded-full" />
+                </div>
+                <Skeleton className="h-8 w-full mt-auto" />
+              </CardContent>
+            </Card>
+          ))}
         </div>
       ) : searched && results.length === 0 ? (
         <p className="py-12 text-center text-muted-foreground">No results found</p>

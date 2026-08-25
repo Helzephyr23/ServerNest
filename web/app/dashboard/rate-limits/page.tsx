@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm-dialog";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface RateLimitRule {
   id: number;
@@ -160,8 +161,33 @@ export default function RateLimitsPage() {
       )}
 
       {loading ? (
-        <div className="flex justify-center py-12">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+        <div className="overflow-x-auto rounded-lg border">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b bg-muted/50">
+                <th className="px-4 py-3 text-left font-medium">Method</th>
+                <th className="px-4 py-3 text-left font-medium">Route</th>
+                <th className="px-4 py-3 text-left font-medium">Limit</th>
+                <th className="px-4 py-3 text-left font-medium">Window</th>
+                <th className="px-4 py-3 text-left font-medium">Description</th>
+                <th className="px-4 py-3 text-left font-medium">Status</th>
+                <th className="px-4 py-3 text-right font-medium">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {Array.from({ length: 5 }).map((_, i) => (
+                <tr key={i} className="border-b last:border-0">
+                  <td className="px-4 py-3"><Skeleton className="h-5 w-14" /></td>
+                  <td className="px-4 py-3"><Skeleton className="h-4 w-40" /></td>
+                  <td className="px-4 py-3"><Skeleton className="h-4 w-10" /></td>
+                  <td className="px-4 py-3"><Skeleton className="h-4 w-12" /></td>
+                  <td className="px-4 py-3"><Skeleton className="h-4 w-32" /></td>
+                  <td className="px-4 py-3"><Skeleton className="h-5 w-16 rounded" /></td>
+                  <td className="px-4 py-3"><Skeleton className="h-6 w-20" /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       ) : rules.length === 0 ? (
         <Card>

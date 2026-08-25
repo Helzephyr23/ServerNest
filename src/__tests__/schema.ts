@@ -88,6 +88,8 @@ export const TEST_SCHEMA_SQL = `
       version TEXT,
       source TEXT NOT NULL DEFAULT 'modrinth',
       slug TEXT,
+      has_update INTEGER NOT NULL DEFAULT 0,
+      latest_version TEXT,
       installed_at TEXT NOT NULL DEFAULT (datetime('now')),
       FOREIGN KEY (server_id) REFERENCES servers(id) ON DELETE CASCADE
     );
@@ -100,6 +102,11 @@ export const TEST_SCHEMA_SQL = `
       enabled     INTEGER NOT NULL DEFAULT 1,
       description TEXT,
       created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE TABLE IF NOT EXISTS rate_limit_counts (
+      key       TEXT PRIMARY KEY,
+      count     INTEGER NOT NULL DEFAULT 0,
+      reset_at  INTEGER NOT NULL
     );
     CREATE TABLE IF NOT EXISTS server_metrics (
       id              INTEGER PRIMARY KEY AUTOINCREMENT,
