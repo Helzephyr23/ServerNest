@@ -5,6 +5,7 @@ import { validate, schemas } from "../middleware/validate.js";
 import {
   getAllNodes,
   getNodeById,
+  getNodeByApiKey,
   createNode,
   deleteNode,
   updateNodeHeartbeat,
@@ -59,12 +60,13 @@ export default async function nodeRoutes(app: FastifyInstance) {
   });
 
   app.post("/api/nodes/heartbeat", { preHandler: [authMiddleware, validate(schemas.nodeHeartbeatAgent)] }, async (request, reply) => {
-    const { name, metrics } = request.body as {
+    const { api_key, metrics } = request.body as {
+      api_key: string;
       name?: string;
       metrics?: { cpu_percent?: number; memory_percent?: number; disk_percent?: number };
     };
-    const node = name ? getNodeById(Number(name)) : undefined;
-    if (!node) return reply.status(404).send({ error: "Node not found" });
+    const node = getNodeByApiKey(api_key);
+    if (!node) return reply.status(401).send({ error: "Invalid API key" });
     updateNodeHeartbeat(node.id, metrics);
     return { success: true };
   });

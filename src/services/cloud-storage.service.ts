@@ -147,10 +147,15 @@ class GoogleDriveStorageProvider implements CloudStorageProvider {
     });
   }
 
+  private static escapeGdriveQuery(value: string): string {
+    return value.replace(/'/g, "\\'");
+  }
+
   async download(remotePath: string, localPath: string): Promise<void> {
     const folderId = await this.ensureFolder("BiryaniBackups");
+    const safePath = GoogleDriveStorageProvider.escapeGdriveQuery(remotePath);
     const res = await this.drive.files.list({
-      q: `name='${remotePath}' and '${folderId}' in parents and trashed=false`,
+      q: `name='${safePath}' and '${folderId}' in parents and trashed=false`,
       fields: "files(id)",
       spaces: "drive",
     });
@@ -165,8 +170,9 @@ class GoogleDriveStorageProvider implements CloudStorageProvider {
 
   async delete(remotePath: string): Promise<void> {
     const folderId = await this.ensureFolder("BiryaniBackups");
+    const safePath = GoogleDriveStorageProvider.escapeGdriveQuery(remotePath);
     const res = await this.drive.files.list({
-      q: `name='${remotePath}' and '${folderId}' in parents and trashed=false`,
+      q: `name='${safePath}' and '${folderId}' in parents and trashed=false`,
       fields: "files(id)",
       spaces: "drive",
     });

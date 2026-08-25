@@ -516,17 +516,17 @@ describe("All Routes Integration", () => {
       expect(JSON.parse(res.payload).success).toBe(true);
     });
 
-    it("accepts agent heartbeat and 404s unknown node", async () => {
+    it("accepts agent heartbeat and 401s unknown API key", async () => {
       const ok = await app.inject({
         method: "POST", url: "/api/nodes/heartbeat", headers: admin(),
-        payload: { name: "1", api_key: "test-key", metrics: { cpu_percent: 5 } },
+        payload: { api_key: "test-key", metrics: { cpu_percent: 5 } },
       });
       expect(ok.statusCode).toBe(200);
       const missing = await app.inject({
         method: "POST", url: "/api/nodes/heartbeat", headers: admin(),
-        payload: { name: "9999", api_key: "test-key" },
+        payload: { api_key: "invalid-key-that-does-not-exist" },
       });
-      expect(missing.statusCode).toBe(404);
+      expect(missing.statusCode).toBe(401);
     });
 
     it("returns node metrics and find-for-server", async () => {
@@ -1161,6 +1161,91 @@ describe("All Routes Integration", () => {
     it("blocks operator from managing rate limits", async () => {
       const res = await app.inject({ method: "GET", url: "/api/rate-limits", headers: op() });
       expect(res.statusCode).toBe(403);
+    });
+  });
+
+  describe("Security: Node API key not exposed", () => {
+    it("does not return api_key in node list", async () => {
+      const res = await app.inject({ method: "GET", url: "/api/nodes", headers: admin() });
+      expect(res.statusCode).toBe(200);
+      const nodes = JSON.parse(res.payload).nodes;
+      for (const node of nodes) {
+        expect(node).not.toHaveProperty("api_key");
+      }
+    });
+
+    it("does not return api_key in single node get", async () => {
+      const res = await app.inject({ method: "GET", url: "/api/nodes/1", headers: admin() });
+      expect(res.statusCode).toBe(200);
+      expect(JSON.parse(res.payload).node).not.toHaveProperty("api_key");
+    });
+  });
+
+  describe("Security: RBAC on start/stop/restart", () => {
+    it("allows admin to start/stop/restart servers", async () => {
+      const createRes = await app.inject({
+        method: "POST", url: "/api/servers", headers: admin(),
+        payload: { name: "Sec Test", mc_version: "1.21.4", eula_accepted: true },
+      });
+      const serverId = JSON.parse(createRes.payload).server.id;
+
+      const start = await app.inject({ method: "POST", url: `/api/servers/${serverId}/start`, headers: admin() });
+      expect(start.statusCode).toBe(200);
+
+      const stop = await app.inject({ method: "POST", url: `/api/servers/${serverId}/stop`, headers: admin() });
+      expect(stop.statusCode).toBe(200);
+    });
+
+    it("allows operator to start/stop servers", async () => {
+      const createRes = await app.inject({
+        method: "POST", url: "/api/servers", headers: admin(),
+        payload: { name: "Op Test", mc_version: "1.21.4", eula_accepted: true },
+      });
+      const serverId = JSON.parse(createRes.payload).server.id;
+
+      const start = await app.inject({ method: "POST", url: `/api/servers/${serverId}/start`, headers: op() });
+      expect(start.statusCode).toBe(200);
+    });
+
+    it("blocks plain user from starting servers", async () => {
+      const createRes = await app.inject({
+        method: "POST", url: "/api/servers", headers: admin(),
+        payload: { name: "Plain Test", mc_version: "1.21.4", eula_accepted: true },
+      });
+      const serverId = JSON.parse(createRes.payload).server.id;
+
+      const start = await app.inject({ method: "POST", url: `/api/servers/${serverId}/start`, headers: plain() });
+      expect(start.statusCode).toBe(403);
+    });
+  });
+
+  describe("Security: Mod path traversal", () => {
+    it("rejects mod delete with path traversal in URL", async () => {
+      const createRes = await app.inject({
+        method: "POST", url: "/api/servers", headers: admin(),
+        payload: { name: "Mod Test", mc_version: "1.21.4", eula_accepted: true },
+      });
+      const serverId = JSON.parse(createRes.payload).server.id;
+
+      // HTTP parser resolves ../ before reaching handler → 404 (no route match)
+      const del = await app.inject({
+        method: "DELETE", url: `/api/servers/${serverId}/mods/../../etc/passwd`, headers: admin(),
+      });
+      expect(del.statusCode).toBe(404);
+    });
+
+    it("rejects mod delete with encoded path traversal", async () => {
+      const createRes = await app.inject({
+        method: "POST", url: "/api/servers", headers: admin(),
+        payload: { name: "Mod Test2", mc_version: "1.21.4", eula_accepted: true },
+      });
+      const serverId = JSON.parse(createRes.payload).server.id;
+
+      // URL-encoded traversal: ..%2F..%2Fetc%2Fpasswd → filename arrives as ../../etc/passwd
+      const del = await app.inject({
+        method: "DELETE", url: `/api/servers/${serverId}/mods/..%2F..%2Fetc%2Fpasswd`, headers: admin(),
+      });
+      expect(del.statusCode).toBe(400);
     });
   });
 });

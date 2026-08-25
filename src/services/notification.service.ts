@@ -1,5 +1,7 @@
 import db from "../config/database.js";
 import { logger } from "../utils/logger.js";
+import { URL } from "url";
+import dns from "dns";
 
 export interface Notification {
   id: number;
@@ -9,6 +11,36 @@ export interface Notification {
   enabled: boolean;
   events: string;
   created_at: string;
+}
+
+function isPrivateIP(hostname: string): boolean {
+  // Block private/loopback/link-local ranges
+  const privatePatterns = [
+    /^127\./,
+    /^10\./,
+    /^172\.(1[6-9]|2\d|3[01])\./,
+    /^192\.168\./,
+    /^169\.254\./,
+    /^::1$/,
+    /^0:/,
+    /^localhost$/i,
+    /^\[::1\]$/,
+  ];
+  return privatePatterns.some((p) => p.test(hostname));
+}
+
+async function validateWebhookUrl(urlStr: string): Promise<boolean> {
+  try {
+    const parsed = new URL(urlStr);
+    if (parsed.protocol !== "https:") return false;
+    if (isPrivateIP(parsed.hostname)) return false;
+    // DNS resolve to catch DNS rebinding
+    const addresses = await dns.promises.resolve4(parsed.hostname).catch(() => []);
+    if (addresses.some(isPrivateIP)) return false;
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export function getAllNotifications(): Notification[] {
@@ -36,6 +68,10 @@ export function deleteNotification(id: number) {
 }
 
 export async function sendDiscordNotification(webhookUrl: string, title: string, message: string, color: number = 0x00ff00): Promise<boolean> {
+  if (!(await validateWebhookUrl(webhookUrl))) {
+    logger.error("Discord webhook URL rejected: points to private/internal network or invalid protocol");
+    return false;
+  }
   try {
     const res = await fetch(webhookUrl, {
       method: "POST",

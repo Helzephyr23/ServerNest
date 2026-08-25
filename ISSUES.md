@@ -9,7 +9,7 @@
 
 | Check | Status |
 | ----- | ------ |
-| Tests | 429 passing (346 api + 52 web + 31 agent) |
+| Tests | 445 passing (362 api + 52 web + 31 agent) |
 | Typecheck | Clean across all workspaces |
 | Lint | 0 errors (~191 `no-explicit-any` warnings) |
 | Test DB schema | Single source: `src/__tests__/schema.ts` |

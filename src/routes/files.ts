@@ -4,7 +4,7 @@ import { validate, validateQuery, schemas } from "../middleware/validate.js";
 import db from "../config/database.js";
 import { execInContainer, writeInContainer } from "../utils/container.js";
 import { join, normalize } from "path";
-import { existsSync, mkdirSync, writeFileSync, readFileSync } from "fs";
+import { existsSync, mkdirSync, writeFileSync, createReadStream, statSync } from "fs";
 
 function sanitizePath(userPath: string): string {
   const normal = normalize(userPath).replace(/\\/g, "/");
@@ -185,12 +185,14 @@ export default async function filesRoutes(app: FastifyInstance) {
       }
       if (!existsSync(fullPath)) return reply.status(404).send({ error: "File not found" });
 
-      const content = readFileSync(fullPath);
       const filename = safePath.split("/").pop() || "download";
+      const stat = statSync(fullPath);
+      const stream = createReadStream(fullPath);
       return reply
         .header("Content-Type", "application/octet-stream")
         .header("Content-Disposition", `attachment; filename="${filename}"`)
-        .send(content);
+        .header("Content-Length", stat.size)
+        .send(stream);
     } catch (err: unknown) {
       return reply.status(500).send({ error: (err as Error).message });
     }

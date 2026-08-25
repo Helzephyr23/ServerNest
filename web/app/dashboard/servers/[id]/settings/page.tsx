@@ -63,10 +63,16 @@ export default function ServerSettingsPage() {
   const [needsRestart, setNeedsRestart] = useState(false);
   const { server, refresh } = useServer();
   const [search, setSearch] = useState("");
-  const [updatingRam, setUpdatingRam] = useState(false);
-  const [portValue, setPortValue] = useState<number>(0);
   const [portError, setPortError] = useState("");
-  const [updatingPort, setUpdatingPort] = useState(false);
+
+  // Pending (staged) changes — not saved until user clicks Save
+  const [pendingRam, setPendingRam] = useState<number | null>(null);
+  const [pendingPort, setPendingPort] = useState<number | null>(null);
+  const [pendingVersion, setPendingVersion] = useState<string | null>(null);
+  const [versionToApply, setVersionToApply] = useState("");
+  const [showVersionConfirm, setShowVersionConfirm] = useState(false);
+
+  const [mcVersions, setMcVersions] = useState<any[]>([]);
 
   const fetchProps = () => {
     api.get(`/api/servers/${id}/properties`)
@@ -76,8 +82,14 @@ export default function ServerSettingsPage() {
   };
 
   useEffect(() => { fetchProps(); }, [id]);
-  useEffect(() => { if (server?.port) setPortValue(server.port); }, [server?.port]);
   useEffect(() => { if (server?.status) fetchProps(); }, [server?.status]);
+  useEffect(() => {
+    api.get("/api/mc-versions").then(({ versions }) => {
+      setMcVersions(Array.isArray(versions) ? versions.filter((v: any) => v.type === "release") : []);
+    }).catch(() => {});
+  }, []);
+
+  const hasChanges = pendingRam !== null || pendingPort !== null || pendingVersion !== null || needsRestart;
 
   const handleChange = (key: string, value: string) => {
     setProperties((prev) => ({ ...prev, [key]: value }));
@@ -89,12 +101,54 @@ export default function ServerSettingsPage() {
     handleChange(key, current === "true" ? "false" : "true");
   };
 
-  const handleSave = async (applyNow: boolean = false) => {
+  const handleReset = () => {
+    setPendingRam(null);
+    setPendingPort(null);
+    setPendingVersion(null);
+    setNeedsRestart(false);
+    setPortError("");
+    setShowVersionConfirm(false);
+    setVersionToApply("");
+    fetchProps();
+  };
+
+  const handleSave = async () => {
     setSaving(true);
+    let savedAny = false;
     try {
-      await api.put(`/api/servers/${id}/properties`, { properties, reload: applyNow });
+      // 1. RAM + Port (single PUT)
+      if (pendingRam !== null || pendingPort !== null) {
+        const body: Record<string, number> = {};
+        if (pendingRam !== null) body.ram_mb = pendingRam;
+        if (pendingPort !== null) body.port = pendingPort;
+        await api.put(`/api/servers/${id}`, body);
+        savedAny = true;
+      }
+
+      // 2. Version (separate endpoint — validates against Mojang, updates server_config, restarts)
+      if (pendingVersion !== null) {
+        await api.post(`/api/servers/${id}/update-version`, { version: pendingVersion });
+        savedAny = true;
+      }
+
+      // 3. Properties
+      if (needsRestart) {
+        await api.put(`/api/servers/${id}/properties`, { properties, reload: false });
+        savedAny = true;
+      }
+
+      // Clear pending
+      setPendingRam(null);
+      setPendingPort(null);
+      setPendingVersion(null);
       setNeedsRestart(false);
-      success(applyNow ? "Settings saved and reloaded." : "Settings saved. Restart the server to apply changes.");
+      setPortError("");
+      setShowVersionConfirm(false);
+      setVersionToApply("");
+      refresh();
+      if (savedAny) {
+        success("Settings saved. Restart the server to apply changes.");
+      }
     } catch (err: any) {
       toastError("Failed to save", err.message);
     } finally {
@@ -102,58 +156,9 @@ export default function ServerSettingsPage() {
     }
   };
 
-  const [mcVersions, setMcVersions] = useState<any[]>([]);
-const [updatingVersion, setUpdatingVersion] = useState(false);
+  const formatRam = (mb: number) => mb >= 1024 ? `${mb / 1024} GB` : `${mb} MB`;
 
-useEffect(() => {
-  api.get("/api/mc-versions").then(({ versions }) => {
-    setMcVersions(Array.isArray(versions) ? versions.filter((v: any) => v.type === "release") : []);
-  }).catch(() => {});
-}, []);
-
-const handleVersionUpdate = async (version: string) => {
-  setUpdatingVersion(true);
-  try {
-    await api.post(`/api/servers/${id}/update-version`, { version });
-    success(`Server version updated to ${version}`);
-    refresh();
-  } catch (err: any) {
-    toastError("Failed to update version", err.message);
-  } finally {
-    setUpdatingVersion(false);
-  }
-};
-
-const handleRamChange = async (ramMb: number) => {
-  setUpdatingRam(true);
-  try {
-    await api.put(`/api/servers/${id}`, { ram_mb: ramMb });
-    success(`RAM updated to ${ramMb >= 1024 ? `${ramMb / 1024} GB` : `${ramMb} MB`}`);
-    refresh();
-  } catch (err: any) {
-    toastError("Failed to update RAM", err.message);
-  } finally {
-    setUpdatingRam(false);
-  }
-};
-
-const handlePortChange = async () => {
-  setPortError("");
-  if (portValue === server?.port) return;
-  setUpdatingPort(true);
-  try {
-    await api.put(`/api/servers/${id}`, { port: portValue });
-    success(`Port updated to ${portValue}`);
-    refresh();
-  } catch (err: any) {
-    setPortError(err.message);
-    setPortValue(server?.port ?? 25565);
-  } finally {
-    setUpdatingPort(false);
-  }
-};
-
-if (loading) {
+  if (loading) {
     return (
       <div className="flex justify-center py-12">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
@@ -171,81 +176,138 @@ if (loading) {
 
   return (
     <div className="space-y-4">
+      {/* Header with Save / Reset */}
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold">Server Settings</h2>
         <div className="flex items-center gap-3">
-          {needsRestart && (
-            <span className="text-sm text-yellow-500">Unsaved changes</span>
+          {hasChanges && (
+            <span className="text-sm text-yellow-500">
+              Unsaved changes
+            </span>
           )}
-          <Button variant="outline" onClick={() => handleSave(false)} disabled={saving || !needsRestart}>
-            {saving ? "Saving..." : "Save"}
-          </Button>
-          {server?.status === "running" && (
-            <Button onClick={() => handleSave(true)} disabled={saving || !needsRestart}>
-              {saving ? "Saving..." : "Save & Reload"}
+          {hasChanges && (
+            <Button variant="ghost" size="sm" onClick={handleReset} disabled={saving}>
+              Reset
             </Button>
           )}
+          <Button onClick={handleSave} disabled={saving || !hasChanges}>
+            {saving ? "Saving..." : "Save"}
+          </Button>
         </div>
       </div>
 
-      {needsRestart && (
+      {hasChanges && (
         <div className="rounded-lg bg-yellow-500/10 px-4 py-3 text-sm text-yellow-500">
           Restart the server after saving to apply changes
         </div>
       )}
 
+      {/* Minecraft Version */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Minecraft Version</CardTitle>
+          <CardTitle className="flex items-center gap-2 text-base">
+            Minecraft Version
+            {pendingVersion !== null && (
+              <span className="rounded bg-yellow-500/20 px-2 py-0.5 text-xs text-yellow-500">Unsaved</span>
+            )}
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <p className="mb-3 text-sm text-muted-foreground">
             Current: <span className="font-medium text-foreground">{server?.mc_version}</span>
+            {pendingVersion !== null && (
+              <span className="ml-2 text-yellow-500">&rarr; {pendingVersion}</span>
+            )}
           </p>
-          <div className="flex gap-2">
-            <select
-              id="version-select"
-              className="flex h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-              defaultValue=""
-              onChange={(e) => {
-                if (e.target.value) handleVersionUpdate(e.target.value);
-                e.target.value = "";
-              }}
-            >
-              <option value="" disabled>Select version to update...</option>
-              {mcVersions.map((v: any) => (
-                <option key={v.id} value={v.id}>
-                  {v.id} {v.id === mcVersions[0]?.id ? "(latest)" : ""}
-                </option>
-              ))}
-            </select>
-            {updatingVersion && <p className="text-sm text-yellow-500">Updating...</p>}
-          </div>
+
+          {showVersionConfirm ? (
+            <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/5 p-3">
+              <p className="mb-3 text-sm text-yellow-500">
+                Update to <strong>{versionToApply}</strong>?{server?.status === "running" && " The server will be stopped and restarted."}
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    setPendingVersion(versionToApply);
+                    setShowVersionConfirm(false);
+                  }}
+                >
+                  Confirm
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setShowVersionConfirm(false);
+                    setVersionToApply("");
+                  }}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex gap-2">
+              <select
+                id="version-select"
+                className="flex h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                defaultValue=""
+                onChange={(e) => {
+                  if (e.target.value) {
+                    setVersionToApply(e.target.value);
+                    setShowVersionConfirm(true);
+                  }
+                  e.target.value = "";
+                }}
+              >
+                <option value="" disabled>Select version to update...</option>
+                {mcVersions.map((v: any) => (
+                  <option key={v.id} value={v.id}>
+                    {v.id} {v.id === mcVersions[0]?.id ? "(latest)" : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
         </CardContent>
       </Card>
 
+      {/* Memory (RAM) */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Memory (RAM)</CardTitle>
+          <CardTitle className="flex items-center gap-2 text-base">
+            Memory (RAM)
+            {pendingRam !== null && (
+              <span className="rounded bg-yellow-500/20 px-2 py-0.5 text-xs text-yellow-500">Unsaved</span>
+            )}
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <p className="mb-3 text-sm text-muted-foreground">
-            Current: <span className="font-medium text-foreground">{server && server.ram_mb >= 1024 ? `${server.ram_mb / 1024} GB` : `${server?.ram_mb ?? 0} MB`}</span>
+            Current: <span className="font-medium text-foreground">{formatRam(server?.ram_mb ?? 0)}</span>
+            {pendingRam !== null && (
+              <span className="ml-2 text-yellow-500">&rarr; {formatRam(pendingRam)}</span>
+            )}
           </p>
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2">
             <select
               id="ram-select"
               className="flex h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-              value={server?.ram_mb || 2048}
-              onChange={(e) => handleRamChange(Number(e.target.value))}
+              value={pendingRam ?? server?.ram_mb ?? 2048}
+              onChange={(e) => setPendingRam(Number(e.target.value))}
             >
               {RAM_OPTIONS.map((r) => (
                 <option key={r} value={r}>
-                  {r >= 1024 ? `${r / 1024} GB` : `${r} MB`}
+                  {formatRam(r)}
                 </option>
               ))}
             </select>
-            {updatingRam && <p className="text-sm text-yellow-500">Updating...</p>}
+            {pendingRam !== null && (
+              <Button variant="ghost" size="sm" onClick={() => setPendingRam(null)}>
+                Revert
+              </Button>
+            )}
           </div>
           {server?.status === "running" && (
             <p className="mt-2 text-sm text-yellow-500">
@@ -255,25 +317,40 @@ if (loading) {
         </CardContent>
       </Card>
 
+      {/* Network Port */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Network Port</CardTitle>
+          <CardTitle className="flex items-center gap-2 text-base">
+            Network Port
+            {pendingPort !== null && (
+              <span className="rounded bg-yellow-500/20 px-2 py-0.5 text-xs text-yellow-500">Unsaved</span>
+            )}
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <p className="mb-3 text-sm text-muted-foreground">
             Current: <span className="font-medium text-foreground">{server?.port}</span>
+            {pendingPort !== null && (
+              <span className="ml-2 text-yellow-500">&rarr; {pendingPort}</span>
+            )}
           </p>
           <div className="flex items-center gap-2">
             <Input
               type="number"
               min={1024}
               max={65535}
-              value={portValue || ""}
-              onChange={(e) => { setPortError(""); setPortValue(Number(e.target.value)); }}
-              onBlur={handlePortChange}
+              value={pendingPort ?? server?.port ?? ""}
+              onChange={(e) => {
+                setPortError("");
+                setPendingPort(Number(e.target.value));
+              }}
               className="w-32"
             />
-            {updatingPort && <p className="text-sm text-yellow-500">Updating...</p>}
+            {pendingPort !== null && (
+              <Button variant="ghost" size="sm" onClick={() => { setPendingPort(null); setPortError(""); }}>
+                Revert
+              </Button>
+            )}
           </div>
           {portError && (
             <p className="mt-2 text-sm text-red-500">{portError}</p>

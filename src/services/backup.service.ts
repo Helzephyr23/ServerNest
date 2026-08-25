@@ -113,7 +113,13 @@ export async function createBackup(serverId: number): Promise<Backup> {
   }
 
   const stats = fs.statSync(backupPath);
-  const checksum = crypto.createHash("sha256").update(fs.readFileSync(backupPath)).digest("hex");
+  const checksum = await new Promise<string>((resolve, reject) => {
+    const hash = crypto.createHash("sha256");
+    const stream = fs.createReadStream(backupPath);
+    stream.on("data", (chunk) => hash.update(chunk));
+    stream.on("end", () => resolve(hash.digest("hex")));
+    stream.on("error", reject);
+  });
   const result = db.prepare("INSERT INTO backups (server_id, filename, size, checksum) VALUES (?, ?, ?, ?)").run(serverId, filename, stats.size, checksum);
   const backupId = result.lastInsertRowid as number;
   notify("backup_created", "Backup Created", `Backup "${filename}" created for server "${server.name}" (${(stats.size / 1024 / 1024).toFixed(1)} MB)`, 0x00ff00);
@@ -151,6 +157,18 @@ export async function restoreBackup(serverId: number, backupId: number): Promise
   // Ensure data directory exists
   if (!existsSync(dataDir)) {
     mkdirSync(dataDir, { recursive: true });
+  }
+
+  // Create safety snapshot of current data before restore
+  let safetySnapshot: string | null = null;
+  if (existsSync(dataDir) && fs.readdirSync(dataDir).length > 0) {
+    safetySnapshot = path.join(BACKUP_DIR, `safety-${serverId}-${Date.now()}.tar.gz`);
+    try {
+      const { execSync } = await import("child_process");
+      execSync(`tar -czf "${safetySnapshot}" -C "${dataDir}" .`, { timeout: 60000 });
+    } catch {
+      safetySnapshot = null;
+    }
   }
 
   // Try to reuse existing container; fall back to creating a new one
@@ -195,8 +213,24 @@ export async function restoreBackup(serverId: number, backupId: number): Promise
   }
 
   // Restore archive into the container
-  const restoreStream = createReadStream(backupPath).pipe(createGunzip());
-  await container.putArchive(restoreStream, { path: "/data" });
+  try {
+    const restoreStream = createReadStream(backupPath).pipe(createGunzip());
+    await container.putArchive(restoreStream, { path: "/data" });
+  } catch (err) {
+    // Restore safety snapshot on failure
+    if (safetySnapshot && existsSync(safetySnapshot)) {
+      try {
+        const { execSync } = await import("child_process");
+        execSync(`tar -xzf "${safetySnapshot}" -C "${dataDir}"`, { timeout: 60000 });
+      } catch {}
+      try { fs.unlinkSync(safetySnapshot); } catch {}
+    }
+    throw new Error(`Restore failed: ${(err as Error).message}. Previous data has been restored.`);
+  }
+  // Clean up safety snapshot on success
+  if (safetySnapshot && existsSync(safetySnapshot)) {
+    try { fs.unlinkSync(safetySnapshot); } catch {}
+  }
 
   // Now start the container
   await container.start();

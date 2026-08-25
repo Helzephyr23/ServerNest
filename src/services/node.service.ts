@@ -17,15 +17,23 @@ interface Node {
 }
 
 export function getAllNodes(): Node[] {
-  return db.prepare("SELECT * FROM nodes ORDER BY created_at DESC").all() as Node[];
+  const rows = db.prepare("SELECT * FROM nodes ORDER BY created_at DESC").all() as Node[];
+  return rows.map(sanitizeNode);
 }
 
 export function getNodeById(id: number): Node | undefined {
-  return db.prepare("SELECT * FROM nodes WHERE id = ?").get(id) as Node | undefined;
+  const row = db.prepare("SELECT * FROM nodes WHERE id = ?").get(id) as Node | undefined;
+  return row ? sanitizeNode(row) : undefined;
 }
 
 export function getNodeByApiKey(apiKey: string): Node | undefined {
   return db.prepare("SELECT * FROM nodes WHERE api_key = ?").get(apiKey) as Node | undefined;
+}
+
+function sanitizeNode(node: Node): Node {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { api_key: _, ...safe } = node;
+  return safe as Node;
 }
 
 export function createNode(data: {

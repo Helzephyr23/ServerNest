@@ -5,6 +5,16 @@ import { notify } from "./notification.service.js";
 import { mkdirSync, existsSync } from "fs";
 import { cp } from "fs/promises";
 
+// Per-server locks to prevent concurrent start/stop race conditions
+const serverLocks = new Map<number, Promise<void>>();
+
+async function withServerLock<T>(serverId: number, fn: () => Promise<T>): Promise<T> {
+  const prev = serverLocks.get(serverId) ?? Promise.resolve();
+  const next = prev.then(fn, fn);
+  serverLocks.set(serverId, next.then(() => {}, () => {}));
+  return next;
+}
+
 interface Server {
   id: number;
   name: string;
@@ -58,7 +68,7 @@ export function createServer(data: {
   return getServerById(result.lastInsertRowid as number)!;
 }
 
-export function updateServer(id: number, data: Partial<{ name: string; ram_mb: number; mc_version: string; software: string; port: number }>) {
+export function updateServer(id: number, data: Partial<{ name: string; ram_mb: number; mc_version: string; software: string; port: number; image: string }>) {
   if (data.port !== undefined) {
     const existing = db.prepare("SELECT id FROM servers WHERE port = ? AND id != ?").get(data.port, id) as { id: number } | undefined;
     if (existing) {
@@ -72,6 +82,7 @@ export function updateServer(id: number, data: Partial<{ name: string; ram_mb: n
   if (data.mc_version !== undefined) { fields.push("mc_version = ?"); values.push(data.mc_version); }
   if (data.software !== undefined) { fields.push("software = ?"); values.push(data.software); }
   if (data.port !== undefined) { fields.push("port = ?"); values.push(data.port); }
+  if (data.image !== undefined) { fields.push("image = ?"); values.push(data.image); }
   if (fields.length === 0) return;
   values.push(id);
   db.prepare(`UPDATE servers SET ${fields.join(", ")} WHERE id = ?`).run(...values);
@@ -125,7 +136,8 @@ export async function cloneServer(id: number): Promise<Server> {
 }
 
 export async function startServer(id: number): Promise<string | null> {
-  const server = getServerById(id);
+  return withServerLock(id, async () => {
+    const server = getServerById(id);
   if (!server) throw new Error("Server not found");
 
   db.prepare("UPDATE servers SET status = 'starting' WHERE id = ?").run(id);
@@ -203,10 +215,12 @@ export async function startServer(id: number): Promise<string | null> {
     notify("server_error", "Server Start Failed", `Server "${server.name}" failed to start: ${(err as Error).message}`, 0xff0000);
     throw err;
   }
+  });
 }
 
 export async function stopServer(id: number): Promise<void> {
-  const server = getServerById(id);
+  return withServerLock(id, async () => {
+    const server = getServerById(id);
   if (!server) throw new Error("Server not found");
 
   const containerName = `biryani-mc-${server.id}`;
@@ -221,6 +235,7 @@ export async function stopServer(id: number): Promise<void> {
 
   db.prepare("UPDATE servers SET status = 'stopped', container_id = NULL WHERE id = ?").run(id);
   notify("server_stopped", "Server Stopped", `Server "${server.name}" has been stopped`, 0xffaa00);
+  });
 }
 
 export async function restartServer(id: number): Promise<void> {

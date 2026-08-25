@@ -5,7 +5,7 @@ import { searchMods, searchPlugins, getProject, getProjectVersions, downloadMod 
 import { getServerById } from "../services/server.service.js";
 import db from "../config/database.js";
 import { readdirSync, statSync, unlinkSync, existsSync } from "fs";
-import { join } from "path";
+import { join, resolve } from "path";
 
 interface InstalledModRow {
   slug: string;
@@ -155,11 +155,15 @@ export default async function modsRoutes(app: FastifyInstance) {
       const latest = versions[0];
 
       const dataDir = `${process.cwd()}/data/server-${server.id}`;
-      const oldPath = join(dataDir, "mods", filename);
-      if (existsSync(oldPath)) unlinkSync(oldPath);
+      const modsDir = resolve(dataDir, "mods");
+      const oldPath = resolve(dataDir, "mods", filename);
+      if (!oldPath.startsWith(modsDir)) return reply.status(400).send({ error: "Invalid filename" });
 
       const result = await downloadMod(latest.id, dataDir);
       if (!result.success) return reply.status(500).send({ error: result.error });
+
+      // Only delete old file after successful download
+      if (existsSync(oldPath)) unlinkSync(oldPath);
 
       db.prepare("UPDATE installed_mods SET filename = ?, version = ? WHERE server_id = ? AND filename = ?")
         .run(result.filename, result.version_number, Number(id), filename);
@@ -176,7 +180,9 @@ export default async function modsRoutes(app: FastifyInstance) {
     if (!server) return reply.status(404).send({ error: "Server not found" });
 
     try {
-      const filePath = join(`${process.cwd()}/data/server-${server.id}/mods`, filename);
+      const modsDir = resolve(`${process.cwd()}/data/server-${server.id}/mods`);
+      const filePath = resolve(modsDir, filename);
+      if (!filePath.startsWith(modsDir)) return reply.status(400).send({ error: "Invalid filename" });
       unlinkSync(filePath);
       db.prepare("DELETE FROM installed_mods WHERE server_id = ? AND filename = ?").run(Number(id), filename);
       return { success: true };
