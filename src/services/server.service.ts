@@ -61,10 +61,10 @@ export function createServer(data: {
 export function updateServer(id: number, data: Partial<{ name: string; ram_mb: number; mc_version: string; software: string }>) {
   const fields: string[] = [];
   const values: any[] = [];
-  if (data.name) { fields.push("name = ?"); values.push(data.name); }
-  if (data.ram_mb) { fields.push("ram_mb = ?"); values.push(data.ram_mb); }
-  if (data.mc_version) { fields.push("mc_version = ?"); values.push(data.mc_version); }
-  if (data.software) { fields.push("software = ?"); values.push(data.software); }
+  if (data.name !== undefined) { fields.push("name = ?"); values.push(data.name); }
+  if (data.ram_mb !== undefined) { fields.push("ram_mb = ?"); values.push(data.ram_mb); }
+  if (data.mc_version !== undefined) { fields.push("mc_version = ?"); values.push(data.mc_version); }
+  if (data.software !== undefined) { fields.push("software = ?"); values.push(data.software); }
   if (fields.length === 0) return;
   values.push(id);
   db.prepare(`UPDATE servers SET ${fields.join(", ")} WHERE id = ?`).run(...values);
