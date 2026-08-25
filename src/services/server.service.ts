@@ -68,7 +68,7 @@ export function createServer(data: {
   return getServerById(result.lastInsertRowid as number)!;
 }
 
-export function updateServer(id: number, data: Partial<{ name: string; ram_mb: number; mc_version: string; software: string; port: number }>) {
+export function updateServer(id: number, data: Partial<{ name: string; ram_mb: number; mc_version: string; software: string; port: number; image: string }>) {
   if (data.port !== undefined) {
     const existing = db.prepare("SELECT id FROM servers WHERE port = ? AND id != ?").get(data.port, id) as { id: number } | undefined;
     if (existing) {
@@ -82,6 +82,7 @@ export function updateServer(id: number, data: Partial<{ name: string; ram_mb: n
   if (data.mc_version !== undefined) { fields.push("mc_version = ?"); values.push(data.mc_version); }
   if (data.software !== undefined) { fields.push("software = ?"); values.push(data.software); }
   if (data.port !== undefined) { fields.push("port = ?"); values.push(data.port); }
+  if (data.image !== undefined) { fields.push("image = ?"); values.push(data.image); }
   if (fields.length === 0) return;
   values.push(id);
   db.prepare(`UPDATE servers SET ${fields.join(", ")} WHERE id = ?`).run(...values);
