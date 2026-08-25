@@ -116,6 +116,7 @@ export const schemas = {
     mc_version: z.string().min(1).optional(),
     software: z.string().optional(),
     ram_mb: z.number().int().min(512).max(32768).optional(),
+    port: z.number().int().min(1024).max(65535).optional(),
     image: z.string().optional(),
   }),
 

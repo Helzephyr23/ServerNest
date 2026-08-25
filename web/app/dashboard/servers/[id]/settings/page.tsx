@@ -64,6 +64,9 @@ export default function ServerSettingsPage() {
   const { server, refresh } = useServer();
   const [search, setSearch] = useState("");
   const [updatingRam, setUpdatingRam] = useState(false);
+  const [portValue, setPortValue] = useState<number>(0);
+  const [portError, setPortError] = useState("");
+  const [updatingPort, setUpdatingPort] = useState(false);
 
   const fetchProps = () => {
     api.get(`/api/servers/${id}/properties`)
@@ -73,6 +76,7 @@ export default function ServerSettingsPage() {
   };
 
   useEffect(() => { fetchProps(); }, [id]);
+  useEffect(() => { if (server?.port) setPortValue(server.port); }, [server?.port]);
   useEffect(() => { if (server?.status) fetchProps(); }, [server?.status]);
 
   const handleChange = (key: string, value: string) => {
@@ -130,6 +134,22 @@ const handleRamChange = async (ramMb: number) => {
     toastError("Failed to update RAM", err.message);
   } finally {
     setUpdatingRam(false);
+  }
+};
+
+const handlePortChange = async () => {
+  setPortError("");
+  if (portValue === server?.port) return;
+  setUpdatingPort(true);
+  try {
+    await api.put(`/api/servers/${id}`, { port: portValue });
+    success(`Port updated to ${portValue}`);
+    refresh();
+  } catch (err: any) {
+    setPortError(err.message);
+    setPortValue(server?.port ?? 25565);
+  } finally {
+    setUpdatingPort(false);
   }
 };
 
@@ -230,6 +250,37 @@ if (loading) {
           {server?.status === "running" && (
             <p className="mt-2 text-sm text-yellow-500">
               Restart the server for RAM changes to take effect
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Network Port</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="mb-3 text-sm text-muted-foreground">
+            Current: <span className="font-medium text-foreground">{server?.port}</span>
+          </p>
+          <div className="flex items-center gap-2">
+            <Input
+              type="number"
+              min={1024}
+              max={65535}
+              value={portValue || ""}
+              onChange={(e) => { setPortError(""); setPortValue(Number(e.target.value)); }}
+              onBlur={handlePortChange}
+              className="w-32"
+            />
+            {updatingPort && <p className="text-sm text-yellow-500">Updating...</p>}
+          </div>
+          {portError && (
+            <p className="mt-2 text-sm text-red-500">{portError}</p>
+          )}
+          {server?.status === "running" && !portError && (
+            <p className="mt-2 text-sm text-yellow-500">
+              Restart the server for port changes to take effect
             </p>
           )}
         </CardContent>

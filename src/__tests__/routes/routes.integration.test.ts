@@ -285,6 +285,58 @@ describe("All Routes Integration", () => {
     });
   });
 
+  describe("Server port update", () => {
+    it("updates port via PUT /api/servers/:id", async () => {
+      const serverId = await createServer("Port Test");
+      const res = await app.inject({
+        method: "PUT", url: `/api/servers/${serverId}`, headers: admin(),
+        payload: { port: 25700 },
+      });
+      expect(res.statusCode).toBe(200);
+      expect(JSON.parse(res.payload).server.port).toBe(25700);
+    });
+
+    it("rejects duplicate port (already used by another server)", async () => {
+      const s1 = await createServer("Port Dup S1");
+      const s2 = await createServer("Port Dup S2");
+      const s1Port = JSON.parse((await app.inject({ method: "GET", url: `/api/servers/${s1}`, headers: admin() })).payload).server.port;
+      const res = await app.inject({
+        method: "PUT", url: `/api/servers/${s2}`, headers: admin(),
+        payload: { port: s1Port },
+      });
+      expect(res.statusCode).toBe(400);
+      expect(JSON.parse(res.payload).error).toContain("already in use");
+    });
+
+    it("rejects system port below 1024", async () => {
+      const serverId = await createServer("Port Sys Test");
+      const res = await app.inject({
+        method: "PUT", url: `/api/servers/${serverId}`, headers: admin(),
+        payload: { port: 22 },
+      });
+      expect(res.statusCode).toBe(400);
+    });
+
+    it("rejects port above 65535", async () => {
+      const serverId = await createServer("Port Range Test");
+      const res = await app.inject({
+        method: "PUT", url: `/api/servers/${serverId}`, headers: admin(),
+        payload: { port: 70000 },
+      });
+      expect(res.statusCode).toBe(400);
+    });
+
+    it("allows keeping the same port (no-op)", async () => {
+      const serverId = await createServer("Port Same Test");
+      const server = JSON.parse((await app.inject({ method: "GET", url: `/api/servers/${serverId}`, headers: admin() })).payload).server;
+      const res = await app.inject({
+        method: "PUT", url: `/api/servers/${serverId}`, headers: admin(),
+        payload: { port: server.port },
+      });
+      expect(res.statusCode).toBe(200);
+    });
+  });
+
   describe("Auth session expiry", () => {
     it("exposes expiresAt and a clean user object from /api/auth/me", async () => {
       const res = await app.inject({ method: "GET", url: "/api/auth/me", headers: admin() });
