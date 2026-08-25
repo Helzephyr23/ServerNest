@@ -207,7 +207,11 @@ export default async function serverRoutes(app: FastifyInstance) {
     const { id } = request.params as { id: string };
     const server = getServerById(Number(id));
     if (!server) return reply.status(404).send({ error: "Server not found" });
-    updateServer(Number(id), request.body as Record<string, unknown>);
+    try {
+      updateServer(Number(id), request.body as Record<string, unknown>);
+    } catch (err: any) {
+      return reply.status(400).send({ error: err.message });
+    }
     return { server: getServerById(Number(id)) };
   });
 
