@@ -9,6 +9,7 @@ import { Server as SocketIOServer } from "socket.io";
 import { env, checkJwtSecret } from "./config/env.js";
 import { migrate } from "./config/database.js";
 import db from "./config/database.js";
+import { getSessionByJti, getUserById } from "./services/auth.service.js";
 import authRoutes from "./routes/auth.js";
 import serverRoutes from "./routes/servers.js";
 import modsRoutes from "./routes/mods.js";
@@ -177,7 +178,11 @@ io.use(async (socket, next) => {
     }
 
     if (!token) return next(new Error("No token"));
-    const decoded = app.jwt.verify<{ id: number; username: string }>(token);
+    const decoded = app.jwt.verify<{ id: number; username: string; jti?: string }>(token);
+    if (decoded.jti) {
+      const session = getSessionByJti(decoded.jti);
+      if (!session) return next(new Error("Session revoked"));
+    }
     socket.data.user = decoded;
     next();
   } catch {
@@ -192,11 +197,29 @@ io.on("connection", (socket) => {
   const user = socket.data.user as { id: number; username: string };
   app.log.info(`Client connected: ${user.username}`);
 
+  function canAccessConsole(): boolean {
+    const dbUser = getUserById(user.id);
+    return dbUser?.role === "admin" || dbUser?.role === "operator";
+  }
+
   socket.on("console:subscribe", async (serverId: number) => {
+    if (!canAccessConsole()) {
+      socket.emit("console:error", { serverId, error: "Console access requires admin or operator role" });
+      return;
+    }
+    const server = db.prepare("SELECT 1 FROM servers WHERE id = ?").get(serverId);
+    if (!server) {
+      socket.emit("console:error", { serverId, error: "Server not found" });
+      return;
+    }
     socket.join(`server-${serverId}`);
   });
 
   socket.on("console:attach", async (serverId: number) => {
+    if (!canAccessConsole()) {
+      socket.emit("console:error", { serverId, error: "Console access requires admin or operator role" });
+      return;
+    }
     const key = `${user.id}-${serverId}`;
     try {
       const server = db.prepare("SELECT * FROM servers WHERE id = ?").get(serverId) as { id: number; container_id: string | null } | undefined;
@@ -235,6 +258,10 @@ io.on("connection", (socket) => {
   });
 
   socket.on("console:command", async ({ serverId, command }: { serverId: number; command: string }) => {
+    if (!canAccessConsole()) {
+      socket.emit("console:error", { serverId, error: "Console access requires admin or operator role" });
+      return;
+    }
     try {
       const server = db.prepare("SELECT * FROM servers WHERE id = ?").get(serverId) as { id: number; container_id: string | null } | undefined;
       if (!server || !server.container_id) {
@@ -248,7 +275,13 @@ io.on("connection", (socket) => {
         AttachStdout: true,
         AttachStderr: true,
       });
-      const stream = await exec.start({ Detach: false });
+      const stream = await exec.start({ Detach: false, Tty: false });
+      const timeout = setTimeout(() => {
+        stream.destroy();
+        socket.emit("console:error", { serverId, error: "Command timed out (30s)" });
+      }, 30000);
+      stream.on("end", () => clearTimeout(timeout));
+      stream.on("error", () => clearTimeout(timeout));
       dockerStreamDemux(stream,
         (data) => socket.emit("console:output", { serverId, data }),
         (data) => socket.emit("console:output", { serverId, data }),

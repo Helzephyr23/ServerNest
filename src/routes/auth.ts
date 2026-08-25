@@ -9,6 +9,9 @@ import { rateLimit } from "../middleware/rate-limit.js";
 import { validate, schemas } from "../middleware/validate.js";
 
 export default async function authRoutes(app: FastifyInstance) {
+  // Prevent race condition on concurrent setup calls
+  let setupInProgress = false;
+
   function setAuthCookie(request: FastifyRequest, reply: any, token: string) {
     // Detect the real scheme so Secure is only set when actually served over
     // HTTPS — plain-HTTP deployments (LAN/Tailscale IP) must still get the cookie.
@@ -26,15 +29,20 @@ export default async function authRoutes(app: FastifyInstance) {
   app.post("/api/auth/setup", {
     preHandler: [rateLimit(5, 60000), validate(schemas.setup)],
   }, async (request, reply) => {
-    if (!isFirstRun()) {
+    if (!isFirstRun() || setupInProgress) {
       return reply.status(400).send({ error: "Admin already exists" });
     }
-    const { username, password } = request.body as { username: string; password: string };
-    const user = await createUser(username, password, "admin");
-    const jti = createSession(user.id, request.headers["user-agent"], request.ip);
-    const token = app.jwt.sign({ id: user.id, username: user.username, role: user.role, jti });
-    setAuthCookie(request, reply, token);
-    return { token, user: { id: user.id, username: user.username, role: user.role } };
+    setupInProgress = true;
+    try {
+      const { username, password } = request.body as { username: string; password: string };
+      const user = await createUser(username, password, "admin");
+      const jti = createSession(user.id, request.headers["user-agent"], request.ip);
+      const token = app.jwt.sign({ id: user.id, username: user.username, role: user.role, jti });
+      setAuthCookie(request, reply, token);
+      return { token, user: { id: user.id, username: user.username, role: user.role } };
+    } finally {
+      setupInProgress = false;
+    }
   });
 
   app.get("/api/auth/status", async () => {

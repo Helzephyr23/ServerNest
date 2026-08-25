@@ -1,5 +1,5 @@
 import { FastifyInstance } from "fastify";
-import { authMiddleware, adminMiddleware } from "../middleware/auth.js";
+import { authMiddleware, adminMiddleware, operatorOrAboveMiddleware } from "../middleware/auth.js";
 import { validate, validateQuery, schemas } from "../middleware/validate.js";
 import {
   getAllServers,
@@ -21,7 +21,8 @@ import { getServerMetrics, getMetricsHistory } from "../services/metrics.service
 import docker from "../config/docker.js";
 import { rmSync, existsSync, mkdirSync, readdirSync, readFileSync, createWriteStream, statSync } from "fs";
 import os from "os";
-import { join } from "path";
+import path from "path";
+const { join, resolve: pathResolve } = path;
 import { pipeline } from "stream/promises";
 import { Transform } from "stream";
 import zlib from "zlib";
@@ -99,7 +100,12 @@ export default async function serverRoutes(app: FastifyInstance) {
           yauzl.open(tmpPath, { lazyEntries: true }, (err: any, zipfile: any) => {
             if (err) { reject(err); return; }
             zipfile.on("entry", (entry: any) => {
-              const entryPath = join(serverDataDir, entry.fileName);
+              const entryPath = pathResolve(serverDataDir, entry.fileName);
+              if (!entryPath.startsWith(pathResolve(serverDataDir))) {
+                request.log.warn({ fileName: entry.fileName }, "Zip Slip path traversal attempt — skipping entry");
+                zipfile.readEntry();
+                return;
+              }
               if (entry.fileName.endsWith("/")) {
                 if (!existsSync(entryPath)) mkdirSync(entryPath, { recursive: true });
                 zipfile.readEntry();
@@ -243,7 +249,7 @@ export default async function serverRoutes(app: FastifyInstance) {
     }
   });
 
-  app.post("/api/servers/:id/start", opts, async (request, reply) => {
+  app.post("/api/servers/:id/start", { preHandler: [authMiddleware, operatorOrAboveMiddleware] }, async (request, reply) => {
     try {
       const { id } = request.params as { id: string };
       await startServer(Number(id));
@@ -256,7 +262,7 @@ export default async function serverRoutes(app: FastifyInstance) {
     }
   });
 
-  app.post("/api/servers/:id/stop", opts, async (request, reply) => {
+  app.post("/api/servers/:id/stop", { preHandler: [authMiddleware, operatorOrAboveMiddleware] }, async (request, reply) => {
     try {
       const { id } = request.params as { id: string };
       await stopServer(Number(id));
@@ -267,7 +273,7 @@ export default async function serverRoutes(app: FastifyInstance) {
     }
   });
 
-  app.post("/api/servers/:id/restart", opts, async (request, reply) => {
+  app.post("/api/servers/:id/restart", { preHandler: [authMiddleware, operatorOrAboveMiddleware] }, async (request, reply) => {
     try {
       const { id } = request.params as { id: string };
       await restartServer(Number(id));
