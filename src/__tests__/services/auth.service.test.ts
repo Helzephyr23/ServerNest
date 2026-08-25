@@ -34,6 +34,10 @@ const {
   getUserByUsername, getUserById, createUser, verifyPassword, isFirstRun,
   setupTotp, verifyTotpCode, isTotpEnabled, enableTotp,
   createSession, getSessions, getSessionByJti, revokeSessionByJti,
+  isAccountLocked, recordFailedLogin, clearFailedLogins,
+  listUsers, updateUserRole, updateUserPassword, deleteUser,
+  revokeSession, revokeAllUserSessions, touchSession,
+  disableTotp, getUserTotpStatus,
 } = await import("../../services/auth.service.js");
 
 describe("auth.service", () => {
@@ -197,6 +201,136 @@ describe("auth.service", () => {
       expect(isTotpEnabled(admin.id)).toBe(false);
       enableTotp(admin.id);
       expect(isTotpEnabled(admin.id)).toBe(true);
+    });
+  });
+
+  describe("Account lockout", () => {
+    it("isAccountLocked returns false when no record exists", async () => {
+      const user = await createUser("admin", "password123");
+      expect(isAccountLocked(user.id)).toBe(false);
+    });
+
+    it("recordFailedLogin increments attempts", async () => {
+      const user = await createUser("admin", "password123");
+      recordFailedLogin(user.id);
+      const row = testDb.prepare("SELECT attempts FROM failed_logins WHERE user_id = ?").get(user.id) as { attempts: number };
+      expect(row.attempts).toBe(1);
+      recordFailedLogin(user.id);
+      const row2 = testDb.prepare("SELECT attempts FROM failed_logins WHERE user_id = ?").get(user.id) as { attempts: number };
+      expect(row2.attempts).toBe(2);
+    });
+
+    it("recordFailedLogin locks account after MAX_LOGIN_ATTEMPTS", async () => {
+      const user = await createUser("admin", "password123");
+      for (let i = 0; i < 10; i++) recordFailedLogin(user.id);
+      expect(isAccountLocked(user.id)).toBe(true);
+    });
+
+    it("clearFailedLogins removes the record", async () => {
+      const user = await createUser("admin", "password123");
+      recordFailedLogin(user.id);
+      clearFailedLogins(user.id);
+      expect(isAccountLocked(user.id)).toBe(false);
+      const row = testDb.prepare("SELECT attempts FROM failed_logins WHERE user_id = ?").get(user.id);
+      expect(row).toBeUndefined();
+    });
+  });
+
+  describe("User management", () => {
+    it("listUsers returns users without password_hash", async () => {
+      await createUser("admin", "password123", "admin");
+      await createUser("user1", "password123", "user");
+      const users = listUsers() as { username: string; role: string; password_hash?: string }[];
+      expect(users).toHaveLength(2);
+      expect(users[0].password_hash).toBeUndefined();
+    });
+
+    it("updateUserRole changes the role", async () => {
+      const user = await createUser("admin", "password123", "admin");
+      updateUserRole(user.id, "operator");
+      const updated = getUserById(user.id)!;
+      expect(updated.role).toBe("operator");
+    });
+
+    it("updateUserPassword hashes and stores new password", async () => {
+      const user = await createUser("admin", "password123", "admin");
+      await updateUserPassword(user.id, "newpassword456");
+      const updated = getUserById(user.id)!;
+      expect(updated.password_hash).not.toBe("newpassword456");
+      expect(await verifyPassword(updated, "newpassword456")).toBe(true);
+      expect(await verifyPassword(updated, "password123")).toBe(false);
+    });
+
+    it("deleteUser removes the user", async () => {
+      const user = await createUser("admin", "password123", "admin");
+      expect(getUserById(user.id)).toBeDefined();
+      deleteUser(user.id);
+      expect(getUserById(user.id)).toBeUndefined();
+    });
+  });
+
+  describe("Session management", () => {
+    it("revokeSession marks session expired by ID", async () => {
+      const user = await createUser("admin", "password123");
+      const jti = createSession(user.id);
+      const sessionId = testDb.prepare("SELECT id FROM sessions WHERE jti = ?").get(jti) as { id: number };
+      revokeSession(sessionId.id);
+      expect(getSessions(user.id)).toHaveLength(0);
+      expect(getSessionByJti(jti)).toBeUndefined();
+    });
+
+    it("revokeAllUserSessions expires all sessions for a user", async () => {
+      const user = await createUser("admin", "password123");
+      const jti1 = createSession(user.id);
+      const jti2 = createSession(user.id);
+      revokeAllUserSessions(user.id);
+      expect(getSessions(user.id)).toHaveLength(0);
+      expect(getSessionByJti(jti1)).toBeUndefined();
+      expect(getSessionByJti(jti2)).toBeUndefined();
+    });
+
+    it("revokeAllUserSessions with excludeJti keeps the excluded session", async () => {
+      const user = await createUser("admin", "password123");
+      const keep = createSession(user.id);
+      const drop = createSession(user.id);
+      revokeAllUserSessions(user.id, keep);
+      const remaining = getSessions(user.id);
+      expect(remaining).toHaveLength(1);
+      expect(remaining[0].jti).toBe(keep);
+      expect(getSessionByJti(drop)).toBeUndefined();
+    });
+
+    it("touchSession updates last_used timestamp", async () => {
+      const user = await createUser("admin", "password123");
+      const jti = createSession(user.id);
+      testDb.prepare("UPDATE sessions SET last_used = '2020-01-01 00:00:00' WHERE jti = ?").run(jti);
+      touchSession(jti);
+      const after = testDb.prepare("SELECT last_used FROM sessions WHERE jti = ?").get(jti) as { last_used: string };
+      expect(after.last_used).not.toBe("2020-01-01 00:00:00");
+    });
+  });
+
+  describe("TOTP status", () => {
+    it("disableTotp clears secret and enabled flag", async () => {
+      const user = await createUser("admin", "password123");
+      await setupTotp(user.id);
+      enableTotp(user.id);
+      expect(isTotpEnabled(user.id)).toBe(true);
+      disableTotp(user.id);
+      expect(isTotpEnabled(user.id)).toBe(false);
+      const row = testDb.prepare("SELECT totp_secret FROM users WHERE id = ?").get(user.id) as { totp_secret: string | null };
+      expect(row.totp_secret).toBeNull();
+    });
+
+    it("getUserTotpStatus returns correct state", async () => {
+      const user = await createUser("admin", "password123");
+      expect(getUserTotpStatus(user.id)).toEqual({ enabled: false, setup: false });
+      await setupTotp(user.id);
+      expect(getUserTotpStatus(user.id)).toEqual({ enabled: false, setup: true });
+      enableTotp(user.id);
+      expect(getUserTotpStatus(user.id)).toEqual({ enabled: true, setup: true });
+      disableTotp(user.id);
+      expect(getUserTotpStatus(user.id)).toEqual({ enabled: false, setup: false });
     });
   });
 });

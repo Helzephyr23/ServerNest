@@ -1,16 +1,34 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { createTestDb, seedServer } from "../helpers.js";
+import { PassThrough } from "stream";
 
 const testDb = createTestDb();
 
 vi.mock("../../config/database.js", () => ({ default: testDb, migrate: vi.fn() }));
+
+const mockBackupContainer = {
+  exec: vi.fn().mockResolvedValue({
+    start: vi.fn().mockImplementation(() => {
+      const s = new PassThrough();
+      const tar = Buffer.from("file-data");
+      const header = Buffer.alloc(8);
+      header.writeUInt32BE(1, 0);
+      header.writeUInt32BE(tar.length, 4);
+      process.nextTick(() => { s.write(Buffer.concat([header, tar])); s.end(); });
+      return s;
+    }),
+  }),
+  inspect: vi.fn().mockResolvedValue({}),
+  stop: vi.fn().mockResolvedValue(undefined),
+  start: vi.fn().mockResolvedValue(undefined),
+  putArchive: vi.fn().mockResolvedValue(undefined),
+};
 vi.mock("../../config/docker.js", () => ({
   default: {
     ping: vi.fn().mockResolvedValue(true),
     pull: vi.fn().mockResolvedValue(null),
-    getContainer: vi.fn().mockReturnValue({
-      export: vi.fn().mockResolvedValue(Buffer.from("test")),
-    }),
+    getContainer: vi.fn().mockReturnValue(mockBackupContainer),
+    createContainer: vi.fn().mockResolvedValue({ id: "test-container-id", start: vi.fn().mockResolvedValue(undefined) }),
   },
   isDockerAvailable: vi.fn().mockResolvedValue(true),
   getImageName: vi.fn().mockReturnValue("itzg/minecraft-server"),
@@ -23,17 +41,24 @@ vi.mock("../../config/env.js", () => ({
     SERVER_PORT_RANGE_END: 25665, NODE_NAME: "master", NODE_API_KEY: "test-key", GRPC_PORT: 50051,
   },
 }));
+vi.mock("../../services/notification.service.js", () => ({ notify: vi.fn() }));
+vi.mock("../../services/cloud-storage.service.js", () => ({
+  uploadBackupToCloud: vi.fn().mockResolvedValue(undefined),
+  deleteFromCloud: vi.fn().mockResolvedValue(undefined),
+}));
 
-const { getBackups, deleteBackup, rotateBackups, rotateAllBackups } = await import("../../services/backup.service.js");
+const { getBackups, deleteBackup, rotateBackups, rotateAllBackups, createBackup, restoreBackup } = await import("../../services/backup.service.js");
 
 describe("backup.service", () => {
   let serverId: number;
 
   beforeEach(() => {
     testDb.exec("DELETE FROM backups");
+    testDb.exec("DELETE FROM backup_uploads");
     testDb.exec("DELETE FROM server_config");
     testDb.exec("DELETE FROM servers");
     serverId = seedServer(testDb);
+    testDb.prepare("UPDATE servers SET container_id = 'fake-container-id' WHERE id = ?").run(serverId);
   });
 
   describe("getBackups", () => {
@@ -100,6 +125,39 @@ describe("backup.service", () => {
       rotateAllBackups(10);
       expect(getBackups(serverId).length).toBe(10);
       expect(getBackups(s2Id).length).toBe(10);
+    });
+  });
+
+  describe("createBackup", () => {
+    it("should create a backup and record it", async () => {
+      const backup = await createBackup(serverId);
+      expect(backup.id).toBeDefined();
+      expect(backup.server_id).toBe(serverId);
+      expect(backup.filename).toContain("Test Server");
+      expect(backup.size).toBeGreaterThan(0);
+      expect(backup.checksum).toBeDefined();
+      expect(getBackups(serverId).length).toBe(1);
+    });
+
+    it("should throw if server not found", async () => {
+      await expect(createBackup(9999)).rejects.toThrow("Server not found");
+    });
+
+    it("should throw if server has no container", async () => {
+      const noContainerId = seedServer(testDb, { name: "NoContainer", port: 25570 });
+      await expect(createBackup(noContainerId)).rejects.toThrow("Server must be running");
+    });
+  });
+
+  describe("restoreBackup", () => {
+    it("should restore a backup and start the server", async () => {
+      const backup = await createBackup(serverId);
+      await restoreBackup(serverId, backup.id);
+      expect(getBackups(serverId).length).toBe(1);
+    });
+
+    it("should throw if backup not found", async () => {
+      await expect(restoreBackup(serverId, 9999)).rejects.toThrow("Backup not found");
     });
   });
 });

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
@@ -16,9 +16,12 @@ export default function LoginPage() {
   const [totpCode, setTotpCode] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const isSubmitting = useRef(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting.current) return;
+    isSubmitting.current = true;
     setError("");
     setLoading(true);
     try {
@@ -32,11 +35,14 @@ export default function LoginPage() {
       setError(err.message || "Login failed");
     } finally {
       setLoading(false);
+      isSubmitting.current = false;
     }
   };
 
   const handleTotpSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting.current) return;
+    isSubmitting.current = true;
     setError("");
     setLoading(true);
     try {
@@ -46,6 +52,7 @@ export default function LoginPage() {
       setError(err.message || "Invalid code");
     } finally {
       setLoading(false);
+      isSubmitting.current = false;
     }
   };
 

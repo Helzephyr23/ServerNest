@@ -18,7 +18,7 @@ vi.mock("../../config/env.js", () => ({
   },
 }));
 
-const { getAllNotifications, getNotificationById, createNotification, deleteNotification } = await import("../../services/notification.service.js");
+const { getAllNotifications, getNotificationById, createNotification, deleteNotification, sendDiscordNotification, notify } = await import("../../services/notification.service.js");
 
 describe("notification.service", () => {
   beforeEach(() => {
@@ -79,6 +79,63 @@ describe("notification.service", () => {
       const notif = createNotification({ type: "discord", webhook_url: "https://discord.com/api/webhooks/123/abc", events: ["all"] });
       deleteNotification(notif.id);
       expect(getNotificationById(notif.id)).toBeUndefined();
+    });
+  });
+
+  describe("sendDiscordNotification", () => {
+    beforeEach(() => { vi.unstubAllGlobals(); });
+
+    it("should return true on successful webhook call", async () => {
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true }));
+      expect(await sendDiscordNotification("https://discord.com/api/webhooks/123/abc", "Test", "Hello")).toBe(true);
+    });
+
+    it("should return false on HTTP error", async () => {
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false }));
+      expect(await sendDiscordNotification("https://discord.com/api/webhooks/123/abc", "Test", "Hello")).toBe(false);
+    });
+
+    it("should return false on network error", async () => {
+      vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("ECONNREFUSED")));
+      expect(await sendDiscordNotification("https://discord.com/api/webhooks/123/abc", "Test", "Hello")).toBe(false);
+    });
+  });
+
+  describe("notify", () => {
+    beforeEach(() => { vi.unstubAllGlobals(); });
+
+    it("should send to enabled matching notifications", async () => {
+      createNotification({ type: "discord", webhook_url: "https://discord.com/api/webhooks/123/abc", events: ["server_start"] });
+      const spy = vi.fn().mockResolvedValue({ ok: true });
+      vi.stubGlobal("fetch", spy);
+      await notify("server_start", "Started", "Server is up");
+      expect(spy).toHaveBeenCalledTimes(1);
+      expect(spy.mock.calls[0][0]).toBe("https://discord.com/api/webhooks/123/abc");
+    });
+
+    it("should not send to disabled notifications", async () => {
+      const notif = createNotification({ type: "discord", webhook_url: "https://discord.com/api/webhooks/123/abc", events: ["server_start"] });
+      testDb.prepare("UPDATE notifications SET enabled = 0 WHERE id = ?").run(notif.id);
+      const spy = vi.fn();
+      vi.stubGlobal("fetch", spy);
+      await notify("server_start", "Started", "Server is up");
+      expect(spy).not.toHaveBeenCalled();
+    });
+
+    it("should not send to non-matching event types", async () => {
+      createNotification({ type: "discord", webhook_url: "https://discord.com/api/webhooks/123/abc", events: ["backup_complete"] });
+      const spy = vi.fn();
+      vi.stubGlobal("fetch", spy);
+      await notify("server_start", "Started", "Server is up");
+      expect(spy).not.toHaveBeenCalled();
+    });
+
+    it("should send to 'all' event type for any event", async () => {
+      createNotification({ type: "discord", webhook_url: "https://discord.com/api/webhooks/123/abc", events: ["all"] });
+      const spy = vi.fn().mockResolvedValue({ ok: true });
+      vi.stubGlobal("fetch", spy);
+      await notify("server_start", "Started", "Server is up");
+      expect(spy).toHaveBeenCalledTimes(1);
     });
   });
 });

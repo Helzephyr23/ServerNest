@@ -4,20 +4,30 @@ import { createTestDb } from "../helpers.js";
 const testDb = createTestDb();
 
 vi.mock("../../config/database.js", () => ({ default: testDb, migrate: vi.fn() }));
+
+const mockContainer = {
+  start: vi.fn().mockResolvedValue(undefined),
+  stop: vi.fn().mockResolvedValue(undefined),
+  remove: vi.fn().mockResolvedValue(undefined),
+  inspect: vi.fn().mockResolvedValue({ State: { Running: true } }),
+  logs: vi.fn().mockResolvedValue(Buffer.from("test log")),
+  exec: vi.fn().mockResolvedValue({
+    start: vi.fn().mockResolvedValue({
+      on: vi.fn(),
+      pipe: vi.fn(),
+    }),
+  }),
+};
 vi.mock("../../config/docker.js", () => ({
   default: {
     ping: vi.fn().mockResolvedValue(true),
     pull: vi.fn().mockResolvedValue(null),
-    getContainer: vi.fn().mockReturnValue({
-      start: vi.fn().mockResolvedValue(undefined),
-      stop: vi.fn().mockResolvedValue(undefined),
-      remove: vi.fn().mockResolvedValue(undefined),
-      inspect: vi.fn().mockResolvedValue({ State: { Running: true } }),
-    }),
+    getContainer: vi.fn().mockReturnValue(mockContainer),
     createContainer: vi.fn().mockResolvedValue({ id: "test-id", start: vi.fn().mockResolvedValue(undefined) }),
   },
   isDockerAvailable: vi.fn().mockResolvedValue(true),
   getImageName: vi.fn().mockReturnValue("itzg/minecraft-server"),
+  dockerStreamDemux: vi.fn(),
 }));
 vi.mock("../../config/env.js", () => ({
   env: {
@@ -27,11 +37,16 @@ vi.mock("../../config/env.js", () => ({
     SERVER_PORT_RANGE_END: 25665, NODE_NAME: "master", NODE_API_KEY: "test-key", GRPC_PORT: 50051,
   },
 }));
+vi.mock("../../services/notification.service.js", () => ({
+  notify: vi.fn(),
+}));
 
 const {
   getAllServers, getServerById, createServer, updateServer, deleteServer,
   getServerConfig, setServerConfig, deleteServerConfig, findAvailablePort,
+  startServer, stopServer, restartServer, cloneServer, getServerLogs, sendCommand,
 } = await import("../../services/server.service.js");
+const docker = (await import("../../config/docker.js")).default;
 
 describe("server.service", () => {
   beforeEach(() => {
@@ -177,6 +192,100 @@ describe("server.service", () => {
     it("should skip used ports", () => {
       createServer({ name: "S1", mc_version: "1.21.4", software: "vanilla", ram_mb: 2048,       port: 25565, eula_accepted: true });
       expect(findAvailablePort()).toBe(25566);
+    });
+  });
+
+  describe("startServer", () => {
+    it("should start a stopped server and set status to running", async () => {
+      const server = createServer({ name: "Test", mc_version: "1.21.4", software: "vanilla", ram_mb: 2048, port: 25565, eula_accepted: true });
+      vi.mocked(docker.getContainer).mockReturnValue({ ...mockContainer, remove: vi.fn().mockRejectedValue(new Error("no container")) } as any);
+      const containerId = await startServer(server.id);
+      expect(containerId).toBe("test-id");
+      expect(getServerById(server.id)!.status).toBe("running");
+    });
+
+    it("should throw if Docker is not available", async () => {
+      const { isDockerAvailable } = await import("../../config/docker.js");
+      vi.mocked(isDockerAvailable).mockResolvedValueOnce(false);
+      const server = createServer({ name: "Test", mc_version: "1.21.4", software: "vanilla", ram_mb: 2048, port: 25565, eula_accepted: true });
+      await expect(startServer(server.id)).rejects.toThrow("Docker is not available");
+      expect(getServerById(server.id)!.status).toBe("error");
+    });
+
+    it("should throw if EULA not accepted", async () => {
+      const server = createServer({ name: "Test", mc_version: "1.21.4", software: "vanilla", ram_mb: 2048, port: 25565, eula_accepted: true });
+      testDb.prepare("UPDATE servers SET eula_accepted = 0 WHERE id = ?").run(server.id);
+      await expect(startServer(server.id)).rejects.toThrow("EULA");
+      expect(getServerById(server.id)!.status).toBe("error");
+    });
+
+    it("should throw on non-existent server", async () => {
+      await expect(startServer(9999)).rejects.toThrow("Server not found");
+    });
+  });
+
+  describe("stopServer", () => {
+    it("should stop a running server and set status to stopped", async () => {
+      const server = createServer({ name: "Test", mc_version: "1.21.4", software: "vanilla", ram_mb: 2048, port: 25565, eula_accepted: true });
+      vi.mocked(docker.getContainer).mockReturnValue({ ...mockContainer, remove: vi.fn().mockRejectedValue(new Error("no container")) } as any);
+      await startServer(server.id);
+      await stopServer(server.id);
+      expect(getServerById(server.id)!.status).toBe("stopped");
+      expect(getServerById(server.id)!.container_id).toBeNull();
+    });
+
+    it("should throw on non-existent server", async () => {
+      await expect(stopServer(9999)).rejects.toThrow("Server not found");
+    });
+  });
+
+  describe("restartServer", () => {
+    it("should stop then start a server", async () => {
+      const server = createServer({ name: "Test", mc_version: "1.21.4", software: "vanilla", ram_mb: 2048, port: 25565, eula_accepted: true });
+      vi.mocked(docker.getContainer).mockReturnValue({ ...mockContainer, remove: vi.fn().mockRejectedValue(new Error("no container")) } as any);
+      await startServer(server.id);
+      await restartServer(server.id);
+      expect(getServerById(server.id)!.status).toBe("running");
+    });
+  });
+
+  describe("cloneServer", () => {
+    it("should create a copy with 'Copy of' prefix", async () => {
+      const original = createServer({ name: "Original", mc_version: "1.21.4", software: "vanilla", ram_mb: 2048, port: 25565, eula_accepted: true });
+      setServerConfig(original.id, "DIFFICULTY", "hard");
+      const clone = await cloneServer(original.id);
+      expect(clone.name).toBe("Copy of Original");
+      expect(clone.mc_version).toBe("1.21.4");
+      expect(clone.software).toBe("vanilla");
+      expect(getServerConfig(clone.id).find((c) => c.key === "DIFFICULTY")?.value).toBe("hard");
+    });
+  });
+
+  describe("getServerLogs", () => {
+    it("should return parsed log output", async () => {
+      const server = createServer({ name: "Test", mc_version: "1.21.4", software: "vanilla", ram_mb: 2048, port: 25565, eula_accepted: true });
+      vi.mocked(docker.getContainer).mockReturnValue({ ...mockContainer, remove: vi.fn().mockRejectedValue(new Error("no container")) } as any);
+      await startServer(server.id);
+      // Simulate Docker multiplexed stdout frame
+      const msg = Buffer.from("hello world");
+      const header = Buffer.alloc(8);
+      header.writeUInt32BE(1, 0);
+      header.writeUInt32BE(msg.length, 4);
+      mockContainer.logs.mockResolvedValueOnce(Buffer.concat([header, msg]));
+      const logs = await getServerLogs(server.id);
+      expect(logs).toBe("hello world");
+    });
+
+    it("should return empty string when no container_id", async () => {
+      const server = createServer({ name: "Test", mc_version: "1.21.4", software: "vanilla", ram_mb: 2048, port: 25565, eula_accepted: true });
+      expect(await getServerLogs(server.id)).toBe("");
+    });
+  });
+
+  describe("sendCommand", () => {
+    it("should throw if server has no container", async () => {
+      const server = createServer({ name: "Test", mc_version: "1.21.4", software: "vanilla", ram_mb: 2048, port: 25565, eula_accepted: true });
+      await expect(sendCommand(server.id, "list")).rejects.toThrow("Server not running");
     });
   });
 });
