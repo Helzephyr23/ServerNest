@@ -9,7 +9,7 @@ import { useToast } from "@/components/toast";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function MarketplacePage() {
-  const { success, error: toastError } = useToast();
+  const { success, error: toastError, warning } = useToast();
   const [query, setQuery] = useState("");
   const [type, setType] = useState<"mods" | "plugins">("mods");
   const [results, setResults] = useState<any[]>([]);
@@ -21,7 +21,6 @@ export default function MarketplacePage() {
   const [versionsModal, setVersionsModal] = useState<any>(null);
   const [versions, setVersions] = useState<any[]>([]);
   const [loadingVersions, setLoadingVersions] = useState(false);
-  const [installStatus, setInstallStatus] = useState<string>("");
   const [selectedMods, setSelectedMods] = useState<Set<string>>(new Set());
   const [batchInstalling, setBatchInstalling] = useState(false);
 
@@ -57,7 +56,7 @@ export default function MarketplacePage() {
 
   const openVersions = async (mod: any) => {
     if (!selectedServer) {
-      setInstallStatus("Please select a server first");
+      warning("No server selected", "Please select a server before installing");
       return;
     }
     setVersionsModal(mod);
@@ -80,30 +79,26 @@ export default function MarketplacePage() {
     }
   };
 
-  const installMod = async (versionId: string) => {
+  const installMod = async (versionId: string, modTitle?: string) => {
     if (!selectedServer) return;
     setInstallingMod(versionsModal?.slug || null);
-    setInstallStatus("Installing...");
     try {
       const { filename } = await api.post(`/api/servers/${selectedServer}/mods/install`, { versionId });
-      setInstallStatus(`Installed ${filename}`);
+      success(`Installed ${modTitle || filename}`, `${filename} added to server`);
       setVersionsModal(null);
-      setTimeout(() => setInstallStatus(""), 3000);
     } catch (err: any) {
-      setInstallStatus(`Error: ${err.message}`);
-      setTimeout(() => setInstallStatus(""), 5000);
+      toastError(`Failed to install ${modTitle || "mod"}`, err.message);
     }
     setInstallingMod(null);
   };
 
   const batchInstall = async () => {
     if (!selectedServer) {
-      setInstallStatus("Please select a server first");
+      warning("No server selected", "Please select a server first");
       return;
     }
     if (selectedMods.size === 0) return;
     setBatchInstalling(true);
-    setInstallStatus(`Preparing ${selectedMods.size} mods...`);
 
     const server = servers.find((s: any) => s.id === Number(selectedServer));
     const versionIds: { slug: string; versionId: string }[] = [];
@@ -124,25 +119,23 @@ export default function MarketplacePage() {
     }
 
     if (versionIds.length === 0) {
-      setInstallStatus("No compatible versions found for selected mods");
+      warning("No compatible versions", "No compatible versions found for selected mods");
       setBatchInstalling(false);
       return;
     }
 
-    setInstallStatus(`Installing ${versionIds.length} mods...`);
     try {
       const { results } = await api.post(`/api/servers/${selectedServer}/mods/install-batch`, {
         versionIds: versionIds.map((v) => v.versionId),
       });
       const succeeded = results.filter((r: any) => r.success).length;
       const failed = results.filter((r: any) => !r.success).length;
-      success(`Installed ${succeeded} mod(s)` + (failed ? `, ${failed} failed` : ""));
+      success(`Installed ${succeeded} mod(s)`, failed ? `${failed} failed to install` : undefined);
       setSelectedMods(new Set());
     } catch (err: any) {
       toastError("Batch install failed", err.message);
     } finally {
       setBatchInstalling(false);
-      setInstallStatus("");
     }
   };
 
@@ -152,18 +145,6 @@ export default function MarketplacePage() {
         <h1 className="text-3xl font-bold">Marketplace</h1>
         <p className="text-muted-foreground">Browse mods and plugins from Modrinth</p>
       </div>
-
-      {installStatus && (
-        <div className={`rounded-md px-4 py-3 text-sm ${
-          installStatus.startsWith("Error") || installStatus === "Please select a server first"
-            ? "bg-destructive/10 text-destructive"
-            : installStatus.startsWith("Preparing") || installStatus.startsWith("Installing")
-              ? "bg-yellow-500/10 text-yellow-600"
-              : "bg-green-500/10 text-green-600"
-        }`}>
-          {installStatus}
-        </div>
-      )}
 
       <div className="flex flex-col gap-3 sm:flex-row">
         <select
@@ -275,9 +256,14 @@ export default function MarketplacePage() {
                     size="sm"
                     className="w-full"
                     onClick={() => openVersions(mod)}
-                    disabled={!selectedServer || installingMod === mod.slug}
+                    disabled={!selectedServer || !!installingMod || batchInstalling}
                   >
-                    {installingMod === mod.slug ? "Installing..." : "Install"}
+                    {installingMod === mod.slug ? (
+                      <span className="flex items-center gap-2">
+                        <span className="h-3 w-3 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                        Installing...
+                      </span>
+                    ) : installingMod ? "Busy..." : "Install"}
                   </Button>
                 </div>
               </CardContent>
@@ -324,8 +310,13 @@ export default function MarketplacePage() {
                         {v.version_number} &middot; {v.game_versions?.join(", ")} &middot; {v.loaders?.join(", ")}
                       </p>
                     </div>
-                    <Button size="sm" onClick={() => installMod(v.id)}>
-                      Install
+                    <Button size="sm" onClick={() => installMod(v.id, versionsModal?.title)} disabled={!!installingMod}>
+                      {installingMod === versionsModal?.slug ? (
+                        <span className="flex items-center gap-2">
+                          <span className="h-3 w-3 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                          Installing...
+                        </span>
+                      ) : "Install"}
                     </Button>
                   </div>
                 ))}
