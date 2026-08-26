@@ -159,19 +159,19 @@ export default function MarketplacePage() {
         </select>
       </div>
 
-      <form onSubmit={search} className="flex gap-2">
-        <div className="flex gap-1 rounded-lg border p-1">
+      <form onSubmit={search} className="flex flex-col gap-2 sm:flex-row">
+        <div className="flex gap-1 rounded-lg border p-1 shrink-0">
           <button
             type="button"
             onClick={() => { setType("mods"); setSelectedMods(new Set()); }}
-            className={`rounded-md px-3 py-1 text-sm ${type === "mods" ? "bg-primary text-primary-foreground" : ""}`}
+            className={`rounded-md px-3 py-1.5 text-sm ${type === "mods" ? "bg-primary text-primary-foreground" : ""}`}
           >
             Mods
           </button>
           <button
             type="button"
             onClick={() => { setType("plugins"); setSelectedMods(new Set()); }}
-            className={`rounded-md px-3 py-1 text-sm ${type === "plugins" ? "bg-primary text-primary-foreground" : ""}`}
+            className={`rounded-md px-3 py-1.5 text-sm ${type === "plugins" ? "bg-primary text-primary-foreground" : ""}`}
           >
             Plugins
           </button>
@@ -180,7 +180,7 @@ export default function MarketplacePage() {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search mods..."
-          className="flex-1"
+          className="flex-1 min-w-0"
         />
         <Button type="submit" disabled={loading}>
           {loading ? "Searching..." : "Search"}

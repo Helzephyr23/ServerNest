@@ -111,7 +111,7 @@ export default function ServersPage() {
             onChange={(e) => setSearch(e.target.value)}
             className="max-w-sm"
           />
-          <div className="flex gap-1">
+          <div className="flex flex-wrap gap-1">
             {STATUS_OPTIONS.map((opt) => (
               <Button
                 key={opt.value}

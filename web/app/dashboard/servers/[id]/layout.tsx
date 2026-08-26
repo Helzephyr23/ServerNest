@@ -58,16 +58,16 @@ function ServerLayoutInner({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <h1 className="text-xl font-bold flex items-center gap-2 sm:text-3xl">
             {server.icon && <span>{server.icon}</span>}
-            {server.name}
+            <span className="truncate">{server.name}</span>
           </h1>
           <p className="text-muted-foreground">{server.software} {server.mc_version}</p>
-          {server.description && <p className="text-sm text-muted-foreground mt-1">{server.description}</p>}
+          {server.description && <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{server.description}</p>}
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 shrink-0">
           {server.status === "running" || server.status === "error" ? (
             <>
               <Button variant="outline" onClick={() => handleAction("restart")}>Restart</Button>
@@ -81,7 +81,7 @@ function ServerLayoutInner({ children }: { children: React.ReactNode }) {
         </div>
       </div>
 
-      <div className="flex gap-1 overflow-x-auto border-b">
+      <div className="flex gap-1 overflow-x-auto border-b [-webkit-scrollbar-hide] [scrollbar-width:none]">
         {TABS.map((tab) => {
           const href = basePath + tab.href;
           const isActive = tab.exact
