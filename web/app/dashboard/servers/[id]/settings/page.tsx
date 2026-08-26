@@ -70,6 +70,8 @@ export default function ServerSettingsPage() {
   const [pendingRam, setPendingRam] = useState<number | null>(null);
   const [pendingPort, setPendingPort] = useState<number | null>(null);
   const [pendingVersion, setPendingVersion] = useState<string | null>(null);
+  const [pendingDescription, setPendingDescription] = useState<string | null>(null);
+  const [pendingIcon, setPendingIcon] = useState<string | null>(null);
   const [versionToApply, setVersionToApply] = useState("");
   const [showVersionConfirm, setShowVersionConfirm] = useState(false);
 
@@ -90,7 +92,7 @@ export default function ServerSettingsPage() {
     }).catch(() => {});
   }, []);
 
-  const hasChanges = pendingRam !== null || pendingPort !== null || pendingVersion !== null || needsRestart;
+  const hasChanges = pendingRam !== null || pendingPort !== null || pendingVersion !== null || pendingDescription !== null || pendingIcon !== null || needsRestart;
 
   const handleChange = (key: string, value: string) => {
     setProperties((prev) => ({ ...prev, [key]: value }));
@@ -106,6 +108,8 @@ export default function ServerSettingsPage() {
     setPendingRam(null);
     setPendingPort(null);
     setPendingVersion(null);
+    setPendingDescription(null);
+    setPendingIcon(null);
     setNeedsRestart(false);
     setPortError("");
     setShowVersionConfirm(false);
@@ -117,11 +121,13 @@ export default function ServerSettingsPage() {
     setSaving(true);
     let savedAny = false;
     try {
-      // 1. RAM + Port (single PUT)
-      if (pendingRam !== null || pendingPort !== null) {
-        const body: Record<string, number> = {};
+      // 1. RAM + Port + Description + Icon (single PUT)
+      if (pendingRam !== null || pendingPort !== null || pendingDescription !== null || pendingIcon !== null) {
+        const body: Record<string, any> = {};
         if (pendingRam !== null) body.ram_mb = pendingRam;
         if (pendingPort !== null) body.port = pendingPort;
+        if (pendingDescription !== null) body.description = pendingDescription || null;
+        if (pendingIcon !== null) body.icon = pendingIcon || null;
         await api.put(`/api/servers/${id}`, body);
         savedAny = true;
       }
@@ -142,6 +148,8 @@ export default function ServerSettingsPage() {
       setPendingRam(null);
       setPendingPort(null);
       setPendingVersion(null);
+      setPendingDescription(null);
+      setPendingIcon(null);
       setNeedsRestart(false);
       setPortError("");
       setShowVersionConfirm(false);
@@ -295,6 +303,42 @@ export default function ServerSettingsPage() {
               </select>
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Description & Icon */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            Description & Icon
+            {(pendingDescription !== null || pendingIcon !== null) && (
+              <span className="rounded bg-yellow-500/20 px-2 py-0.5 text-xs text-yellow-500">Unsaved</span>
+            )}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Server Icon (emoji)</label>
+            <input
+              type="text"
+              maxLength={10}
+              value={pendingIcon ?? server?.icon ?? ""}
+              onChange={(e) => setPendingIcon(e.target.value)}
+              placeholder="e.g. ⛏️ 🟣 🧵"
+              className="flex h-9 w-full max-w-xs rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Description</label>
+            <textarea
+              maxLength={500}
+              value={pendingDescription ?? server?.description ?? ""}
+              onChange={(e) => setPendingDescription(e.target.value)}
+              placeholder="A short description of this server"
+              rows={3}
+              className="flex w-full max-w-md rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none"
+            />
+          </div>
         </CardContent>
       </Card>
 

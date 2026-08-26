@@ -60,8 +60,12 @@ function ServerLayoutInner({ children }: { children: React.ReactNode }) {
     <div className="space-y-6">
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-3xl font-bold">{server.name}</h1>
+          <h1 className="text-3xl font-bold flex items-center gap-2">
+            {server.icon && <span>{server.icon}</span>}
+            {server.name}
+          </h1>
           <p className="text-muted-foreground">{server.software} {server.mc_version}</p>
+          {server.description && <p className="text-sm text-muted-foreground mt-1">{server.description}</p>}
         </div>
         <div className="flex gap-2">
           {server.status === "running" || server.status === "error" ? (

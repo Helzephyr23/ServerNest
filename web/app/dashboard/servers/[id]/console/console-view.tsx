@@ -228,12 +228,12 @@ export default function ConsoleView() {
 
   const handleSearch = () => {
     if (!searchAddonRef.current || !searchQuery.trim()) return;
-    searchAddonRef.current.searchNext(searchQuery);
+    searchAddonRef.current.findNext(searchQuery);
   };
 
   const handleSearchPrev = () => {
     if (!searchAddonRef.current || !searchQuery.trim()) return;
-    searchAddonRef.current.searchPrevious(searchQuery);
+    searchAddonRef.current.findPrevious(searchQuery);
   };
 
   const handleSearchKeyDown = (e: React.KeyboardEvent) => {

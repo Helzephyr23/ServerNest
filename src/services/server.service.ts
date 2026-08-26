@@ -47,6 +47,8 @@ export function getServerById(id: number): Server | undefined {
 
 export function createServer(data: {
   name: string;
+  description?: string;
+  icon?: string;
   mc_version: string;
   software: string;
   ram_mb: number;
@@ -58,8 +60,8 @@ export function createServer(data: {
   const nodeId = data.node_id || 1;
   const image = data.image || "itzg/minecraft-server";
   const result = db.prepare(
-    "INSERT INTO servers (name, node_id, port, mc_version, software, ram_mb, image, eula_accepted, eula_accepted_at) VALUES (?, ?, ?, ?, ?, ?, ?, 1, datetime('now'))"
-  ).run(data.name, nodeId, data.port, data.mc_version, data.software, data.ram_mb, image);
+    "INSERT INTO servers (name, description, icon, node_id, port, mc_version, software, ram_mb, image, eula_accepted, eula_accepted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, datetime('now'))"
+  ).run(data.name, data.description || null, data.icon || null, nodeId, data.port, data.mc_version, data.software, data.ram_mb, image);
   db.prepare("INSERT INTO server_config (server_id, key, value) VALUES (?, ?, ?)")
     .run(result.lastInsertRowid, "TYPE", data.software === "vanilla" ? "VANILLA" : data.software.toUpperCase());
   db.prepare("INSERT INTO server_config (server_id, key, value) VALUES (?, ?, ?)")
@@ -68,7 +70,7 @@ export function createServer(data: {
   return getServerById(result.lastInsertRowid as number)!;
 }
 
-export function updateServer(id: number, data: Partial<{ name: string; ram_mb: number; mc_version: string; software: string; port: number; image: string }>) {
+export function updateServer(id: number, data: Partial<{ name: string; description: string | null; icon: string | null; ram_mb: number; mc_version: string; software: string; port: number; image: string }>) {
   if (data.port !== undefined) {
     const existing = db.prepare("SELECT id FROM servers WHERE port = ? AND id != ?").get(data.port, id) as { id: number } | undefined;
     if (existing) {

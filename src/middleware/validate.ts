@@ -36,6 +36,8 @@ export const schemas = {
 
   createServer: z.object({
     name: z.string().min(1, "Name is required").max(50),
+    description: z.string().max(500).optional(),
+    icon: z.string().max(10).optional(),
     mc_version: z.string().min(1, "Version is required"),
     software: z.string().optional().default("vanilla"),
     ram_mb: z.number().int().min(512).max(32768).optional().default(2048),
@@ -113,6 +115,8 @@ export const schemas = {
 
   updateServer: z.object({
     name: z.string().min(1).max(50).optional(),
+    description: z.string().max(500).optional().nullable(),
+    icon: z.string().max(10).optional().nullable(),
     mc_version: z.string().min(1).optional(),
     software: z.string().optional(),
     ram_mb: z.number().int().min(512).max(32768).optional(),
