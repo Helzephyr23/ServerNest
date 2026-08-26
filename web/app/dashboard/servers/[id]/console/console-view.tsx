@@ -4,11 +4,13 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { getSocket } from "@/lib/socket";
 import type { Socket } from "socket.io-client";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebLinksAddon } from "@xterm/addon-web-links";
+import { SearchAddon } from "@xterm/addon-search";
 import "@xterm/xterm/css/xterm.css";
 import { useServer } from "@/lib/server-context";
 
@@ -24,6 +26,9 @@ export default function ConsoleView() {
   const socketRef = useRef<Socket | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const cmdBufferRef = useRef<string>("");
+  const searchAddonRef = useRef<SearchAddon | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showSearch, setShowSearch] = useState(false);
 
   const writePrompt = useCallback((term: Terminal) => {
     term.write("\r\n\x1b[36m>\x1b[0m ");
@@ -67,14 +72,17 @@ export default function ConsoleView() {
     });
 
     const fitAddon = new FitAddon();
+    const searchAddon = new SearchAddon();
     term.loadAddon(fitAddon);
     term.loadAddon(new WebLinksAddon());
+    term.loadAddon(searchAddon);
 
     term.open(containerRef.current);
     fitAddon.fit();
     term.focus();
     termRef.current = term;
     fitAddonRef.current = fitAddon;
+    searchAddonRef.current = searchAddon;
 
     term.writeln("\x1b[1;36m╔══════════════════════════════════════════╗\x1b[0m");
     term.writeln("\x1b[1;36m║          Biryani Server Console          ║\x1b[0m");
@@ -218,11 +226,56 @@ export default function ConsoleView() {
     }
   };
 
+  const handleSearch = () => {
+    if (!searchAddonRef.current || !searchQuery.trim()) return;
+    searchAddonRef.current.searchNext(searchQuery);
+  };
+
+  const handleSearchPrev = () => {
+    if (!searchAddonRef.current || !searchQuery.trim()) return;
+    searchAddonRef.current.searchPrevious(searchQuery);
+  };
+
+  const handleSearchKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleSearch();
+    } else if (e.key === "Escape") {
+      setShowSearch(false);
+      setSearchQuery("");
+      searchAddonRef.current?.clearDecorations();
+    }
+  };
+
+  const handleDownloadLog = () => {
+    const term = termRef.current;
+    if (!term) return;
+    const buffer = term.buffer.active;
+    const lines: string[] = [];
+    for (let i = 0; i < buffer.length; i++) {
+      const line = buffer.getLine(i);
+      if (line) {
+        lines.push(line.translateToString(true));
+      }
+    }
+    const blob = new Blob([lines.join("\n")], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `server-${id}-console-${new Date().toISOString().slice(0, 10)}.log`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleClear = () => {
+    termRef.current?.clear();
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold">Console</h2>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <div className="flex items-center gap-2 text-sm">
             <div className={`h-2 w-2 rounded-full ${connected && attached ? "bg-green-500" : connected ? "bg-yellow-500" : "bg-red-500"}`} />
             <span className="text-muted-foreground">
@@ -234,6 +287,24 @@ export default function ConsoleView() {
           )}
         </div>
       </div>
+
+      {showSearch && (
+        <div className="flex items-center gap-2">
+          <Input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={handleSearchKeyDown}
+            placeholder="Search in console..."
+            className="max-w-xs"
+            autoFocus
+          />
+          <Button variant="outline" size="sm" onClick={handleSearch} disabled={!searchQuery.trim()}>Next</Button>
+          <Button variant="outline" size="sm" onClick={handleSearchPrev} disabled={!searchQuery.trim()}>Prev</Button>
+          <Button variant="ghost" size="sm" onClick={() => { setShowSearch(false); setSearchQuery(""); searchAddonRef.current?.clearDecorations(); }}>
+            Close
+          </Button>
+        </div>
+      )}
 
       {server?.status !== "running" ? (
         <Card>
@@ -255,6 +326,18 @@ export default function ConsoleView() {
       <p className="text-xs text-muted-foreground">
         Type commands in the terminal and press Enter to execute. Ctrl+C to cancel input.
       </p>
+
+      <div className="flex items-center gap-2">
+        <Button variant="outline" size="sm" onClick={() => setShowSearch(!showSearch)}>
+          {showSearch ? "Hide Search" : "Search"}
+        </Button>
+        <Button variant="outline" size="sm" onClick={handleDownloadLog}>
+          Download Log
+        </Button>
+        <Button variant="outline" size="sm" onClick={handleClear}>
+          Clear
+        </Button>
+      </div>
     </div>
   );
 }
