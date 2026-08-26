@@ -13,7 +13,7 @@ export default function NewServerPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const templateId = searchParams.get("template");
-  const { success: toastSuccess, error: toastError } = useToast();
+  const { success: toastSuccess } = useToast();
   const [name, setName] = useState("");
   const [software, setSoftware] = useState("vanilla");
   const [version, setVersion] = useState("1.21.4");
