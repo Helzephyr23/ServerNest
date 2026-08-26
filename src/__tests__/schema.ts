@@ -130,6 +130,17 @@ CREATE TABLE IF NOT EXISTS servers (
       expired     INTEGER NOT NULL DEFAULT 0,
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     );
+    CREATE TABLE IF NOT EXISTS audit_log (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id     INTEGER,
+      username    TEXT,
+      action      TEXT NOT NULL,
+      target_type TEXT,
+      target_id   INTEGER,
+      details     TEXT,
+      ip          TEXT,
+      created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+    );
     CREATE TABLE IF NOT EXISTS cloud_storage_configs (
       id          INTEGER PRIMARY KEY AUTOINCREMENT,
       server_id   INTEGER NOT NULL,

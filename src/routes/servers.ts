@@ -18,6 +18,7 @@ import {
   findAvailablePort,
 } from "../services/server.service.js";
 import { getServerMetrics, getMetricsHistory } from "../services/metrics.service.js";
+import { logAudit } from "../services/audit.service.js";
 import docker from "../config/docker.js";
 import { rmSync, existsSync, mkdirSync, readdirSync, readFileSync, createWriteStream, statSync } from "fs";
 import os from "os";
@@ -64,6 +65,7 @@ export default async function serverRoutes(app: FastifyInstance) {
       image,
       eula_accepted,
     });
+    logAudit({ user_id: (request as any).user?.id, username: (request as any).user?.username, action: "server.create", target_type: "server", target_id: server.id, details: name, ip: request.ip });
     return reply.status(201).send({ server });
   });
 
@@ -238,6 +240,7 @@ export default async function serverRoutes(app: FastifyInstance) {
     deleteServer(Number(id));
     const dataDir = `${process.cwd()}/data/server-${server.id}`;
     try { if (existsSync(dataDir)) rmSync(dataDir, { recursive: true, force: true }); } catch {}
+    logAudit({ user_id: (request as any).user?.id, username: (request as any).user?.username, action: "server.delete", target_type: "server", target_id: Number(id), details: server.name, ip: request.ip });
     return { success: true };
   });
 
@@ -255,6 +258,7 @@ export default async function serverRoutes(app: FastifyInstance) {
     try {
       const { id } = request.params as { id: string };
       await startServer(Number(id));
+      logAudit({ user_id: (request as any).user?.id, username: (request as any).user?.username, action: "server.start", target_type: "server", target_id: Number(id), ip: request.ip });
       if (ioRef) ioRef.to("server-" + id).emit("server:status", { serverId: Number(id), status: "running" });
       return { success: true, status: "running" };
     } catch (err: unknown) {
@@ -268,6 +272,7 @@ export default async function serverRoutes(app: FastifyInstance) {
     try {
       const { id } = request.params as { id: string };
       await stopServer(Number(id));
+      logAudit({ user_id: (request as any).user?.id, username: (request as any).user?.username, action: "server.stop", target_type: "server", target_id: Number(id), ip: request.ip });
       if (ioRef) ioRef.to("server-" + id).emit("server:status", { serverId: Number(id), status: "stopped" });
       return { success: true, status: "stopped" };
     } catch (err: unknown) {
@@ -279,6 +284,7 @@ export default async function serverRoutes(app: FastifyInstance) {
     try {
       const { id } = request.params as { id: string };
       await restartServer(Number(id));
+      logAudit({ user_id: (request as any).user?.id, username: (request as any).user?.username, action: "server.restart", target_type: "server", target_id: Number(id), ip: request.ip });
       if (ioRef) ioRef.to("server-" + id).emit("server:status", { serverId: Number(id), status: "running" });
       return { success: true, status: "running" };
     } catch (err: unknown) {
