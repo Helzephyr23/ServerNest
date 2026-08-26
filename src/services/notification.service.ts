@@ -67,6 +67,15 @@ export function deleteNotification(id: number) {
   db.prepare("DELETE FROM notifications WHERE id = ?").run(id);
 }
 
+export function updateNotification(id: number, data: { enabled?: boolean }): Notification | undefined {
+  const existing = getNotificationById(id);
+  if (!existing) return undefined;
+  if (data.enabled !== undefined) {
+    db.prepare("UPDATE notifications SET enabled = ? WHERE id = ?").run(data.enabled ? 1 : 0, id);
+  }
+  return getNotificationById(id);
+}
+
 export async function sendDiscordNotification(webhookUrl: string, title: string, message: string, color: number = 0x00ff00): Promise<boolean> {
   if (!(await validateWebhookUrl(webhookUrl))) {
     logger.error("Discord webhook URL rejected: points to private/internal network or invalid protocol");

@@ -57,6 +57,15 @@ export default function NotificationsPage() {
     }
   };
 
+  const handleToggle = async (id: number, currentEnabled: boolean) => {
+    try {
+      await api.put(`/api/notifications/${id}`, { enabled: !currentEnabled });
+      fetchNotifications();
+    } catch (err: any) {
+      toastError("Failed to toggle", err.message);
+    }
+  };
+
   const handleTest = async () => {
     if (!testUrl) return;
     try {
@@ -197,17 +206,30 @@ export default function NotificationsPage() {
       ) : (
         <div className="space-y-2">
           {notifications.map((notif) => (
-            <Card key={notif.id}>
+            <Card key={notif.id} className={!notif.enabled ? "opacity-60" : ""}>
               <CardContent className="flex items-center justify-between p-4">
-                <div>
-                  <p className="font-medium">{notif.type === "discord" ? "Discord" : "Email"} Notification</p>
-                  <p className="text-xs text-muted-foreground">
-                    {notif.type === "discord" ? notif.webhook_url?.substring(0, 50) + "..." : notif.email}
-                  </p>
-                  <div className="mt-1 flex gap-1">
-                    {JSON.parse(notif.events || "[]").map((e: string) => (
-                      <span key={e} className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-400">{e}</span>
-                    ))}
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => handleToggle(notif.id, notif.enabled)}
+                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
+                      notif.enabled ? "bg-primary" : "bg-zinc-600"
+                    }`}
+                  >
+                    <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${
+                      notif.enabled ? "translate-x-4" : "translate-x-0"
+                    }`} />
+                  </button>
+                  <div>
+                    <p className="font-medium">{notif.type === "discord" ? "Discord" : "Email"} Notification</p>
+                    <p className="text-xs text-muted-foreground">
+                      {notif.type === "discord" ? notif.webhook_url?.substring(0, 50) + "..." : notif.email}
+                    </p>
+                    <div className="mt-1 flex gap-1">
+                      {JSON.parse(notif.events || "[]").map((e: string) => (
+                        <span key={e} className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-400">{e}</span>
+                      ))}
+                    </div>
                   </div>
                 </div>
                 <Button variant="destructive" size="sm" onClick={() => handleDelete(notif.id)}>

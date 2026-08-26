@@ -5,6 +5,7 @@ import {
   getAllNotifications,
   createNotification,
   deleteNotification,
+  updateNotification,
   sendDiscordNotification,
 } from "../services/notification.service.js";
 
@@ -25,6 +26,14 @@ export default async function notificationRoutes(app: FastifyInstance) {
     const { id } = request.params as { id: string };
     deleteNotification(Number(id));
     return { success: true };
+  });
+
+  app.put("/api/notifications/:id", opts, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const body = request.body as { enabled?: boolean };
+    const notif = updateNotification(Number(id), body);
+    if (!notif) return reply.status(404).send({ error: "Notification not found" });
+    return { notification: notif };
   });
 
   app.post("/api/notifications/test", { preHandler: [authMiddleware, validate(schemas.testNotification)] }, async (request, reply) => {
