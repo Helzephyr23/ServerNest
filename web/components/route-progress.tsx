@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { Suspense, useEffect, useRef } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import NProgress from "nprogress";
 
 NProgress.configure({ showSpinner: false, speed: 400, minimum: 0.2 });
 
-export function RouteProgress() {
+function RouteProgressInner() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const prevPath = useRef(pathname + searchParams.toString());
@@ -38,27 +38,36 @@ export function RouteProgress() {
     };
   }, []);
 
+  return null;
+}
+
+export function RouteProgress() {
   return (
-    <style
-      dangerouslySetInnerHTML={{
-        __html: `
-          #nprogress .bar {
-            background: hsl(262, 83%, 58%);
-            height: 2px;
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            z-index: 9999;
-          }
-          #nprogress .peg {
-            box-shadow: 0 0 10px hsl(262, 83%, 58%), 0 0 5px hsl(262, 83%, 58%);
-          }
-          #nprogress .spinner {
-            display: none !important;
-          }
-        `,
-      }}
-    />
+    <>
+      <Suspense fallback={null}>
+        <RouteProgressInner />
+      </Suspense>
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
+            #nprogress .bar {
+              background: hsl(262, 83%, 58%);
+              height: 2px;
+              position: fixed;
+              top: 0;
+              left: 0;
+              right: 0;
+              z-index: 9999;
+            }
+            #nprogress .peg {
+              box-shadow: 0 0 10px hsl(262, 83%, 58%), 0 0 5px hsl(262, 83%, 58%);
+            }
+            #nprogress .spinner {
+              display: none !important;
+            }
+          `,
+        }}
+      />
+    </>
   );
 }
