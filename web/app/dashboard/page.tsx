@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
 import { api } from "@/lib/api";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -175,65 +176,94 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Servers</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {servers.length ? (
-            <div className="space-y-3">
-              {servers.filter((s) => s.status === "running").map((server) => (
-                <Link key={server.id} href={`/dashboard/servers/${server.id}`} className="block rounded-lg border p-3 transition-colors hover:bg-accent">
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="font-medium">{server.name}</p>
-                    <div className="flex items-center gap-1">
-                      {updateCounts[server.id] > 0 && (
-                        <span className="rounded-full bg-yellow-500/10 px-1.5 py-0.5 text-[10px] font-medium text-yellow-500">
-                          {updateCounts[server.id]} update{updateCounts[server.id] > 1 ? "s" : ""}
-                        </span>
-                      )}
-                      <span className="rounded-full bg-green-500/10 px-2 py-0.5 text-xs text-green-500">Running</span>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <p className="text-xs text-muted-foreground">CPU</p>
-                      <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-muted">
-                        <div
-                          className="h-full rounded-full bg-blue-500 transition-all"
-                          style={{ width: `${Math.min(server.cpu_percent || 0, 100)}%` }}
-                        />
-                      </div>
-                      <p className="mt-0.5 text-xs text-muted-foreground">{Math.round(server.cpu_percent || 0)}%</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground">RAM</p>
-                      <p className="mt-1 text-sm font-medium">{server.ram_mb || 0} MB</p>
-                    </div>
-                  </div>
-                </Link>
-              ))}
-              {servers.filter((s) => s.status !== "running").length > 0 && (
-                <details className="text-sm text-muted-foreground">
-                  <summary className="cursor-pointer hover:text-foreground">
-                    {servers.filter((s) => s.status !== "running").length} stopped servers
-                  </summary>
-                  <div className="mt-2 space-y-1">
-                    {servers.filter((s) => s.status !== "running").map((server) => (
-                      <Link key={server.id} href={`/dashboard/servers/${server.id}`} className="flex items-center justify-between rounded px-2 py-1 hover:bg-accent">
-                        <span>{server.name}</span>
-                        <span className={`text-xs ${server.status === "error" ? "text-red-500" : "text-muted-foreground"}`}>{server.status}</span>
-                      </Link>
-                    ))}
-                  </div>
-                </details>
-              )}
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">No servers created yet</p>
-          )}
-        </CardContent>
-      </Card>
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-bold">Servers</h2>
+          <Link href="/dashboard/servers/new">
+            <Button size="sm">Create Server</Button>
+          </Link>
+        </div>
+        {servers.length ? (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {(() => {
+              const sorted = [...servers].sort((a, b) => {
+                if (a.status === "running" && b.status !== "running") return -1;
+                if (a.status !== "running" && b.status === "running") return 1;
+                return a.name.localeCompare(b.name);
+              });
+              const visible = sorted.slice(0, 5);
+              return (
+                <>
+                  {visible.map((server) => (
+                    <Link key={server.id} href={`/dashboard/servers/${server.id}`}>
+                      <Card className="relative overflow-hidden transition-colors hover:bg-accent h-full">
+                        <CardHeader className="pb-3">
+                          <div className="flex items-start justify-between">
+                            <div className="flex items-center gap-2">
+                              {server.icon && <span className="text-2xl">{server.icon}</span>}
+                              <div>
+                                <CardTitle className="text-lg">{server.name}</CardTitle>
+                                <p className="text-sm text-muted-foreground">{server.software} {server.mc_version}</p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              {updateCounts[server.id] > 0 && (
+                                <span className="rounded-full bg-yellow-500/10 px-2 py-0.5 text-[10px] font-medium text-yellow-500">
+                                  {updateCounts[server.id]} update{updateCounts[server.id] > 1 ? "s" : ""}
+                                </span>
+                              )}
+                              <span className={`rounded-full px-2 py-1 text-xs font-medium ${
+                                server.status === "running"
+                                  ? "bg-green-500/10 text-green-500"
+                                  : server.status === "starting"
+                                  ? "bg-yellow-500/10 text-yellow-500"
+                                  : server.status === "error"
+                                  ? "bg-red-500/10 text-red-500"
+                                  : "bg-zinc-500/10 text-zinc-400"
+                              }`}>
+                                {server.status}
+                              </span>
+                            </div>
+                          </div>
+                        </CardHeader>
+                        <CardContent>
+                          {server.description && (
+                            <p className="mb-2 text-sm text-muted-foreground line-clamp-2">{server.description}</p>
+                          )}
+                          <div className="space-y-1 text-sm text-muted-foreground">
+                            <p>Port: {server.port}</p>
+                            <p>RAM: {server.ram_mb} MB</p>
+                            <p>CPU: {server.cpu_percent !== null ? `${server.cpu_percent}%` : "N/A"}</p>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </Link>
+                  ))}
+                  {sorted.length > 5 && (
+                    <Link href="/dashboard/servers">
+                      <Card className="flex flex-col items-center justify-center border-dashed transition-colors hover:bg-accent h-full min-h-[200px]">
+                        <CardContent className="flex flex-col items-center justify-center py-0">
+                          <p className="text-3xl font-bold text-muted-foreground">+{sorted.length - 5}</p>
+                          <p className="text-sm text-muted-foreground">View all servers</p>
+                        </CardContent>
+                      </Card>
+                    </Link>
+                  )}
+                </>
+              );
+            })()}
+          </div>
+        ) : (
+          <Card>
+            <CardContent className="flex flex-col items-center justify-center py-12">
+              <p className="text-sm text-muted-foreground mb-3">No servers created yet</p>
+              <Link href="/dashboard/servers/new">
+                <Button size="sm">Create Your First Server</Button>
+              </Link>
+            </CardContent>
+          </Card>
+        )}
+      </div>
 
       <div className="grid gap-4 md:grid-cols-2">
         <Card>

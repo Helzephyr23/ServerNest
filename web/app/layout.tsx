@@ -3,6 +3,7 @@ import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ToastProvider } from "@/components/toast";
 import { AuthProvider } from "@/lib/auth";
+import { RouteProgress } from "@/components/route-progress";
 
 export const metadata: Metadata = {
   title: "Biryani - Minecraft Server Panel",
@@ -13,6 +14,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" suppressHydrationWarning>
       <body className="min-h-screen antialiased">
+        <RouteProgress />
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
           <ToastProvider>
             <AuthProvider>{children}</AuthProvider>
