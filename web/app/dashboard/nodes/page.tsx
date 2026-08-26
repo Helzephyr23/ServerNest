@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm-dialog";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function NodesPage() {
   const { error: toastError } = useToast();
@@ -115,8 +116,30 @@ export default function NodesPage() {
       )}
 
       {loading ? (
-        <div className="flex justify-center py-12">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+        <div className="grid gap-4 md:grid-cols-2">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Card key={i}>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <Skeleton className="h-5 w-32" />
+                <Skeleton className="h-5 w-16 rounded-full" />
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  <div className="space-y-2">
+                    <Skeleton className="h-3 w-48" />
+                    <Skeleton className="h-3 w-32" />
+                    <Skeleton className="h-3 w-40" />
+                  </div>
+                  <div className="space-y-2">
+                    <Skeleton className="h-1.5 w-full rounded-full" />
+                    <Skeleton className="h-1.5 w-full rounded-full" />
+                    <Skeleton className="h-1.5 w-full rounded-full" />
+                  </div>
+                  <Skeleton className="h-8 w-20" />
+                </div>
+              </CardContent>
+            </Card>
+          ))}
         </div>
       ) : nodes.length === 0 ? (
         <Card>

@@ -123,7 +123,11 @@ export default async function modsRoutes(app: FastifyInstance) {
     for (const mod of dbMods) {
       try {
         const versions = await getProjectVersions(mod.slug, server.mc_version);
-        if (versions.length === 0) continue;
+        if (versions.length === 0) {
+          db.prepare("UPDATE installed_mods SET has_update = 0, latest_version = NULL WHERE server_id = ? AND filename = ?")
+            .run(Number(id), mod.filename);
+          continue;
+        }
         const latest = versions[0];
         if (latest.version_number !== mod.version) {
           updates.push({
@@ -134,11 +138,26 @@ export default async function modsRoutes(app: FastifyInstance) {
             latestVersion: latest.version_number,
             latestVersionId: latest.id,
           });
+          db.prepare("UPDATE installed_mods SET has_update = 1, latest_version = ? WHERE server_id = ? AND filename = ?")
+            .run(latest.version_number, Number(id), mod.filename);
+        } else {
+          db.prepare("UPDATE installed_mods SET has_update = 0, latest_version = NULL WHERE server_id = ? AND filename = ?")
+            .run(Number(id), mod.filename);
         }
       } catch {}
     }
 
     return { updates };
+  });
+
+  app.get("/api/servers/:id/mods/update-count", opts, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const server = getServerById(Number(id));
+    if (!server) return reply.status(404).send({ error: "Server not found" });
+
+    const row = db.prepare("SELECT COUNT(*) as count FROM installed_mods WHERE server_id = ? AND has_update = 1")
+      .get(Number(id)) as { count: number };
+    return { count: row.count };
   });
 
   app.post("/api/servers/:id/mods/update/:filename", opts, async (request, reply) => {
@@ -165,7 +184,7 @@ export default async function modsRoutes(app: FastifyInstance) {
       // Only delete old file after successful download
       if (existsSync(oldPath)) unlinkSync(oldPath);
 
-      db.prepare("UPDATE installed_mods SET filename = ?, version = ? WHERE server_id = ? AND filename = ?")
+      db.prepare("UPDATE installed_mods SET filename = ?, version = ?, has_update = 0, latest_version = NULL WHERE server_id = ? AND filename = ?")
         .run(result.filename, result.version_number, Number(id), filename);
 
       return { success: true, filename: result.filename, version: result.version_number };

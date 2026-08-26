@@ -5,6 +5,7 @@ import { useParams, usePathname } from "next/navigation";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { ServerProvider, useServer } from "@/lib/server-context";
 
 const TABS = [
@@ -34,8 +35,19 @@ function ServerLayoutInner({ children }: { children: React.ReactNode }) {
 
   if (loading) {
     return (
-      <div className="flex justify-center py-12">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+      <div className="space-y-6">
+        <div className="flex items-start justify-between">
+          <div className="space-y-2">
+            <Skeleton className="h-8 w-48" />
+            <Skeleton className="h-4 w-32" />
+          </div>
+          <Skeleton className="h-9 w-20" />
+        </div>
+        <div className="flex gap-1 border-b">
+          {Array.from({ length: 9 }).map((_, i) => (
+            <Skeleton key={i} className="h-10 w-20" />
+          ))}
+        </div>
       </div>
     );
   }

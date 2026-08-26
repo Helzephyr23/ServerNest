@@ -112,3 +112,30 @@ export async function getNodeMetrics(): Promise<{
     used_memory_mb: Math.round(usedMemory),
   };
 }
+
+export function getCachedNodeMetrics(): {
+  total_servers: number;
+  running_servers: number;
+  total_memory_mb: number;
+  used_memory_mb: number;
+} {
+  const servers = db.prepare("SELECT id, status, ram_mb FROM servers").all() as { id: number; status: string; ram_mb: number }[];
+  let totalMemory = 0;
+  let usedMemory = 0;
+
+  for (const server of servers) {
+    totalMemory += server.ram_mb;
+    if (server.status === "running") {
+      const latest = db.prepare("SELECT memory_mb FROM server_metrics WHERE server_id = ? ORDER BY collected_at DESC LIMIT 1")
+        .get(server.id) as { memory_mb: number } | undefined;
+      if (latest) usedMemory += latest.memory_mb;
+    }
+  }
+
+  return {
+    total_servers: servers.length,
+    running_servers: servers.filter((s) => s.status === "running").length,
+    total_memory_mb: totalMemory,
+    used_memory_mb: Math.round(usedMemory),
+  };
+}

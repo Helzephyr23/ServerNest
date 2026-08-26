@@ -1,5 +1,6 @@
 import db from "../config/database.js";
 import { logger } from "../utils/logger.js";
+import { CronExpressionParser } from "cron-parser";
 
 export interface ScheduledTask {
   id: number;
@@ -59,64 +60,58 @@ export function deleteTask(id: number) {
 }
 
 export function parseSchedule(schedule: string): number | null {
-  const parts = schedule.split(" ");
-  if (parts.length !== 5) return null;
-
-  const [min, hour, , ,] = parts;
-  const now = new Date();
-  const next = new Date(now);
-
-  if (min !== "*") {
-    const m = parseInt(min, 10);
-    if (!isNaN(m)) next.setMinutes(m, 0, 0);
+  try {
+    const interval = CronExpressionParser.parse(schedule, { currentDate: new Date() });
+    return interval.next().toDate().getTime() - Date.now();
+  } catch {
+    return null;
   }
-  if (hour !== "*") {
-    const h = parseInt(hour, 10);
-    if (!isNaN(h)) next.setHours(h, next.getMinutes(), 0, 0);
-  }
+}
 
-  if (schedule.includes("*/")) {
-    const intervalMatch = schedule.match(/\*\/(\d+)/);
-    if (intervalMatch) {
-      const interval = parseInt(intervalMatch[1], 10);
-      if (schedule.startsWith("*/")) {
-        return interval * 60 * 1000;
-      }
-      return interval * 60 * 60 * 1000;
-    }
+export function getNextRunTime(schedule: string): Date | null {
+  try {
+    const interval = CronExpressionParser.parse(schedule, { currentDate: new Date() });
+    return interval.next().toDate();
+  } catch {
+    return null;
   }
-
-  let diff = next.getTime() - now.getTime();
-  if (diff <= 0) {
-    next.setDate(next.getDate() + 1);
-    diff = next.getTime() - now.getTime();
-  }
-  return diff;
 }
 
 export function startTask(task: ScheduledTask, executor: (task: ScheduledTask) => Promise<void>) {
-  const interval = parseSchedule(task.schedule);
-  if (!interval) return;
-
   stopTask(task.id);
 
-  const timeout = setInterval(async () => {
-    try {
-      await executor(task);
-      const now = new Date().toISOString();
-      db.prepare("UPDATE scheduled_tasks SET last_run = ? WHERE id = ?").run(now, task.id);
-    } catch (err) {
-      logger.error(`Scheduler - Task ${task.id} failed:`, err);
-    }
-  }, interval);
+  function scheduleNext() {
+    const ms = parseSchedule(task.schedule);
+    if (ms === null || ms <= 0) return;
 
-  tasks.set(task.id, timeout);
+    const nextRun = getNextRunTime(task.schedule);
+    if (nextRun) {
+      db.prepare("UPDATE scheduled_tasks SET next_run = ? WHERE id = ?")
+        .run(nextRun.toISOString(), task.id);
+    }
+
+    const timeout = setTimeout(async () => {
+      tasks.delete(task.id);
+      try {
+        await executor(task);
+        const now = new Date().toISOString();
+        db.prepare("UPDATE scheduled_tasks SET last_run = ? WHERE id = ?").run(now, task.id);
+      } catch (err) {
+        logger.error(`Scheduler - Task ${task.id} failed:`, err);
+      }
+      scheduleNext();
+    }, ms);
+
+    tasks.set(task.id, timeout);
+  }
+
+  scheduleNext();
 }
 
 export function stopTask(id: number) {
   const timeout = tasks.get(id);
   if (timeout) {
-    clearInterval(timeout);
+    clearTimeout(timeout);
     tasks.delete(id);
   }
 }

@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm-dialog";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const EVENT_OPTIONS = [
   { id: "server_start", label: "Server Start" },
@@ -167,8 +168,23 @@ export default function NotificationsPage() {
       </Card>
 
       {loading ? (
-        <div className="flex justify-center py-12">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+        <div className="space-y-2">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Card key={i}>
+              <CardContent className="flex items-center justify-between p-4">
+                <div>
+                  <Skeleton className="h-4 w-40 mb-1" />
+                  <Skeleton className="h-3 w-64 mb-1" />
+                  <div className="mt-1 flex gap-1">
+                    <Skeleton className="h-4 w-12 rounded" />
+                    <Skeleton className="h-4 w-14 rounded" />
+                    <Skeleton className="h-4 w-10 rounded" />
+                  </div>
+                </div>
+                <Skeleton className="h-8 w-16" />
+              </CardContent>
+            </Card>
+          ))}
         </div>
       ) : notifications.length === 0 ? (
         <Card>

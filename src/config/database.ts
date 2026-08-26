@@ -180,6 +180,12 @@ export function migrate() {
   if (!modColumns.some((c) => c.name === "slug")) {
     db.exec("ALTER TABLE installed_mods ADD COLUMN slug TEXT");
   }
+  if (!modColumns.some((c) => c.name === "has_update")) {
+    db.exec("ALTER TABLE installed_mods ADD COLUMN has_update INTEGER NOT NULL DEFAULT 0");
+  }
+  if (!modColumns.some((c) => c.name === "latest_version")) {
+    db.exec("ALTER TABLE installed_mods ADD COLUMN latest_version TEXT");
+  }
 
   const backupColumns = db.prepare("PRAGMA table_info(backups)").all() as { name: string }[];
   if (!backupColumns.some((c) => c.name === "checksum")) {
@@ -196,6 +202,12 @@ export function migrate() {
       enabled     INTEGER NOT NULL DEFAULT 1,
       description TEXT,
       created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS rate_limit_counts (
+      key       TEXT PRIMARY KEY,
+      count     INTEGER NOT NULL DEFAULT 0,
+      reset_at  INTEGER NOT NULL
     );
 
     CREATE TABLE IF NOT EXISTS server_metrics (

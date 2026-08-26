@@ -55,8 +55,10 @@ vi.mock("../../services/modrinth.service.js", () => ({
 }));
 
 const getNodeMetrics = vi.hoisted(() => vi.fn());
+const getCachedNodeMetrics = vi.hoisted(() => vi.fn());
 vi.mock("../../services/metrics.service.js", () => ({
   getNodeMetrics,
+  getCachedNodeMetrics,
   getServerMetrics: vi.fn(),
   getMetricsHistory: vi.fn(() => []),
   collectMetrics: vi.fn(),
@@ -205,6 +207,7 @@ describe("E2E Integration Scenarios", () => {
     resetTables();
     vi.clearAllMocks();
     getNodeMetrics.mockResolvedValue({ cpu_percent: 12.5, memory_percent: 40, disk_percent: 60 });
+    getCachedNodeMetrics.mockReturnValue({ total_servers: 0, running_servers: 0, total_memory_mb: 0, used_memory_mb: 0 });
     mockNotify.mockResolvedValue(undefined);
     mockVerifyTotpCode.mockResolvedValue(true);
     app = await buildApp();

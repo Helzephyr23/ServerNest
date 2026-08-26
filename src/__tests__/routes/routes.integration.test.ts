@@ -55,8 +55,10 @@ vi.mock("../../services/modrinth.service.js", () => ({
 }));
 
 const getNodeMetrics = vi.hoisted(() => vi.fn());
+const getCachedNodeMetrics = vi.hoisted(() => vi.fn());
 vi.mock("../../services/metrics.service.js", () => ({
   getNodeMetrics,
+  getCachedNodeMetrics,
   getServerMetrics: vi.fn(),
   getMetricsHistory: vi.fn(() => []),
   collectMetrics: vi.fn(),
@@ -194,6 +196,7 @@ describe("All Routes Integration", () => {
     resetTables();
     vi.clearAllMocks();
     getNodeMetrics.mockResolvedValue({ cpu_percent: 12.5, memory_percent: 40, disk_percent: 60 });
+    getCachedNodeMetrics.mockReturnValue({ total_servers: 1, running_servers: 1, total_memory_mb: 2048, used_memory_mb: 820 });
     app = await buildApp();
     await app.ready();
     const setupRes = await app.inject({
@@ -546,7 +549,8 @@ describe("All Routes Integration", () => {
       expect(res.statusCode).toBe(200);
       const body = JSON.parse(res.payload);
       expect(body.nodes[0].name).toBe("master");
-      expect(body.metrics.memory_percent).toBe(40);
+      expect(body.metrics.total_servers).toBe(1);
+      expect(body.metrics.used_memory_mb).toBe(820);
     });
 
     it("requires auth", async () => {

@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm-dialog";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function UsersPage() {
   const { success, error: toastError } = useToast();
@@ -151,9 +152,20 @@ export default function UsersPage() {
       )}
 
       {loading ? (
-        <div className="flex justify-center py-12">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-        </div>
+        <Card>
+          <CardContent className="p-0">
+            <div className="space-y-0">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="flex items-center gap-3 border-b px-6 py-4 last:border-0">
+                  <Skeleton className="h-8 w-8 rounded-full" />
+                  <Skeleton className="h-4 w-32" />
+                  <Skeleton className="h-4 w-16 ml-auto" />
+                  <Skeleton className="h-4 w-24 ml-4" />
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
       ) : users.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">

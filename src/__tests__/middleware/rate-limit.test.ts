@@ -44,6 +44,7 @@ async function call(mw: ReturnType<typeof rateLimit>, ip: string, url: string, m
 
 beforeEach(() => {
   testDb.exec("DELETE FROM rate_limits");
+  testDb.exec("DELETE FROM rate_limit_counts");
   vi.useRealTimers();
 });
 

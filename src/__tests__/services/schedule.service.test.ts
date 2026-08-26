@@ -102,34 +102,66 @@ describe("schedule.service", () => {
   });
 
   describe("parseSchedule", () => {
-    it("should parse interval schedule (*/30 * * * *)", () => {
-      expect(parseSchedule("*/30 * * * *")).toBe(30 * 60 * 1000);
-    });
-
-    it("should parse hourly interval (0 */2 * * *)", () => {
-      expect(parseSchedule("0 */2 * * *")).toBe(2 * 60 * 60 * 1000);
-    });
-
     it("should return null for invalid schedule", () => {
       expect(parseSchedule("invalid")).toBeNull();
     });
 
-    it("should parse specific time schedule", () => {
+    it("should return positive ms for every-30-minutes (*/30 * * * *)", () => {
+      expect(parseSchedule("*/30 * * * *")).toBeGreaterThan(0);
+    });
+
+    it("should return positive ms for every-2-hours (0 */2 * * *)", () => {
+      expect(parseSchedule("0 */2 * * *")).toBeGreaterThan(0);
+    });
+
+    it("should return positive ms for daily at specific time (0 3 * * *)", () => {
       expect(parseSchedule("0 3 * * *")).toBeGreaterThan(0);
+    });
+
+    it("should return positive ms for day-of-month (0 0 15 * *)", () => {
+      expect(parseSchedule("0 0 15 * *")).toBeGreaterThan(0);
+    });
+
+    it("should return positive ms for day-of-week (0 0 * * 1)", () => {
+      expect(parseSchedule("0 0 * * 1")).toBeGreaterThan(0);
+    });
+
+    it("should return positive ms for month constraint (0 0 1 6 *)", () => {
+      expect(parseSchedule("0 0 1 6 *")).toBeGreaterThan(0);
+    });
+
+    it("should return positive ms for complex schedule (30 2 * * 0)", () => {
+      expect(parseSchedule("30 2 * * 0")).toBeGreaterThan(0);
     });
   });
 
   describe("startTask / stopTask", () => {
-    beforeEach(() => { vi.useFakeTimers(); vi.clearAllTimers(); });
+    beforeEach(() => { vi.useFakeTimers(); });
     afterEach(() => { vi.useRealTimers(); });
 
-    it("should call the executor on each interval tick", async () => {
+    it("should call the executor after the scheduled delay", async () => {
       const task = createTask({ server_id: serverId, name: "T1", type: "backup", schedule: "*/30 * * * *" });
       const executor = vi.fn().mockResolvedValue(undefined);
       startTask(task, executor);
       expect(executor).not.toHaveBeenCalled();
-      vi.advanceTimersByTime(30 * 60 * 1000);
+
+      await vi.advanceTimersByTimeAsync(30 * 60 * 1000 + 1000);
       expect(executor).toHaveBeenCalledTimes(1);
+
+      stopTask(task.id);
+    });
+
+    it("should reschedule after execution", async () => {
+      const task = createTask({ server_id: serverId, name: "T1", type: "backup", schedule: "*/30 * * * *" });
+      const executor = vi.fn().mockResolvedValue(undefined);
+      startTask(task, executor);
+
+      await vi.advanceTimersByTimeAsync(30 * 60 * 1000 + 1000);
+      expect(executor).toHaveBeenCalledTimes(1);
+
+      await vi.advanceTimersByTimeAsync(30 * 60 * 1000 + 1000);
+      expect(executor).toHaveBeenCalledTimes(2);
+
       stopTask(task.id);
     });
 
@@ -138,17 +170,37 @@ describe("schedule.service", () => {
       const executor = vi.fn().mockResolvedValue(undefined);
       startTask(task, executor);
       stopTask(task.id);
-      vi.advanceTimersByTime(30 * 60 * 1000);
+      await vi.advanceTimersByTimeAsync(60 * 60 * 1000);
       expect(executor).not.toHaveBeenCalled();
     });
 
     it("should not throw when stopping a task that was never started", () => {
       expect(() => stopTask(9999)).not.toThrow();
     });
+
+    it("should update last_run after execution", async () => {
+      const task = createTask({ server_id: serverId, name: "T1", type: "backup", schedule: "*/30 * * * *" });
+      const executor = vi.fn().mockResolvedValue(undefined);
+      startTask(task, executor);
+      expect(getTaskById(task.id)!.last_run).toBeNull();
+
+      await vi.advanceTimersByTimeAsync(30 * 60 * 1000 + 1000);
+      expect(getTaskById(task.id)!.last_run).toBeTruthy();
+
+      stopTask(task.id);
+    });
+
+    it("should update next_run when task starts", () => {
+      const task = createTask({ server_id: serverId, name: "T1", type: "backup", schedule: "*/30 * * * *" });
+      const executor = vi.fn().mockResolvedValue(undefined);
+      startTask(task, executor);
+      expect(getTaskById(task.id)!.next_run).toBeTruthy();
+      stopTask(task.id);
+    });
   });
 
   describe("startAllTasks", () => {
-    beforeEach(() => { vi.useFakeTimers(); vi.clearAllTimers(); });
+    beforeEach(() => { vi.useFakeTimers(); });
     afterEach(() => { vi.useRealTimers(); });
 
     it("should start all enabled tasks", async () => {
@@ -157,7 +209,7 @@ describe("schedule.service", () => {
       updateTask(t2.id, { enabled: false });
       const executor = vi.fn().mockResolvedValue(undefined);
       startAllTasks(executor);
-      vi.advanceTimersByTime(30 * 60 * 1000);
+      await vi.advanceTimersByTimeAsync(30 * 60 * 1000 + 1000);
       expect(executor).toHaveBeenCalledTimes(1);
       stopTask(t1.id);
     });

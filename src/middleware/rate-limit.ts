@@ -11,8 +11,20 @@ interface RateLimitRule {
   created_at: string;
 }
 
-const rateLimitStore = new Map<string, { count: number; resetAt: number }>();
 let dbRules: RateLimitRule[] = [];
+
+let _getCount: any = null;
+let _upsertCount: any = null;
+let _deleteExpired: any = null;
+
+function getStatements() {
+  if (!_getCount) {
+    _getCount = db.prepare("SELECT count, reset_at FROM rate_limit_counts WHERE key = ?");
+    _upsertCount = db.prepare("INSERT OR REPLACE INTO rate_limit_counts (key, count, reset_at) VALUES (?, ?, ?)");
+    _deleteExpired = db.prepare("DELETE FROM rate_limit_counts WHERE reset_at <= ?");
+  }
+  return { getCount: _getCount, upsertCount: _upsertCount, deleteExpired: _deleteExpired };
+}
 
 export function loadRateLimits() {
   try {
@@ -36,10 +48,10 @@ function matchRoute(url: string, method: string): RateLimitRule | undefined {
 }
 
 const cleanup = setInterval(() => {
-  const now = Date.now();
-  for (const [key, entry] of rateLimitStore) {
-    if (entry.resetAt <= now) rateLimitStore.delete(key);
-  }
+  try {
+    const { deleteExpired } = getStatements();
+    deleteExpired.run(Date.now());
+  } catch {}
 }, 60_000);
 
 if (cleanup.unref) cleanup.unref();
@@ -52,15 +64,16 @@ export function rateLimit(maxRequests: number, windowMs: number) {
 
     const key = `${request.ip}-${request.url}-${request.method}`;
     const now = Date.now();
-    const entry = rateLimitStore.get(key);
+    const { getCount, upsertCount } = getStatements();
+    const row = getCount.get(key) as { count: number; reset_at: number } | undefined;
 
-    if (entry && entry.resetAt > now) {
-      if (entry.count >= limit) {
+    if (row && row.reset_at > now) {
+      if (row.count >= limit) {
         return reply.status(429).send({ error: "Too many requests" });
       }
-      entry.count++;
+      upsertCount.run(key, row.count + 1, row.reset_at);
     } else {
-      rateLimitStore.set(key, { count: 1, resetAt: now + window });
+      upsertCount.run(key, 1, now + window);
     }
   };
 }
