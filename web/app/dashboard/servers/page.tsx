@@ -111,7 +111,7 @@ export default function ServersPage() {
             onChange={(e) => setSearch(e.target.value)}
             className="max-w-sm"
           />
-          <div className="flex gap-1">
+          <div className="flex flex-wrap gap-1">
             {STATUS_OPTIONS.map((opt) => (
               <Button
                 key={opt.value}
@@ -175,9 +175,12 @@ export default function ServersPage() {
             <Card key={server.id} className="relative overflow-hidden">
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between">
-                  <div>
-                    <CardTitle className="text-lg">{server.name}</CardTitle>
-                    <p className="text-sm text-muted-foreground">{server.software} {server.mc_version}</p>
+                  <div className="flex items-center gap-2">
+                    {server.icon && <span className="text-2xl">{server.icon}</span>}
+                    <div>
+                      <CardTitle className="text-lg">{server.name}</CardTitle>
+                      <p className="text-sm text-muted-foreground">{server.software} {server.mc_version}</p>
+                    </div>
                   </div>
                   <span className={`rounded-full px-2 py-1 text-xs font-medium ${
                     server.status === "running"
@@ -198,6 +201,9 @@ export default function ServersPage() {
                 </div>
               </CardHeader>
               <CardContent>
+                {server.description && (
+                  <p className="mb-2 text-sm text-muted-foreground line-clamp-2">{server.description}</p>
+                )}
                 <div className="mb-4 space-y-1 text-sm text-muted-foreground">
                   <p>Port: {server.port}</p>
                   <p>RAM: {server.ram_mb} MB</p>

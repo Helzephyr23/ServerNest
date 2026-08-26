@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatBytes, formatDate } from "@/lib/utils";
 import { useToast } from "@/components/toast";
@@ -30,6 +31,15 @@ const STATUS_BADGE: Record<string, string> = {
   failed: "bg-red-500/10 text-red-500",
 };
 
+const CRON_PRESETS = [
+  { label: "Every 6 hours", value: "0 */6 * * *" },
+  { label: "Every 12 hours", value: "0 */12 * * *" },
+  { label: "Daily at midnight", value: "0 0 * * *" },
+  { label: "Daily at 3 AM", value: "0 3 * * *" },
+  { label: "Weekly (Sunday)", value: "0 0 * * 0" },
+  { label: "Every 3 days", value: "0 0 */3 * *" },
+];
+
 export default function BackupsPage() {
   const { success, error: toastError } = useToast();
   const { confirm: showConfirm } = useConfirm();
@@ -41,6 +51,13 @@ export default function BackupsPage() {
   const [downloading, setDownloading] = useState<number | null>(null);
   const { server } = useServer();
 
+  const [schedules, setSchedules] = useState<any[]>([]);
+  const [loadingSchedules, setLoadingSchedules] = useState(true);
+  const [showScheduleForm, setShowScheduleForm] = useState(false);
+  const [scheduleName, setScheduleName] = useState("Auto Backup");
+  const [scheduleCron, setScheduleCron] = useState("0 3 * * *");
+  const [creatingSchedule, setCreatingSchedule] = useState(false);
+
   const fetchBackups = () => {
     api.get(`/api/servers/${id}/backups`)
       .then(({ backups: b }) => setBackups(Array.isArray(b) ? b : []))
@@ -48,7 +65,17 @@ export default function BackupsPage() {
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { fetchBackups(); }, [id]);
+  const fetchSchedules = () => {
+    api.get(`/api/servers/${id}/tasks`)
+      .then(({ tasks }) => {
+        const backupTasks = Array.isArray(tasks) ? tasks.filter((t: any) => t.type === "backup") : [];
+        setSchedules(backupTasks);
+      })
+      .catch(() => setSchedules([]))
+      .finally(() => setLoadingSchedules(false));
+  };
+
+  useEffect(() => { fetchBackups(); fetchSchedules(); }, [id]);
   useEffect(() => { if (server?.status) fetchBackups(); }, [server?.status]);
 
   const handleCreate = async () => {
@@ -105,8 +132,59 @@ export default function BackupsPage() {
     }
   };
 
+  const handleCreateSchedule = async () => {
+    if (!scheduleCron.trim() || !scheduleName.trim()) return;
+    setCreatingSchedule(true);
+    try {
+      await api.post(`/api/servers/${id}/tasks`, {
+        name: scheduleName.trim(),
+        type: "backup",
+        schedule: scheduleCron.trim(),
+      });
+      success("Schedule created", `Backup will run: ${scheduleCron}`);
+      setShowScheduleForm(false);
+      setScheduleName("Auto Backup");
+      setScheduleCron("0 3 * * *");
+      fetchSchedules();
+    } catch (err: any) {
+      toastError("Failed to create schedule", err.message);
+    } finally {
+      setCreatingSchedule(false);
+    }
+  };
+
+  const handleToggleSchedule = async (taskId: number, enabled: boolean) => {
+    try {
+      await api.put(`/api/tasks/${taskId}`, { enabled });
+      success(enabled ? "Schedule enabled" : "Schedule disabled");
+      fetchSchedules();
+    } catch (err: any) {
+      toastError("Failed to update schedule", err.message);
+    }
+  };
+
+  const handleRunSchedule = async (taskId: number) => {
+    try {
+      await api.post(`/api/tasks/${taskId}/run`);
+      success("Backup started manually");
+      setTimeout(fetchBackups, 2000);
+    } catch (err: any) {
+      toastError("Failed to run backup", err.message);
+    }
+  };
+
+  const handleDeleteSchedule = async (taskId: number) => {
+    if (!(await showConfirm({ title: "Delete Schedule", message: "Remove this scheduled backup?" }))) return;
+    try {
+      await api.delete(`/api/tasks/${taskId}`);
+      fetchSchedules();
+    } catch (err: any) {
+      toastError("Failed to delete schedule", err.message);
+    }
+  };
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold">Backups</h2>
         <Button onClick={handleCreate} disabled={creating || server?.status !== "running"}>
@@ -119,6 +197,107 @@ export default function BackupsPage() {
           Server must be running to create backups
         </div>
       )}
+
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base">Scheduled Backups</CardTitle>
+            <Button variant="outline" size="sm" onClick={() => setShowScheduleForm(!showScheduleForm)}>
+              {showScheduleForm ? "Cancel" : "+ Add Schedule"}
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {showScheduleForm && (
+            <div className="mb-4 space-y-3 rounded-md border p-4">
+              <Input
+                value={scheduleName}
+                onChange={(e) => setScheduleName(e.target.value)}
+                placeholder="Schedule name"
+              />
+              <Input
+                value={scheduleCron}
+                onChange={(e) => setScheduleCron(e.target.value)}
+                placeholder="Cron expression (e.g. 0 3 * * *)"
+              />
+              <div className="flex flex-wrap gap-1">
+                {CRON_PRESETS.map((preset) => (
+                  <button
+                    key={preset.value}
+                    type="button"
+                    onClick={() => setScheduleCron(preset.value)}
+                    className={`rounded-full border px-2 py-0.5 text-xs transition-colors ${
+                      scheduleCron === preset.value
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "hover:bg-secondary"
+                    }`}
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Current: <code className="rounded bg-muted px-1">{scheduleCron}</code>
+              </p>
+              <Button size="sm" onClick={handleCreateSchedule} disabled={creatingSchedule || !scheduleCron.trim()}>
+                {creatingSchedule ? "Creating..." : "Create Schedule"}
+              </Button>
+            </div>
+          )}
+
+          {loadingSchedules ? (
+            <div className="space-y-2">
+              <Skeleton className="h-10 w-full" />
+            </div>
+          ) : schedules.length === 0 ? (
+            <p className="py-4 text-center text-sm text-muted-foreground">
+              No scheduled backups. Click &quot;Add Schedule&quot; to set up automatic backups.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {schedules.map((schedule) => (
+                <div key={schedule.id} className="flex items-center justify-between rounded-md border p-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium">{schedule.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      <code className="rounded bg-muted px-1">{schedule.schedule}</code>
+                    </p>
+                    {schedule.last_run && (
+                      <p className="text-xs text-muted-foreground">Last run: {formatDate(schedule.last_run)}</p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0 ml-3">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleRunSchedule(schedule.id)}
+                      disabled={!schedule.enabled}
+                      title="Run now"
+                    >
+                      Run
+                    </Button>
+                    <Button
+                      variant={schedule.enabled ? "outline" : "ghost"}
+                      size="sm"
+                      onClick={() => handleToggleSchedule(schedule.id, !schedule.enabled)}
+                    >
+                      {schedule.enabled ? "Enabled" : "Disabled"}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDeleteSchedule(schedule.id)}
+                      className="text-destructive hover:text-destructive"
+                    >
+                      Delete
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {loading ? (
         <div className="space-y-2">

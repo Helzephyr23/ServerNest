@@ -42,6 +42,8 @@ export function migrate() {
     CREATE TABLE IF NOT EXISTS servers (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
+      description TEXT DEFAULT NULL,
+      icon TEXT DEFAULT NULL,
       node_id INTEGER NOT NULL DEFAULT 1,
       port INTEGER UNIQUE NOT NULL,
       status TEXT NOT NULL DEFAULT 'stopped',
@@ -134,6 +136,12 @@ export function migrate() {
   if (!serverColumns.some((c) => c.name === "eula_accepted")) {
     db.exec("ALTER TABLE servers ADD COLUMN eula_accepted INTEGER NOT NULL DEFAULT 0");
     db.exec("ALTER TABLE servers ADD COLUMN eula_accepted_at TEXT");
+  }
+  if (!serverColumns.some((c) => c.name === "description")) {
+    db.exec("ALTER TABLE servers ADD COLUMN description TEXT DEFAULT NULL");
+  }
+  if (!serverColumns.some((c) => c.name === "icon")) {
+    db.exec("ALTER TABLE servers ADD COLUMN icon TEXT DEFAULT NULL");
   }
 
   const nodeColumns = db.prepare("PRAGMA table_info(nodes)").all() as { name: string }[];
@@ -230,6 +238,18 @@ export function migrate() {
       last_used   TEXT NOT NULL DEFAULT (datetime('now')),
       expired     INTEGER NOT NULL DEFAULT 0,
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS audit_log (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id     INTEGER,
+      username    TEXT,
+      action      TEXT NOT NULL,
+      target_type TEXT,
+      target_id   INTEGER,
+      details     TEXT,
+      ip          TEXT,
+      created_at  TEXT NOT NULL DEFAULT (datetime('now'))
     );
   `);
 

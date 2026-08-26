@@ -19,6 +19,7 @@ const navItems = [
   { href: "/dashboard/rate-limits", label: "Rate Limits", icon: "🚦" },
   { href: "/dashboard/users", label: "Users", icon: "👤" },
   { href: "/dashboard/sessions", label: "Sessions", icon: "🔐" },
+  { href: "/dashboard/audit", label: "Audit Log", icon: "📝" },
 ];
 
 export default function Sidebar() {
@@ -46,7 +47,7 @@ export default function Sidebar() {
             href={item.href}
             onClick={() => setMobileOpen(false)}
             className={cn(
-              "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
+              "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors",
               isActive(item.href)
                 ? "bg-primary/10 text-primary"
                 : "text-muted-foreground hover:bg-accent hover:text-foreground"
@@ -79,7 +80,7 @@ export default function Sidebar() {
   return (
     <>
       <button
-        className="fixed left-4 top-4 z-50 rounded-lg bg-card p-2 shadow-md md:hidden"
+        className="fixed left-4 top-4 z-50 rounded-lg bg-card p-3 shadow-md md:hidden"
         onClick={() => setMobileOpen(!mobileOpen)}
       >
         <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

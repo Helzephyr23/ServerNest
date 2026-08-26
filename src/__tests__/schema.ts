@@ -25,23 +25,25 @@ export const TEST_SCHEMA_SQL = `
       disk_percent REAL DEFAULT 0,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
-    CREATE TABLE IF NOT EXISTS servers (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL,
-      node_id INTEGER NOT NULL DEFAULT 1,
-      port INTEGER UNIQUE NOT NULL,
-      status TEXT NOT NULL DEFAULT 'stopped',
-      mc_version TEXT NOT NULL DEFAULT '1.21.4',
-      software TEXT NOT NULL DEFAULT 'vanilla',
-      image TEXT NOT NULL DEFAULT 'itzg/minecraft-server',
-      ram_mb INTEGER NOT NULL DEFAULT 2048,
-      cpu_percent REAL DEFAULT NULL,
-      container_id TEXT,
-      eula_accepted INTEGER NOT NULL DEFAULT 0,
-      eula_accepted_at TEXT,
-      created_at TEXT NOT NULL DEFAULT (datetime('now')),
-      FOREIGN KEY (node_id) REFERENCES nodes(id)
-    );
+CREATE TABLE IF NOT EXISTS servers (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  description TEXT DEFAULT NULL,
+  icon TEXT DEFAULT NULL,
+  node_id INTEGER NOT NULL DEFAULT 1,
+  port INTEGER UNIQUE NOT NULL,
+  status TEXT NOT NULL DEFAULT 'stopped',
+  mc_version TEXT NOT NULL DEFAULT '1.21.4',
+  software TEXT NOT NULL DEFAULT 'vanilla',
+  image TEXT NOT NULL DEFAULT 'itzg/minecraft-server',
+  ram_mb INTEGER NOT NULL DEFAULT 2048,
+  cpu_percent REAL DEFAULT NULL,
+  container_id TEXT,
+  eula_accepted INTEGER NOT NULL DEFAULT 0,
+  eula_accepted_at TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (node_id) REFERENCES nodes(id)
+);
     CREATE TABLE IF NOT EXISTS server_config (
       server_id INTEGER NOT NULL,
       key TEXT NOT NULL,
@@ -127,6 +129,17 @@ export const TEST_SCHEMA_SQL = `
       last_used   TEXT NOT NULL DEFAULT (datetime('now')),
       expired     INTEGER NOT NULL DEFAULT 0,
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+    CREATE TABLE IF NOT EXISTS audit_log (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id     INTEGER,
+      username    TEXT,
+      action      TEXT NOT NULL,
+      target_type TEXT,
+      target_id   INTEGER,
+      details     TEXT,
+      ip          TEXT,
+      created_at  TEXT NOT NULL DEFAULT (datetime('now'))
     );
     CREATE TABLE IF NOT EXISTS cloud_storage_configs (
       id          INTEGER PRIMARY KEY AUTOINCREMENT,

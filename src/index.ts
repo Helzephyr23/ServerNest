@@ -25,6 +25,7 @@ import overviewRoutes from "./routes/overview.js";
 import cloudStorageRoutes from "./routes/cloud-storage.js";
 import rateLimitRoutes from "./routes/rate-limits.js";
 import sessionRoutes from "./routes/sessions.js";
+import auditRoutes from "./routes/audit.js";
 import { loadRateLimits } from "./middleware/rate-limit.js";
 import { setSocketIO } from "./routes/servers.js";
 import { startAllTasks } from "./services/schedule.service.js";
@@ -82,7 +83,8 @@ await app.register(userRoutes);
 await app.register(overviewRoutes);
 await app.register(cloudStorageRoutes);
 await app.register(rateLimitRoutes);
-await app.register(sessionRoutes);
+  await app.register(sessionRoutes);
+  await app.register(auditRoutes);
 
 app.get("/api/health", async () => {
   let dockerOk = false;

@@ -75,9 +75,22 @@ export default function TemplatesPage() {
               </div>
             </CardHeader>
             <CardContent>
-              <p className="mb-4 text-sm text-muted-foreground">{template.description}</p>
-              <div className="mb-4 text-xs text-muted-foreground">
-                <p>Default RAM: {template.default_ram_mb >= 1024 ? `${template.default_ram_mb / 1024} GB` : `${template.default_ram_mb} MB`}</p>
+              <p className="mb-3 text-sm text-muted-foreground">{template.description}</p>
+              <div className="mb-4 space-y-1 text-xs text-muted-foreground">
+                <div className="flex justify-between">
+                  <span>RAM:</span>
+                  <span className="font-medium">{template.default_ram_mb >= 1024 ? `${template.default_ram_mb / 1024} GB` : `${template.default_ram_mb} MB`}</span>
+                </div>
+                {template.recommended_version && (
+                  <div className="flex justify-between">
+                    <span>Version:</span>
+                    <span className="font-medium">{template.recommended_version}</span>
+                  </div>
+                )}
+                <div className="flex justify-between">
+                  <span>Image:</span>
+                  <span className="font-medium truncate ml-2">{template.image}</span>
+                </div>
               </div>
               <Button variant="outline" size="sm" className="w-full" onClick={() => handleSelect(template)}>
                 Use Template

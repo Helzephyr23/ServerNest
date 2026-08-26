@@ -1,15 +1,19 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { SOFTWARE_OPTIONS, RAM_OPTIONS, FALLBACK_VERSIONS } from "@/lib/constants";
+import { useToast } from "@/components/toast";
 
 export default function NewServerPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const templateId = searchParams.get("template");
+  const { success: toastSuccess, error: toastError } = useToast();
   const [name, setName] = useState("");
   const [software, setSoftware] = useState("vanilla");
   const [version, setVersion] = useState("1.21.4");
@@ -18,6 +22,7 @@ export default function NewServerPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [versions, setVersions] = useState(FALLBACK_VERSIONS);
+  const [templateLoaded, setTemplateLoaded] = useState(false);
 
   useEffect(() => {
     api.get("/api/mc-versions")
@@ -31,6 +36,21 @@ export default function NewServerPage() {
       })
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (!templateId || templateLoaded) return;
+    api.get(`/api/templates/${templateId}`)
+      .then(({ template }) => {
+        if (template) {
+          setSoftware(template.software);
+          setRam(template.default_ram_mb);
+          if (template.recommended_version) setVersion(template.recommended_version);
+          toastSuccess("Template loaded", `Using ${template.name} preset`);
+        }
+        setTemplateLoaded(true);
+      })
+      .catch(() => setTemplateLoaded(true));
+  }, [templateId, templateLoaded, toastSuccess]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,7 +78,14 @@ export default function NewServerPage() {
     <div className="mx-auto max-w-2xl space-y-6">
       <div>
         <h1 className="text-3xl font-bold">Create Server</h1>
-        <p className="text-muted-foreground">Set up a new Minecraft server</p>
+        <p className="text-muted-foreground">
+          Set up a new Minecraft server
+          {templateLoaded && templateId && (
+            <span className="ml-2 rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">
+              Template: {templateId}
+            </span>
+          )}
+        </p>
       </div>
 
       <Card>
