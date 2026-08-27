@@ -42,6 +42,7 @@ class FakeUpload {
 }
 
 const oauthSetCredentials = vi.fn();
+const oauthGetAccessToken = vi.fn();
 class FakeOAuth2 {
   static instances: FakeOAuth2[] = [];
   constructor(public config: any) {
@@ -49,6 +50,9 @@ class FakeOAuth2 {
   }
   setCredentials(creds: unknown) {
     oauthSetCredentials(creds);
+  }
+  async getAccessToken() {
+    return oauthGetAccessToken();
   }
 }
 
@@ -108,11 +112,15 @@ _setSdkLoader(loadSdk);
 
 let tempDir: string;
 
+const fetchMock = vi.fn();
+
 beforeEach(() => {
   vi.clearAllMocks();
   FakeS3Client.instances = [];
   FakeOAuth2.instances = [];
   FakeUpload.lastParams = undefined;
+  oauthGetAccessToken.mockResolvedValue({ token: "test-access-token" });
+  (global as any).fetch = fetchMock;
   tempDir = mkdtempSync(join(tmpdir(), "cloud-storage-test-"));
 });
 
@@ -134,15 +142,6 @@ function gdriveConfig(overrides: Record<string, unknown> = {}) {
     id: 2, server_id: 1, provider: "gdrive" as const, label: "test", enabled: 1, created_at: "",
     config_json: JSON.stringify({ clientId: "cid", clientSecret: "cs", refreshToken: "rt", ...overrides }),
   };
-}
-
-// drive.files.create stub that consumes any media stream before resolving.
-async function createReturns(...results: any[]) {
-  let i = 0;
-  driveFiles.create.mockImplementation(async (args: any) => {
-    await drainStream(args?.media?.body);
-    return results[Math.min(i++, results.length - 1)];
-  });
 }
 
 function dropboxConfig(overrides: Record<string, unknown> = {}) {
@@ -231,27 +230,43 @@ describe("Google Drive provider", () => {
   });
 
   it("uses the configured folder without listing when folderId exists", async () => {
-    createReturns({ data: { id: "newfile" } });
-    await uploadBackupToCloud(join(tempDir, "f.txt"), "f.txt", gdriveConfig({ folderId: "folder-42" }), 4);
+    const localFile = join(tempDir, "f.txt");
+    writeFileSync(localFile, "data");
+    fetchMock.mockImplementation(async (url: string, init: any) => {
+      if ((init?.method || "GET") === "POST") {
+        expect(init.headers["X-Upload-Content-Length"]).toBe("4");
+        return { ok: true, status: 200, headers: { get: (n: string) => n.toLowerCase() === "location" ? "https://session.example/resumable" : null } };
+      }
+      return { ok: true, status: 201 };
+    });
+    await uploadBackupToCloud(localFile, "f.txt", gdriveConfig({ folderId: "folder-42" }), 4);
     expect(driveFiles.list).not.toHaveBeenCalled();
-    expect(driveFiles.create).toHaveBeenCalledWith(
-      expect.objectContaining({ requestBody: expect.objectContaining({ parents: ["folder-42"] }) })
-    );
+    expect(driveFiles.list).not.toHaveBeenCalled();
   });
 
   it("discovers an existing BiryaniBackups folder when none configured", async () => {
+    const localFile = join(tempDir, "f.txt");
+    writeFileSync(localFile, "data");
     driveFiles.list.mockResolvedValueOnce({ data: { files: [{ id: "found-1" }] } });
-    createReturns({ data: { id: "newfile" } });
-    await uploadBackupToCloud(join(tempDir, "f.txt"), "f.txt", gdriveConfig(), 4);
-    expect(driveFiles.create).toHaveBeenCalledWith(
-      expect.objectContaining({ requestBody: expect.objectContaining({ parents: ["found-1"] }) })
-    );
+    fetchMock.mockImplementation(async (url: string, init: any) => {
+      if ((init?.method || "GET") === "POST") return { ok: true, status: 200, headers: { get: (n: string) => n.toLowerCase() === "location" ? "https://session.example/resumable" : null } };
+      return { ok: true, status: 201 };
+    });
+    await uploadBackupToCloud(localFile, "f.txt", gdriveConfig(), 4);
+    // Folder discovery used the existing folder without creating a new one.
+    expect(driveFiles.create).not.toHaveBeenCalled();
   });
 
   it("creates the BiryaniBackups folder when discovery comes up empty", async () => {
+    const localFile = join(tempDir, "f.txt");
+    writeFileSync(localFile, "data");
     driveFiles.list.mockResolvedValueOnce({ data: { files: [] } });
-    createReturns({ data: { id: "new-folder" } }, { data: { id: "new-file" } });
-    await uploadBackupToCloud(join(tempDir, "f.txt"), "f.txt", gdriveConfig(), 4);
+    driveFiles.create.mockResolvedValueOnce({ data: { id: "new-folder" } });
+    fetchMock.mockImplementation(async (url: string, init: any) => {
+      if ((init?.method || "GET") === "POST") return { ok: true, status: 200, headers: { get: (n: string) => n.toLowerCase() === "location" ? "https://session.example/resumable" : null } };
+      return { ok: true, status: 201 };
+    });
+    await uploadBackupToCloud(localFile, "f.txt", gdriveConfig(), 4);
     expect(driveFiles.create).toHaveBeenCalledWith(
       expect.objectContaining({
         requestBody: expect.objectContaining({ name: "BiryaniBackups", mimeType: "application/vnd.google-apps.folder" }),

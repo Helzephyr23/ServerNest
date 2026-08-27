@@ -1,44 +1,8 @@
 import fs from "fs";
 import { createReadStream, createWriteStream } from "fs";
 import { createRequire } from "module";
-import { Readable } from "stream";
 
 const nodeRequire = createRequire(import.meta.url);
-
-// Counts bytes as they pass through, opening the source file lazily only
-// when a consumer starts reading (so an upload that never reads leaves the
-// file untouched — also keeps tests that don't consume the body fast).
-class CountingUploadStream extends Readable {
-  private sourcePath: string;
-  private onProgress: OnProgress | undefined;
-  private source: NodeJS.ReadableStream | null = null;
-  private started = false;
-  private uploaded = 0;
-
-  constructor(sourcePath: string, onProgress?: OnProgress) {
-    super();
-    this.sourcePath = sourcePath;
-    this.onProgress = onProgress;
-  }
-
-  _read() {
-    if (this.started) return;
-    this.started = true;
-    this.source = createReadStream(this.sourcePath);
-    this.source.on("data", (chunk: Buffer) => {
-      this.uploaded += chunk.length;
-      if (this.onProgress) this.onProgress(this.uploaded);
-      if (!this.push(chunk)) this.source!.pause();
-    });
-    this.source.on("end", () => this.push(null));
-    this.source.on("error", (err) => this.destroy(err));
-  }
-
-  _destroy(err: Error | null, callback: (err?: Error | null) => void): void {
-    if (this.source && (this.source as any).destroy) (this.source as any).destroy();
-    callback(err);
-  }
-}
 
 // Resolves CommonJS-only SDK packages from this ESM module.
 // Overridable so tests can substitute lightweight fakes.
@@ -139,6 +103,7 @@ class S3StorageProvider implements CloudStorageProvider {
 
 class GoogleDriveStorageProvider implements CloudStorageProvider {
   private drive: any;
+  private auth: any;
   private folderId: string | undefined;
 
   constructor(config: any) {
@@ -148,6 +113,7 @@ class GoogleDriveStorageProvider implements CloudStorageProvider {
       clientSecret: config.clientSecret,
     });
     auth.setCredentials({ refresh_token: config.refreshToken });
+    this.auth = auth;
     this.drive = google.drive({ version: "v3", auth });
     this.folderId = config.folderId;
   }
@@ -175,20 +141,120 @@ class GoogleDriveStorageProvider implements CloudStorageProvider {
     return this.folderId!;
   }
 
-  async upload(localPath: string, remotePath: string, _totalBytes: number, onProgress?: OnProgress): Promise<void> {
+  private static async getAccessToken(auth: any): Promise<string> {
+    if (auth.getAccessToken && typeof auth.getAccessToken === "function") {
+      const token = await auth.getAccessToken();
+      if (token?.token) return token.token;
+    }
+    throw new Error("Unable to obtain a Google access token");
+  }
+
+  async upload(localPath: string, remotePath: string, totalBytes: number, onProgress?: OnProgress): Promise<void> {
     const folderId = await this.ensureFolder("BiryaniBackups");
-    const countingStream = new CountingUploadStream(localPath, onProgress);
-    await this.drive.files.create({
-      requestBody: {
-        name: remotePath,
-        parents: [folderId],
+    const accessToken = await GoogleDriveStorageProvider.getAccessToken(this.auth);
+
+    // 1. Initiate a resumable upload session. This returns a Location header
+    //    pointing to the resumable session URI. Google's resumable protocol is
+    //    designed for large files and has no single-request timeout.
+    const sessionUrl = await this.initiateResumableSession(
+      accessToken,
+      remotePath,
+      folderId,
+      totalBytes,
+    );
+
+    // 2. Stream the file bytes to the session URI.
+    await this.streamToResumableSession(
+      accessToken,
+      sessionUrl,
+      localPath,
+      totalBytes,
+      onProgress,
+    );
+  }
+
+  private async initiateResumableSession(
+    accessToken: string,
+    remotePath: string,
+    folderId: string,
+    totalBytes: number,
+  ): Promise<string> {
+    const metadata = {
+      name: remotePath,
+      parents: [folderId],
+      mimeType: "application/gzip",
+    };
+    const res = await fetch(
+      "https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json; charset=UTF-8",
+          "X-Upload-Content-Type": "application/gzip",
+          "X-Upload-Content-Length": String(totalBytes),
+        },
+        body: JSON.stringify(metadata),
       },
-      media: {
-        mimeType: "application/gzip",
-        body: countingStream,
-      },
-      fields: "id",
-    });
+    );
+    if (!res.ok) {
+      throw new Error(`Failed to start Google Drive resumable upload (${res.status})`);
+    }
+    const location = res.headers.get("location");
+    if (!location) {
+      throw new Error("Google Drive did not return a resumable upload session");
+    }
+    return location;
+  }
+
+  private async streamToResumableSession(
+    accessToken: string,
+    sessionUrl: string,
+    localPath: string,
+    totalBytes: number,
+    onProgress?: OnProgress,
+  ): Promise<void> {
+    const fd = await import("fs").then((m) => m.promises.open(localPath, "r"));
+    try {
+      let offset = 0;
+      const CHUNK = 5 * 1024 * 1024; // 5 MB resumable chunks
+      while (offset < totalBytes) {
+        const bytesRead = Math.min(CHUNK, totalBytes - offset);
+        const buffer = Buffer.alloc(bytesRead);
+        await fd.read(buffer, 0, bytesRead, offset);
+
+        const isFinal = offset + bytesRead >= totalBytes;
+        const contentRange = isFinal
+          ? `bytes ${offset}-${offset + bytesRead - 1}/${totalBytes}`
+          : `bytes ${offset}-${offset + bytesRead - 1}/*`;
+
+        const res = await fetch(sessionUrl, {
+          method: "PUT",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/gzip",
+            "Content-Length": String(bytesRead),
+            "Content-Range": contentRange,
+          },
+          body: buffer,
+        });
+
+        offset += bytesRead;
+        if (onProgress) onProgress(offset);
+
+        if (res.status === 308) {
+          // Continue sending the next chunk.
+          continue;
+        }
+        if (res.status === 200 || res.status === 201) {
+          // Upload complete.
+          return;
+        }
+        throw new Error(`Google Drive upload failed with status ${res.status}`);
+      }
+    } finally {
+      await fd.close();
+    }
   }
 
   private static escapeGdriveQuery(value: string): string {
