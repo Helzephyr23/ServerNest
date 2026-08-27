@@ -73,7 +73,11 @@ export default function BackupsPage() {
   const [creatingSchedule, setCreatingSchedule] = useState(false);
 
   const [uploadProgress, setUploadProgress] = useState<Record<number, Record<string, { bytesUploaded: number; totalBytes: number; percentage: number; status: string }>>>({});
+  const [preparing, setPreparing] = useState(false);
+  const preparingRef = useRef(false);
+  const preparingStartedAtRef = useRef<number | null>(null);
   const progressTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const backupsRef = useRef<any[]>([]);
 
   const fetchProgress = useCallback(async () => {
     try {
@@ -91,8 +95,12 @@ export default function BackupsPage() {
 
   const fetchBackups = () => {
     api.get(`/api/servers/${id}/backups`)
-      .then(({ backups: b }) => setBackups(Array.isArray(b) ? b : []))
-      .catch(() => setBackups([]))
+      .then(({ backups: b }) => {
+        const list = Array.isArray(b) ? b : [];
+        setBackups(list);
+        backupsRef.current = list;
+      })
+      .catch(() => { setBackups([]); backupsRef.current = []; })
       .finally(() => setLoading(false));
   };
 
@@ -147,9 +155,29 @@ export default function BackupsPage() {
     if (progressTimerRef.current) clearInterval(progressTimerRef.current);
     fetchBackups();
     progressTimerRef.current = setInterval(async () => {
-      const hasActive = await fetchProgress();
+      // 1) In-memory live upload progress (only populated once an upload starts)
+      const hasLiveUpload = await fetchProgress();
+      // 2) DB-backed upload status across the latest backup list (covers the
+      //    long tar/checksum window and the period while uploads are still
+      //    recorded as 'uploading'/'pending' in the database)
+      const hasDbUpload = backupsRef.current.some((b) =>
+        Array.isArray(b.uploads) && b.uploads.some((u: any) => u.status === "uploading" || u.status === "pending"),
+      );
+      if (hasLiveUpload || hasDbUpload) {
+        setPreparing(false);
+        preparingRef.current = false;
+        preparingStartedAtRef.current = null;
+      } else if (preparingRef.current && preparingStartedAtRef.current &&
+                 Date.now() - preparingStartedAtRef.current > 5 * 60 * 1000) {
+        // Safety: if no upload ever materializes (background backup failed),
+        // clear the preparing indicator so the UI isn't stuck forever.
+        setPreparing(false);
+        preparingRef.current = false;
+        preparingStartedAtRef.current = null;
+      }
       fetchBackups();
-      if (!hasActive && progressTimerRef.current) {
+      const stillActive = hasLiveUpload || hasDbUpload || preparingRef.current;
+      if (!stillActive && progressTimerRef.current) {
         clearInterval(progressTimerRef.current);
         progressTimerRef.current = null;
         fetchBackups();
@@ -162,6 +190,9 @@ export default function BackupsPage() {
     try {
       await api.post(`/api/servers/${id}/backups`);
       success("Backup started");
+      setPreparing(true);
+      preparingRef.current = true;
+      preparingStartedAtRef.current = Date.now();
       startProgressPolling();
     } catch (err: any) {
       toastError("Failed to create backup", err.message);
@@ -274,6 +305,13 @@ export default function BackupsPage() {
       {ctxServer?.status !== "running" && (
         <div className="rounded-lg bg-yellow-500/10 px-4 py-3 text-sm text-yellow-500">
           Server must be running to create backups
+        </div>
+      )}
+
+      {preparing && (
+        <div className="flex items-center gap-2 rounded-lg bg-blue-500/10 px-4 py-3 text-sm text-blue-500">
+          <span className="h-3 w-3 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
+          Preparing backup… (compressing &amp; checksumming, upload starts shortly)
         </div>
       )}
 
