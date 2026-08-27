@@ -189,12 +189,22 @@ export function migrate() {
       status      TEXT NOT NULL DEFAULT 'pending',
       checksum    TEXT,
       error       TEXT,
+      bytes_uploaded INTEGER NOT NULL DEFAULT 0,
+      total_bytes   INTEGER NOT NULL DEFAULT 0,
       created_at  TEXT NOT NULL DEFAULT (datetime('now')),
       completed_at TEXT,
       FOREIGN KEY (backup_id) REFERENCES backups(id) ON DELETE CASCADE,
       FOREIGN KEY (storage_id) REFERENCES cloud_storage_configs(id) ON DELETE CASCADE
     );
   `);
+
+  const uploadColumns = db.prepare("PRAGMA table_info(backup_uploads)").all() as { name: string }[];
+  if (!uploadColumns.some((c) => c.name === "bytes_uploaded")) {
+    db.exec("ALTER TABLE backup_uploads ADD COLUMN bytes_uploaded INTEGER NOT NULL DEFAULT 0");
+  }
+  if (!uploadColumns.some((c) => c.name === "total_bytes")) {
+    db.exec("ALTER TABLE backup_uploads ADD COLUMN total_bytes INTEGER NOT NULL DEFAULT 0");
+  }
 
   const modColumns = db.prepare("PRAGMA table_info(installed_mods)").all() as { name: string }[];
   if (!modColumns.some((c) => c.name === "slug")) {

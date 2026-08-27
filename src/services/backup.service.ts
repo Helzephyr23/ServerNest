@@ -128,10 +128,12 @@ export async function createBackup(serverId: number): Promise<Backup> {
   // Async upload to all enabled cloud providers
   const cloudConfigs = db.prepare("SELECT * FROM cloud_storage_configs WHERE server_id = ? AND enabled = 1").all(serverId) as CloudStorageConfig[];
   for (const cfg of cloudConfigs) {
-    const uploadId = db.prepare("INSERT INTO backup_uploads (backup_id, storage_id, status) VALUES (?, ?, 'uploading')").run(backupId, cfg.id).lastInsertRowid;
+    const uploadId = db.prepare("INSERT INTO backup_uploads (backup_id, storage_id, status, total_bytes) VALUES (?, ?, 'uploading', ?)").run(backupId, cfg.id, stats.size).lastInsertRowid;
     setUploadProgress(backupId, cfg.provider, serverId, 0, stats.size);
     uploadBackupToCloud(backupPath, filename, cfg, stats.size, (bytesUploaded) => {
       setUploadProgress(backupId, cfg.provider, serverId, bytesUploaded, stats.size);
+      // Persist byte progress so it survives a page refresh.
+      db.prepare("UPDATE backup_uploads SET bytes_uploaded = ?, status = 'uploading' WHERE id = ?").run(bytesUploaded, uploadId);
     })
       .then(() => {
         completeUpload(backupId, cfg.provider, "uploaded");

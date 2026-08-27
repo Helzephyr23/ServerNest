@@ -128,6 +128,13 @@ export default function BackupsPage() {
   useEffect(() => { fetchBackups(); fetchSchedules(); fetchBackupSettings(); }, [id]);
   useEffect(() => { if (ctxServer?.status) fetchBackups(); }, [ctxServer?.status]);
 
+  // On mount/refresh, resume progress polling if any loaded backup still has
+  // an in-flight upload. Progress is persisted in the DB, so a page refresh
+  // no longer loses live upload progress. Polling self-stops once idle.
+  useEffect(() => {
+    startProgressPolling();
+  }, [id]);
+
   useEffect(() => {
     return () => {
       if (progressTimerRef.current) clearInterval(progressTimerRef.current);
