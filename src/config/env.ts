@@ -1,8 +1,10 @@
 import { config } from "dotenv";
 import path from "path";
 import crypto from "crypto";
+import { fileURLToPath } from "url";
 
-config({ path: path.resolve(process.cwd(), ".env") });
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+config({ path: path.resolve(__dirname, "../../.env") });
 
 function resolveJwtSecret(): string {
   const secret = process.env.JWT_SECRET;
