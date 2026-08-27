@@ -1,8 +1,44 @@
 import fs from "fs";
 import { createReadStream, createWriteStream } from "fs";
 import { createRequire } from "module";
+import { Readable } from "stream";
 
 const nodeRequire = createRequire(import.meta.url);
+
+// Counts bytes as they pass through, opening the source file lazily only
+// when a consumer starts reading (so an upload that never reads leaves the
+// file untouched — also keeps tests that don't consume the body fast).
+class CountingUploadStream extends Readable {
+  private sourcePath: string;
+  private onProgress: OnProgress | undefined;
+  private source: NodeJS.ReadableStream | null = null;
+  private started = false;
+  private uploaded = 0;
+
+  constructor(sourcePath: string, onProgress?: OnProgress) {
+    super();
+    this.sourcePath = sourcePath;
+    this.onProgress = onProgress;
+  }
+
+  _read() {
+    if (this.started) return;
+    this.started = true;
+    this.source = createReadStream(this.sourcePath);
+    this.source.on("data", (chunk: Buffer) => {
+      this.uploaded += chunk.length;
+      if (this.onProgress) this.onProgress(this.uploaded);
+      if (!this.push(chunk)) this.source!.pause();
+    });
+    this.source.on("end", () => this.push(null));
+    this.source.on("error", (err) => this.destroy(err));
+  }
+
+  _destroy(err: Error | null, callback: (err?: Error | null) => void): void {
+    if (this.source && (this.source as any).destroy) (this.source as any).destroy();
+    callback(err);
+  }
+}
 
 // Resolves CommonJS-only SDK packages from this ESM module.
 // Overridable so tests can substitute lightweight fakes.
@@ -22,8 +58,10 @@ export interface CloudStorageConfig {
   created_at: string;
 }
 
+export type OnProgress = (bytesUploaded: number) => void;
+
 export interface CloudStorageProvider {
-  upload(localPath: string, remotePath: string): Promise<void>;
+  upload(localPath: string, remotePath: string, totalBytes: number, onProgress?: OnProgress): Promise<void>;
   download(remotePath: string, localPath: string): Promise<void>;
   delete(remotePath: string): Promise<void>;
   testConnection(): Promise<boolean>;
@@ -49,7 +87,7 @@ class S3StorageProvider implements CloudStorageProvider {
     });
   }
 
-  async upload(localPath: string, remotePath: string): Promise<void> {
+  async upload(localPath: string, remotePath: string, _totalBytes: number, onProgress?: OnProgress): Promise<void> {
     const { Upload } = _loadSdk("@aws-sdk/lib-storage");
     const fileStream = createReadStream(localPath);
     const upload = new Upload({
@@ -60,6 +98,11 @@ class S3StorageProvider implements CloudStorageProvider {
         Body: fileStream,
       },
     });
+    if (onProgress) {
+      upload.on("httpUploadProgress", (progress: { loaded?: number }) => {
+        if (progress.loaded != null) onProgress(progress.loaded);
+      });
+    }
     await upload.done();
   }
 
@@ -132,8 +175,9 @@ class GoogleDriveStorageProvider implements CloudStorageProvider {
     return this.folderId!;
   }
 
-  async upload(localPath: string, remotePath: string): Promise<void> {
+  async upload(localPath: string, remotePath: string, _totalBytes: number, onProgress?: OnProgress): Promise<void> {
     const folderId = await this.ensureFolder("BiryaniBackups");
+    const countingStream = new CountingUploadStream(localPath, onProgress);
     await this.drive.files.create({
       requestBody: {
         name: remotePath,
@@ -141,7 +185,7 @@ class GoogleDriveStorageProvider implements CloudStorageProvider {
       },
       media: {
         mimeType: "application/gzip",
-        body: createReadStream(localPath),
+        body: countingStream,
       },
       fields: "id",
     });
@@ -201,8 +245,9 @@ class DropboxStorageProvider implements CloudStorageProvider {
     this.pathPrefix = (config.path || "/BiryaniBackups").replace(/\/?$/, "/");
   }
 
-  async upload(localPath: string, remotePath: string): Promise<void> {
+  async upload(localPath: string, remotePath: string, totalBytes: number, onProgress?: OnProgress): Promise<void> {
     const fileContent = fs.readFileSync(localPath);
+    if (onProgress) onProgress(totalBytes);
     await this.dbx.filesUpload({
       path: this.pathPrefix + remotePath,
       contents: fileContent,
@@ -242,9 +287,15 @@ export function createCloudProvider(config: CloudStorageConfig): CloudStoragePro
   }
 }
 
-export async function uploadBackupToCloud(localPath: string, filename: string, storageConfig: CloudStorageConfig): Promise<void> {
+export async function uploadBackupToCloud(
+  localPath: string,
+  filename: string,
+  storageConfig: CloudStorageConfig,
+  totalBytes: number,
+  onProgress?: OnProgress,
+): Promise<void> {
   const provider = createCloudProvider(storageConfig);
-  await provider.upload(localPath, filename);
+  await provider.upload(localPath, filename, totalBytes, onProgress);
 }
 
 export async function downloadFromCloud(storageConfig: CloudStorageConfig, filename: string, destPath: string): Promise<void> {

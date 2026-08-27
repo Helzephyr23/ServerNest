@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -72,6 +72,23 @@ export default function BackupsPage() {
   const [scheduleCron, setScheduleCron] = useState("0 3 * * *");
   const [creatingSchedule, setCreatingSchedule] = useState(false);
 
+  const [uploadProgress, setUploadProgress] = useState<Record<number, Record<string, { bytesUploaded: number; totalBytes: number; percentage: number; status: string }>>>({});
+  const progressTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const fetchProgress = useCallback(async () => {
+    try {
+      const data = await api.get(`/api/servers/${id}/backups/progress`) as { uploads: Record<number, Record<string, { bytesUploaded: number; totalBytes: number; percentage: number; status: string }>> };
+      const uploads = data.uploads || {};
+      setUploadProgress(uploads);
+      const hasActive = Object.values(uploads).some((backup) =>
+        Object.values(backup).some((u) => u.status === "uploading"),
+      );
+      return hasActive;
+    } catch {
+      return false;
+    }
+  }, [id]);
+
   const fetchBackups = () => {
     api.get(`/api/servers/${id}/backups`)
       .then(({ backups: b }) => setBackups(Array.isArray(b) ? b : []))
@@ -103,6 +120,12 @@ export default function BackupsPage() {
   useEffect(() => { fetchBackups(); fetchSchedules(); fetchBackupSettings(); }, [id]);
   useEffect(() => { if (ctxServer?.status) fetchBackups(); }, [ctxServer?.status]);
 
+  useEffect(() => {
+    return () => {
+      if (progressTimerRef.current) clearInterval(progressTimerRef.current);
+    };
+  }, []);
+
   const handleSaveSettings = async () => {
     setSavingSettings(true);
     try {
@@ -120,12 +143,26 @@ export default function BackupsPage() {
     }
   };
 
+  const startProgressPolling = useCallback(() => {
+    if (progressTimerRef.current) clearInterval(progressTimerRef.current);
+    fetchBackups();
+    progressTimerRef.current = setInterval(async () => {
+      const hasActive = await fetchProgress();
+      fetchBackups();
+      if (!hasActive && progressTimerRef.current) {
+        clearInterval(progressTimerRef.current);
+        progressTimerRef.current = null;
+        fetchBackups();
+      }
+    }, 2000);
+  }, [fetchProgress, fetchBackups]);
+
   const handleCreate = async () => {
     setCreating(true);
     try {
       await api.post(`/api/servers/${id}/backups`);
-      success("Backup created! Cloud upload starting...");
-      setTimeout(fetchBackups, 2000);
+      success("Backup started");
+      startProgressPolling();
     } catch (err: any) {
       toastError("Failed to create backup", err.message);
     } finally {
@@ -458,16 +495,36 @@ export default function BackupsPage() {
                       )}
                     </p>
                     {backup.uploads?.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {backup.uploads.map((u: any) => (
-                          <span
-                            key={u.id}
-                            className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs ${STATUS_BADGE[u.status] || ""}`}
-                          >
-                            {PROVIDER_ICONS[u.provider] || "☁️"} {PROVIDER_LABELS[u.provider] || u.provider}
-                            {u.status === "uploaded" ? " ✓" : u.status === "uploading" ? " ↻" : u.status === "failed" ? " ✗" : ""}
-                          </span>
-                        ))}
+                      <div className="mt-1 space-y-1">
+                        {backup.uploads.map((u: any) => {
+                          const prog = uploadProgress[backup.id]?.[u.provider];
+                          const isUploading = prog && prog.status === "uploading";
+                          const pct = prog?.percentage ?? (u.status === "uploaded" ? 100 : 0);
+                          return (
+                            <div key={u.id} className="flex items-center gap-2">
+                              <span className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs ${STATUS_BADGE[u.status] || ""}`}>
+                                {PROVIDER_ICONS[u.provider] || "☁️"} {PROVIDER_LABELS[u.provider] || u.provider}
+                              </span>
+                              {isUploading ? (
+                                <div className="flex flex-1 items-center gap-2">
+                                  <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-secondary">
+                                    <div
+                                      className="h-full rounded-full bg-blue-500 transition-all duration-500"
+                                      style={{ width: `${pct}%` }}
+                                    />
+                                  </div>
+                                  <span className="text-xs text-muted-foreground w-20 text-right">
+                                    {pct}% &middot; {formatBytes(prog.bytesUploaded)} / {formatBytes(prog.totalBytes)}
+                                  </span>
+                                </div>
+                              ) : u.status === "uploaded" ? (
+                                <span className="text-xs text-green-500">Done</span>
+                              ) : u.status === "failed" ? (
+                                <span className="text-xs text-red-500">Failed</span>
+                              ) : null}
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
                   </div>

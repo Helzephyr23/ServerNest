@@ -2,6 +2,7 @@ import db from "../config/database.js";
 import docker from "../config/docker.js";
 import { notify } from "./notification.service.js";
 import { uploadBackupToCloud, deleteFromCloud, CloudStorageConfig } from "./cloud-storage.service.js";
+import { setUploadProgress, completeUpload } from "./backup-progress.js";
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
@@ -128,11 +129,16 @@ export async function createBackup(serverId: number): Promise<Backup> {
   const cloudConfigs = db.prepare("SELECT * FROM cloud_storage_configs WHERE server_id = ? AND enabled = 1").all(serverId) as CloudStorageConfig[];
   for (const cfg of cloudConfigs) {
     const uploadId = db.prepare("INSERT INTO backup_uploads (backup_id, storage_id, status) VALUES (?, ?, 'uploading')").run(backupId, cfg.id).lastInsertRowid;
-    uploadBackupToCloud(backupPath, filename, cfg)
+    setUploadProgress(backupId, cfg.provider, serverId, 0, stats.size);
+    uploadBackupToCloud(backupPath, filename, cfg, stats.size, (bytesUploaded) => {
+      setUploadProgress(backupId, cfg.provider, serverId, bytesUploaded, stats.size);
+    })
       .then(() => {
+        completeUpload(backupId, cfg.provider, "uploaded");
         db.prepare("UPDATE backup_uploads SET status = 'uploaded', checksum = ?, completed_at = datetime('now') WHERE id = ?").run(checksum, uploadId);
       })
       .catch((err: any) => {
+        completeUpload(backupId, cfg.provider, "failed");
         db.prepare("UPDATE backup_uploads SET status = 'failed', error = ?, completed_at = datetime('now') WHERE id = ?").run(err.message, uploadId);
         notify("backup_upload_failed", "Cloud Upload Failed", `Failed to upload "${filename}" to ${cfg.label}: ${err.message}`, 0xff0000);
       });

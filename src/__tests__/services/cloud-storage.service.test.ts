@@ -182,7 +182,7 @@ describe("S3 provider", () => {
     const localFile = join(tempDir, "backup.tar.gz");
     writeFileSync(localFile, "data");
     const provider = createCloudProvider(s3Config({ prefix: "prefix" }));
-    await provider.upload(localFile, "remote.tar.gz");
+    await provider.upload(localFile, "remote.tar.gz", 4);
     expect(FakeUpload.lastParams.params).toMatchObject({
       Bucket: "bkt",
       Key: "prefix/remote.tar.gz",
@@ -232,7 +232,7 @@ describe("Google Drive provider", () => {
 
   it("uses the configured folder without listing when folderId exists", async () => {
     createReturns({ data: { id: "newfile" } });
-    await uploadBackupToCloud(join(tempDir, "f.txt"), "f.txt", gdriveConfig({ folderId: "folder-42" }));
+    await uploadBackupToCloud(join(tempDir, "f.txt"), "f.txt", gdriveConfig({ folderId: "folder-42" }), 4);
     expect(driveFiles.list).not.toHaveBeenCalled();
     expect(driveFiles.create).toHaveBeenCalledWith(
       expect.objectContaining({ requestBody: expect.objectContaining({ parents: ["folder-42"] }) })
@@ -242,7 +242,7 @@ describe("Google Drive provider", () => {
   it("discovers an existing BiryaniBackups folder when none configured", async () => {
     driveFiles.list.mockResolvedValueOnce({ data: { files: [{ id: "found-1" }] } });
     createReturns({ data: { id: "newfile" } });
-    await uploadBackupToCloud(join(tempDir, "f.txt"), "f.txt", gdriveConfig());
+    await uploadBackupToCloud(join(tempDir, "f.txt"), "f.txt", gdriveConfig(), 4);
     expect(driveFiles.create).toHaveBeenCalledWith(
       expect.objectContaining({ requestBody: expect.objectContaining({ parents: ["found-1"] }) })
     );
@@ -251,7 +251,7 @@ describe("Google Drive provider", () => {
   it("creates the BiryaniBackups folder when discovery comes up empty", async () => {
     driveFiles.list.mockResolvedValueOnce({ data: { files: [] } });
     createReturns({ data: { id: "new-folder" } }, { data: { id: "new-file" } });
-    await uploadBackupToCloud(join(tempDir, "f.txt"), "f.txt", gdriveConfig());
+    await uploadBackupToCloud(join(tempDir, "f.txt"), "f.txt", gdriveConfig(), 4);
     expect(driveFiles.create).toHaveBeenCalledWith(
       expect.objectContaining({
         requestBody: expect.objectContaining({ name: "BiryaniBackups", mimeType: "application/vnd.google-apps.folder" }),
@@ -309,7 +309,7 @@ describe("Dropbox provider", () => {
     const localFile = join(tempDir, "dbx.bin");
     writeFileSync(localFile, "dropbox-bytes");
     const provider = createCloudProvider(dropboxConfig({ path: "/backups" }));
-    await provider.upload(localFile, "save.tar.gz");
+    await provider.upload(localFile, "save.tar.gz", 14);
     expect(dbxInstance.filesUpload).toHaveBeenCalledWith(
       expect.objectContaining({
         path: "/backups/save.tar.gz",
@@ -353,7 +353,7 @@ describe("wrapper functions", () => {
   it("uploadBackupToCloud delegates to the provider upload", async () => {
     const localFile = join(tempDir, "w.txt");
     writeFileSync(localFile, "w");
-    await uploadBackupToCloud(localFile, "remote-name", s3Config({ prefix: "pre" }));
+    await uploadBackupToCloud(localFile, "remote-name", s3Config({ prefix: "pre" }), 1);
     expect(FakeUpload.lastParams.params.Key).toBe("pre/remote-name");
   });
 

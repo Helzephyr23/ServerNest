@@ -6,6 +6,7 @@ import {
   restoreBackup,
   deleteBackup,
 } from "../services/backup.service.js";
+import { getServerUploadProgress } from "../services/backup-progress.js";
 import { downloadFromCloud, CloudStorageConfig } from "../services/cloud-storage.service.js";
 import db from "../config/database.js";
 import fs from "fs";
@@ -37,6 +38,11 @@ export default async function backupRoutes(app: FastifyInstance) {
   app.get("/api/servers/:id/backups", opts, async (request) => {
     const { id } = request.params as { id: string };
     return { backups: getBackups(Number(id)) };
+  });
+
+  app.get("/api/servers/:id/backups/progress", opts, async (request) => {
+    const { id } = request.params as { id: string };
+    return { uploads: getServerUploadProgress(Number(id)) };
   });
 
   app.post("/api/servers/:id/backups", opts, async (request, reply) => {
