@@ -40,6 +40,14 @@ const CRON_PRESETS = [
   { label: "Every 3 days", value: "0 0 */3 * *" },
 ];
 
+const INTERVAL_OPTIONS = [
+  { label: "Every 30 minutes", value: 30 },
+  { label: "Every 1 hour", value: 60 },
+  { label: "Every 6 hours", value: 360 },
+  { label: "Every 12 hours", value: 720 },
+  { label: "Daily", value: 1440 },
+];
+
 export default function BackupsPage() {
   const { success, error: toastError } = useToast();
   const { confirm: showConfirm } = useConfirm();
@@ -49,7 +57,13 @@ export default function BackupsPage() {
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [downloading, setDownloading] = useState<number | null>(null);
-  const { server } = useServer();
+  const { server: ctxServer } = useServer();
+
+  const [autoBackupEnabled, setAutoBackupEnabled] = useState(true);
+  const [backupInterval, setBackupInterval] = useState(30);
+  const [backupRetention, setBackupRetention] = useState(10);
+  const [lastAutoBackup, setLastAutoBackup] = useState<string | null>(null);
+  const [savingSettings, setSavingSettings] = useState(false);
 
   const [schedules, setSchedules] = useState<any[]>([]);
   const [loadingSchedules, setLoadingSchedules] = useState(true);
@@ -75,8 +89,36 @@ export default function BackupsPage() {
       .finally(() => setLoadingSchedules(false));
   };
 
-  useEffect(() => { fetchBackups(); fetchSchedules(); }, [id]);
-  useEffect(() => { if (server?.status) fetchBackups(); }, [server?.status]);
+  const fetchBackupSettings = () => {
+    api.get(`/api/servers/${id}/backup-settings`)
+      .then((data: any) => {
+        setAutoBackupEnabled(data.auto_backup === 1);
+        setBackupInterval(data.backup_interval || 30);
+        setBackupRetention(data.backup_retention || 10);
+        setLastAutoBackup(data.last_auto_backup || null);
+      })
+      .catch(() => {});
+  };
+
+  useEffect(() => { fetchBackups(); fetchSchedules(); fetchBackupSettings(); }, [id]);
+  useEffect(() => { if (ctxServer?.status) fetchBackups(); }, [ctxServer?.status]);
+
+  const handleSaveSettings = async () => {
+    setSavingSettings(true);
+    try {
+      await api.put(`/api/servers/${id}/backup-settings`, {
+        auto_backup: autoBackupEnabled ? 1 : 0,
+        backup_interval: backupInterval,
+        backup_retention: backupRetention,
+      });
+      success("Auto-backup settings saved");
+      fetchBackupSettings();
+    } catch (err: any) {
+      toastError("Failed to save settings", err.message);
+    } finally {
+      setSavingSettings(false);
+    }
+  };
 
   const handleCreate = async () => {
     setCreating(true);
@@ -187,16 +229,90 @@ export default function BackupsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold">Backups</h2>
-        <Button onClick={handleCreate} disabled={creating || server?.status !== "running"}>
+        <Button onClick={handleCreate} disabled={creating || ctxServer?.status !== "running"}>
           {creating ? "Creating..." : "Create Backup"}
         </Button>
       </div>
 
-      {server?.status !== "running" && (
+      {ctxServer?.status !== "running" && (
         <div className="rounded-lg bg-yellow-500/10 px-4 py-3 text-sm text-yellow-500">
           Server must be running to create backups
         </div>
       )}
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Auto-Backup Settings</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-medium">Enable Auto-Backups</p>
+              <p className="text-xs text-muted-foreground">
+                Automatically back up your server on a schedule
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setAutoBackupEnabled(!autoBackupEnabled)}
+              className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
+                autoBackupEnabled ? "bg-primary" : "bg-zinc-600"
+              }`}
+            >
+              <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${
+                autoBackupEnabled ? "translate-x-4" : "translate-x-0"
+              }`} />
+            </button>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="mb-1 block text-sm font-medium">Backup Interval</label>
+              <select
+                value={backupInterval}
+                onChange={(e) => setBackupInterval(Number(e.target.value))}
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              >
+                {INTERVAL_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium">Keep Backups</label>
+              <Input
+                type="number"
+                min={1}
+                max={50}
+                value={backupRetention}
+                onChange={(e) => setBackupRetention(Number(e.target.value))}
+              />
+              <p className="mt-1 text-xs text-muted-foreground">Maximum backups to keep (1-50)</p>
+            </div>
+          </div>
+
+          {lastAutoBackup && (
+            <p className="text-xs text-muted-foreground">
+              Last auto-backup: {formatDate(lastAutoBackup)}
+            </p>
+          )}
+
+          <div className="flex items-center justify-between rounded-md bg-muted/50 px-4 py-3 text-sm">
+            <div className="flex items-center gap-2">
+              <span className="text-lg">🔒</span>
+              <div>
+                <p className="font-medium">Backup on Server Stop</p>
+                <p className="text-xs text-muted-foreground">Always creates a backup before stopping</p>
+              </div>
+            </div>
+            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">Always On</span>
+          </div>
+
+          <Button onClick={handleSaveSettings} disabled={savingSettings} size="sm">
+            {savingSettings ? "Saving..." : "Save Settings"}
+          </Button>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader className="pb-3">
@@ -251,7 +367,7 @@ export default function BackupsPage() {
             </div>
           ) : schedules.length === 0 ? (
             <p className="py-4 text-center text-sm text-muted-foreground">
-              No scheduled backups. Click &quot;Add Schedule&quot; to set up automatic backups.
+              No scheduled backups. Click &quot;Add Schedule&quot; to set up additional schedules.
             </p>
           ) : (
             <div className="space-y-2">

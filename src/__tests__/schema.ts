@@ -41,6 +41,10 @@ CREATE TABLE IF NOT EXISTS servers (
   container_id TEXT,
   eula_accepted INTEGER NOT NULL DEFAULT 0,
   eula_accepted_at TEXT,
+  auto_backup INTEGER NOT NULL DEFAULT 1,
+  backup_interval INTEGER NOT NULL DEFAULT 30,
+  backup_retention INTEGER NOT NULL DEFAULT 10,
+  last_auto_backup TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   FOREIGN KEY (node_id) REFERENCES nodes(id)
 );

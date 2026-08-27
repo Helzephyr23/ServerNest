@@ -29,6 +29,10 @@ interface Server {
   container_id: string | null;
   eula_accepted: number;
   eula_accepted_at: string | null;
+  auto_backup: number;
+  backup_interval: number;
+  backup_retention: number;
+  last_auto_backup: string | null;
   created_at: string;
 }
 
@@ -220,10 +224,19 @@ export async function startServer(id: number): Promise<string | null> {
   });
 }
 
-export async function stopServer(id: number): Promise<void> {
+export async function stopServer(id: number, skipBackup: boolean = false): Promise<void> {
   return withServerLock(id, async () => {
     const server = getServerById(id);
   if (!server) throw new Error("Server not found");
+
+  if (!skipBackup && server.auto_backup && server.status === "running") {
+    try {
+      const { createAutoBackup } = await import("./backup.service.js");
+      await createAutoBackup(id);
+    } catch (err) {
+      console.error(`[server] Pre-stop backup failed for server ${id}:`, (err as Error).message);
+    }
+  }
 
   const containerName = `biryani-mc-${server.id}`;
 

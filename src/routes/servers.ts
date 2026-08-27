@@ -325,6 +325,41 @@ export default async function serverRoutes(app: FastifyInstance) {
     return { success: true };
   });
 
+  app.get("/api/servers/:id/backup-settings", opts, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const server = getServerById(Number(id));
+    if (!server) return reply.status(404).send({ error: "Server not found" });
+    return {
+      auto_backup: server.auto_backup,
+      backup_interval: server.backup_interval,
+      backup_retention: server.backup_retention,
+      last_auto_backup: server.last_auto_backup,
+    };
+  });
+
+  app.put("/api/servers/:id/backup-settings", { preHandler: [authMiddleware, adminMiddleware] }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const server = getServerById(Number(id));
+    if (!server) return reply.status(404).send({ error: "Server not found" });
+    const { auto_backup, backup_interval, backup_retention } = request.body as {
+      auto_backup?: number;
+      backup_interval?: number;
+      backup_retention?: number;
+    };
+    if (auto_backup !== undefined) {
+      db.prepare("UPDATE servers SET auto_backup = ? WHERE id = ?").run(auto_backup ? 1 : 0, Number(id));
+    }
+    if (backup_interval !== undefined) {
+      const clamped = Math.max(5, Math.min(1440, Number(backup_interval)));
+      db.prepare("UPDATE servers SET backup_interval = ? WHERE id = ?").run(clamped, Number(id));
+    }
+    if (backup_retention !== undefined) {
+      const clamped = Math.max(1, Math.min(50, Number(backup_retention)));
+      db.prepare("UPDATE servers SET backup_retention = ? WHERE id = ?").run(clamped, Number(id));
+    }
+    return { success: true };
+  });
+
   app.get("/api/servers/:id/metrics", opts, async (request, reply) => {
     const { id } = request.params as { id: string };
     const metrics = await getServerMetrics(Number(id));

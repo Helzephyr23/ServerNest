@@ -261,18 +261,55 @@ export function deleteBackup(backupId: number) {
 }
 
 export function rotateBackups(serverId: number, maxBackups: number = 10) {
+  const server = db.prepare("SELECT backup_retention FROM servers WHERE id = ?").get(serverId) as { backup_retention: number } | undefined;
+  const limit = server?.backup_retention ?? maxBackups;
   const backups = getBackups(serverId);
-  if (backups.length > maxBackups) {
-    const toDelete = backups.slice(maxBackups);
+  if (backups.length > limit) {
+    const toDelete = backups.slice(limit);
     for (const backup of toDelete) {
       deleteBackup(backup.id);
     }
   }
 }
 
-export function rotateAllBackups(maxBackups: number = 10) {
+export function rotateAllBackups() {
   const servers = db.prepare("SELECT id FROM servers").all() as { id: number }[];
   for (const server of servers) {
-    rotateBackups(server.id, maxBackups);
+    rotateBackups(server.id);
+  }
+}
+
+const autoBackupRunning = new Set<number>();
+
+export async function createAutoBackup(serverId: number): Promise<void> {
+  if (autoBackupRunning.has(serverId)) return;
+  autoBackupRunning.add(serverId);
+  try {
+    await createBackup(serverId);
+    db.prepare("UPDATE servers SET last_auto_backup = datetime('now') WHERE id = ?").run(serverId);
+  } catch (err) {
+    console.error(`[auto-backup] Failed for server ${serverId}:`, (err as Error).message);
+  } finally {
+    autoBackupRunning.delete(serverId);
+  }
+}
+
+export function checkAndRunAutoBackups(): void {
+  const servers = db.prepare(
+    "SELECT id, status, auto_backup, backup_interval, last_auto_backup FROM servers WHERE auto_backup = 1"
+  ).all() as { id: number; status: string; auto_backup: number; backup_interval: number; last_auto_backup: string | null }[];
+
+  const now = Date.now();
+  for (const server of servers) {
+    if (server.status !== "running") continue;
+    const intervalMs = server.backup_interval * 60 * 1000;
+    if (!server.last_auto_backup) {
+      createAutoBackup(server.id);
+      continue;
+    }
+    const lastRun = new Date(server.last_auto_backup).getTime();
+    if (now - lastRun >= intervalMs) {
+      createAutoBackup(server.id);
+    }
   }
 }

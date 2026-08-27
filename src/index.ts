@@ -32,7 +32,7 @@ import { setSocketIO } from "./routes/servers.js";
 import { startAllTasks } from "./services/schedule.service.js";
 import { notify } from "./services/notification.service.js";
 import { markStaleNodesOffline } from "./services/node.service.js";
-import { rotateAllBackups } from "./services/backup.service.js";
+
 import docker, { dockerStreamDemux } from "./config/docker.js";
 
 if (env.NODE_ENV === "production") {
@@ -137,8 +137,16 @@ const staleNodeInterval = setInterval(() => {
   markStaleNodesOffline();
 }, 60000);
 
-const backupInterval = setInterval(() => {
-  rotateAllBackups(10);
+const autoBackupInterval = setInterval(() => {
+  import("./services/backup.service.js").then(({ checkAndRunAutoBackups }) => {
+    checkAndRunAutoBackups();
+  });
+}, 60000);
+
+const backupRotationInterval = setInterval(() => {
+  import("./services/backup.service.js").then(({ rotateAllBackups }) => {
+    rotateAllBackups();
+  });
 }, 3600000);
 
 const serverCheckInterval = setInterval(async () => {
@@ -330,7 +338,8 @@ function gracefulShutdown(signal: string) {
   app.log.info(`Received ${signal}, shutting down gracefully...`);
   clearInterval(metricInterval);
   clearInterval(staleNodeInterval);
-  clearInterval(backupInterval);
+  clearInterval(autoBackupInterval);
+  clearInterval(backupRotationInterval);
   clearInterval(serverCheckInterval);
   for (const [, attachment] of activeAttachments) {
     attachment.stream?.destroy();
