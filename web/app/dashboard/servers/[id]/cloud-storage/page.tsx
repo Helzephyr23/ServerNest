@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useEffect, useState, useCallback } from "react";
+import { useParams, useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,30 +11,34 @@ import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm-dialog";
 import { useServer } from "@/lib/server-context";
 
-type Provider = "s3" | "gdrive" | "dropbox";
+type Provider = "s3" | "dropbox";
 
 const PROVIDER_LABELS: Record<Provider, string> = {
   s3: "S3-Compatible",
-  gdrive: "Google Drive",
   dropbox: "Dropbox",
 };
 
 const PROVIDER_HELP: Record<Provider, string[]> = {
   s3: ["Endpoint (optional)", "Region", "Bucket", "Access Key ID", "Secret Access Key", "Prefix (optional)"],
-  gdrive: ["Client ID", "Client Secret", "Refresh Token", "Folder ID (optional)"],
   dropbox: ["Access Token", "Path (optional)"],
 };
 
 const PROVIDER_FIELDS: Record<Provider, string[]> = {
   s3: ["endpoint", "region", "bucket", "accessKeyId", "secretAccessKey", "prefix"],
-  gdrive: ["clientId", "clientSecret", "refreshToken", "folderId"],
   dropbox: ["accessToken", "path"],
 };
+
+interface GDriveStatus {
+  connected: boolean;
+  email: string | null;
+  configId: number | null;
+}
 
 export default function CloudStoragePage() {
   const { success, error: toastError } = useToast();
   const { confirm: showConfirm } = useConfirm();
   const params = useParams();
+  const searchParams = useSearchParams();
   const id = params.id as string;
   const { server } = useServer();
   const [configs, setConfigs] = useState<any[]>([]);
@@ -47,15 +51,50 @@ export default function CloudStoragePage() {
   const [saving, setSaving] = useState(false);
   const [testingId, setTestingId] = useState<number | null>(null);
 
-  const fetchConfigs = () => {
+  // Google Drive state
+  const [gdriveStatus, setGdriveStatus] = useState<GDriveStatus>({ connected: false, email: null, configId: null });
+  const [gdriveLoading, setGdriveLoading] = useState(true);
+  const [gdriveConnecting, setGdriveConnecting] = useState(false);
+  const [gdriveDisconnecting, setGdriveDisconnecting] = useState(false);
+  const [gdriveTesting, setGdriveTesting] = useState(false);
+
+  const fetchConfigs = useCallback(() => {
     api.get(`/api/servers/${id}/cloud-storage`)
       .then(({ configs }) => setConfigs(Array.isArray(configs) ? configs : []))
       .catch(() => setConfigs([]))
       .finally(() => setLoading(false));
-  };
+  }, [id]);
 
-  useEffect(() => { fetchConfigs(); }, [id]);
-  useEffect(() => { if (server?.status) fetchConfigs(); }, [server?.status]);
+  const fetchGdriveStatus = useCallback(() => {
+    api.get(`/api/google-drive/status?serverId=${id}`)
+      .then((res) => setGdriveStatus(res))
+      .catch(() => setGdriveStatus({ connected: false, email: null, configId: null }))
+      .finally(() => setGdriveLoading(false));
+  }, [id]);
+
+  useEffect(() => { fetchConfigs(); fetchGdriveStatus(); }, [fetchConfigs, fetchGdriveStatus]);
+  useEffect(() => { if (server?.status) { fetchConfigs(); fetchGdriveStatus(); } }, [server?.status, fetchConfigs, fetchGdriveStatus]);
+
+  // Handle OAuth redirect results
+  useEffect(() => {
+    const gdriveResult = searchParams.get("gdrive");
+    const error = searchParams.get("error");
+    if (gdriveResult === "connected") {
+      success("Google Drive connected successfully");
+      fetchGdriveStatus();
+      window.history.replaceState({}, "", `/dashboard/servers/${id}/cloud-storage`);
+    } else if (error) {
+      const errorMessages: Record<string, string> = {
+        gdrive_auth_denied: "Authorization was denied",
+        gdrive_missing_params: "Missing authorization parameters",
+        gdrive_invalid_state: "Invalid or expired authorization state",
+        gdrive_no_refresh_token: "No refresh token received from Google",
+        gdrive_token_exchange_failed: "Failed to exchange authorization code",
+      };
+      toastError("Google Drive", errorMessages[error] || "Connection failed");
+      window.history.replaceState({}, "", `/dashboard/servers/${id}/cloud-storage`);
+    }
+  }, [searchParams, id, success, toastError, fetchGdriveStatus]);
 
   const resetForm = () => {
     setShowForm(false);
@@ -117,14 +156,48 @@ export default function CloudStoragePage() {
     }
   };
 
-  const providerIcon: Record<Provider, string> = {
-    s3: "☁️",
-    gdrive: "📂",
-    dropbox: "📦",
+  const handleGdriveConnect = async () => {
+    setGdriveConnecting(true);
+    try {
+      const res = await api.get(`/api/google-drive/auth-url?serverId=${id}`);
+      if (res.url) {
+        window.location.href = res.url;
+      }
+    } catch (err: any) {
+      toastError("Google Drive", err.message);
+      setGdriveConnecting(false);
+    }
+  };
+
+  const handleGdriveDisconnect = async () => {
+    if (!(await showConfirm({ title: "Disconnect Google Drive", message: "This will revoke access and remove the connection." }))) return;
+    setGdriveDisconnecting(true);
+    try {
+      await api.post("/api/google-drive/disconnect", { serverId: id });
+      success("Google Drive disconnected");
+      fetchGdriveStatus();
+    } catch (err: any) {
+      toastError("Failed to disconnect", err.message);
+    } finally {
+      setGdriveDisconnecting(false);
+    }
+  };
+
+  const handleGdriveTest = async () => {
+    setGdriveTesting(true);
+    try {
+      const res = await api.post("/api/google-drive/test", { serverId: id });
+      if (res.success) success("Connection successful");
+      else toastError("Connection failed", res.message);
+    } catch (err: any) {
+      toastError("Connection failed", err.message);
+    } finally {
+      setGdriveTesting(false);
+    }
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold">Cloud Storage</h2>
         <Button onClick={() => { resetForm(); setShowForm(true); }} disabled={showForm}>
@@ -132,19 +205,69 @@ export default function CloudStoragePage() {
         </Button>
       </div>
 
+      {/* ── Google Drive Section ───────────────────────────────────────── */}
+      {gdriveLoading ? (
+        <Card>
+          <CardContent className="flex items-center gap-3 p-4">
+            <Skeleton className="h-5 w-5" />
+            <Skeleton className="h-4 w-40" />
+            <Skeleton className="h-5 w-20 rounded" />
+          </CardContent>
+        </Card>
+      ) : gdriveStatus.connected ? (
+        <Card className="border-green-500/30">
+          <CardContent className="flex items-center justify-between p-4">
+            <div className="flex items-center gap-3">
+              <span className="text-xl">📂</span>
+              <div>
+                <div className="flex items-center gap-2">
+                  <p className="font-medium">Google Drive</p>
+                  <span className="rounded bg-green-500/10 px-2 py-0.5 text-xs text-green-500">Connected</span>
+                </div>
+                <p className="text-sm text-muted-foreground">{gdriveStatus.email}</p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={handleGdriveTest} disabled={gdriveTesting}>
+                {gdriveTesting ? "Testing..." : "Test"}
+              </Button>
+              <Button variant="destructive" size="sm" onClick={handleGdriveDisconnect} disabled={gdriveDisconnecting}>
+                {gdriveDisconnecting ? "Disconnecting..." : "Disconnect"}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card className="border-dashed">
+          <CardContent className="flex items-center justify-between p-4">
+            <div className="flex items-center gap-3">
+              <span className="text-xl">📂</span>
+              <div>
+                <p className="font-medium">Google Drive</p>
+                <p className="text-sm text-muted-foreground">Connect your Google Drive to store backups</p>
+              </div>
+            </div>
+            <Button onClick={handleGdriveConnect} disabled={gdriveConnecting}>
+              {gdriveConnecting ? "Connecting..." : "Connect Google Drive"}
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ── Add Provider Form ──────────────────────────────────────────── */}
       {showForm && (
         <Card>
           <CardContent className="p-4 space-y-4">
             <h3 className="font-semibold">{editingId ? "Edit" : "Add"} Cloud Provider</h3>
             <div className="flex gap-2">
-              {(["s3", "gdrive", "dropbox"] as Provider[]).map((p) => (
+              {(["s3", "dropbox"] as Provider[]).map((p) => (
                 <Button
                   key={p}
                   variant={provider === p ? "default" : "outline"}
                   size="sm"
                   onClick={() => { setProvider(p); setConfig({}); }}
                 >
-                  {providerIcon[p]} {PROVIDER_LABELS[p]}
+                  {p === "s3" ? "☁️" : "📦"} {PROVIDER_LABELS[p]}
                 </Button>
               ))}
             </div>
@@ -170,6 +293,7 @@ export default function CloudStoragePage() {
         </Card>
       )}
 
+      {/* ── Other Configs List ─────────────────────────────────────────── */}
       {loading ? (
         <div className="space-y-2">
           {Array.from({ length: 2 }).map((_, i) => (
@@ -190,22 +314,14 @@ export default function CloudStoragePage() {
             </Card>
           ))}
         </div>
-      ) : configs.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <span className="mb-2 text-4xl">☁️</span>
-            <p className="text-muted-foreground">No cloud storage configured</p>
-            <p className="text-xs text-muted-foreground">Add S3, Google Drive, or Dropbox to upload backups</p>
-          </CardContent>
-        </Card>
-      ) : (
+      ) : configs.length === 0 ? null : (
         <div className="space-y-2">
           {configs.map((cfg) => (
             <Card key={cfg.id}>
               <CardContent className="flex items-center justify-between p-4">
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
-                    <span>{providerIcon[cfg.provider as Provider] || "☁️"}</span>
+                    <span>{cfg.provider === "s3" ? "☁️" : "📦"}</span>
                     <p className="font-medium">{cfg.label}</p>
                     <span className="rounded bg-secondary px-2 py-0.5 text-xs text-muted-foreground">
                       {PROVIDER_LABELS[cfg.provider as Provider] || cfg.provider}
@@ -228,6 +344,17 @@ export default function CloudStoragePage() {
             </Card>
           ))}
         </div>
+      )}
+
+      {/* ── Empty State ─────────────────────────────────────────────────── */}
+      {!loading && !gdriveLoading && configs.length === 0 && !gdriveStatus.connected && (
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <span className="mb-2 text-4xl">☁️</span>
+            <p className="text-muted-foreground">No cloud storage configured</p>
+            <p className="text-xs text-muted-foreground">Connect Google Drive or add S3/Dropbox to upload backups</p>
+          </CardContent>
+        </Card>
       )}
     </div>
   );

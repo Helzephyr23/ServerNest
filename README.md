@@ -501,6 +501,16 @@ All endpoints are prefixed with `/api` and require JWT authentication (`Authoriz
 | `GET` | `/api/overview` | auth | Dashboard overview (nodes + metrics) |
 | `GET` | `/api/metrics` | auth | System metrics |
 
+### Google Drive OAuth
+
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| `GET` | `/api/google-drive/auth-url?serverId=` | admin | Generate OAuth authorization URL |
+| `GET` | `/api/google-drive/callback` | none | OAuth callback (exchanges code, stores tokens) |
+| `GET` | `/api/google-drive/status?serverId=` | auth | Get Google Drive connection status |
+| `POST` | `/api/google-drive/disconnect` | admin | Revoke token and remove connection |
+| `POST` | `/api/google-drive/test` | auth | Test Google Drive connection |
+
 ---
 
 ## Environment Variables
@@ -521,6 +531,8 @@ All endpoints are prefixed with `/api` and require JWT authentication (`Authoriz
 | `GRPC_PORT` | `50051` | Agent Express port |
 | `CORS_ORIGIN` | `false` (prod) | CORS origin. Set to frontend URL in production. |
 | `NEXT_PUBLIC_SOCKET_URL` | - | Optional Socket.IO origin override |
+| `GOOGLE_CLIENT_ID` | - | Google OAuth client ID (for Google Drive cloud storage) |
+| `GOOGLE_CLIENT_SECRET` | - | Google OAuth client secret |
 
 ---
 
@@ -559,38 +571,19 @@ Backups can be synced to S3-compatible storage, Google Drive, or Dropbox. Config
 ### Google Drive
 
 1. Go to [Google Cloud Console](https://console.cloud.google.com/) → Create project → **APIs & Services** → **OAuth consent screen**
-2. Set app type to **External**, add `.../auth/drive.file` scope
-3. Go to **Credentials** → **Create Credentials** → **OAuth client ID** → **Desktop app**
-4. Copy the **Client ID** and **Client Secret**
-5. Generate a refresh token:
+2. Set app type to **External**, add the `.../auth/drive.file` scope
+3. Go to **Credentials** → **Create Credentials** → **OAuth client ID** → **Web application**
+4. Add `http://localhost:3000/api/google-drive/callback` as an **Authorized redirect URI** (and your production URL)
+5. Copy the **Client ID** and **Client Secret**
+6. Set the environment variables:
+   ```bash
+   GOOGLE_CLIENT_ID=your-client-id
+   GOOGLE_CLIENT_SECRET=your-client-secret
+   ```
+7. In the panel, go to **Server → Cloud Storage** and click **Connect Google Drive**
+8. Authorize in the browser — you'll be redirected back with a success message
 
-```
-https://accounts.google.com/o/oauth2/v2/auth?
-  client_id=YOUR_CLIENT_ID&
-  redirect_uri=urn:ietf:wg:oauth:2.0:oob&
-  response_type=code&
-  scope=https://www.googleapis.com/auth/drive.file
-```
-
-Visit the URL, authorize, copy the code, then exchange it:
-
-```
-POST https://oauth2.googleapis.com/token
-  client_id=...
-  client_secret=...
-  code=THE_CODE
-  grant_type=authorization_code
-  redirect_uri=urn:ietf:wg:oauth:2.0:oob
-```
-
-The response includes a `refresh_token` — use that in the config.
-
-| Field | Required | Description |
-|-------|----------|-------------|
-| Client ID | Yes | OAuth 2.0 client ID |
-| Client Secret | Yes | OAuth 2.0 client secret |
-| Refresh Token | Yes | Long-lived token (use once) |
-| Folder ID | No | Parent folder ID; leave blank to auto-create `BiryaniBackups` |
+The refresh token is stored server-side and never exposed to the frontend. You can disconnect at any time, which revokes the token with Google.
 
 ### Dropbox
 

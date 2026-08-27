@@ -171,6 +171,11 @@ CREATE TABLE IF NOT EXISTS servers (
       locked_until TEXT,
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     );
+    CREATE TABLE IF NOT EXISTS gdrive_oauth_states (
+      state      TEXT PRIMARY KEY,
+      server_id  INTEGER NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
 `;
 
 export function applyTestSchema(db: Database.Database): void {
