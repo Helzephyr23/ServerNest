@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -72,10 +72,41 @@ export default function BackupsPage() {
   const [scheduleCron, setScheduleCron] = useState("0 3 * * *");
   const [creatingSchedule, setCreatingSchedule] = useState(false);
 
+  const [uploadProgress, setUploadProgress] = useState<Record<number, Record<string, { bytesUploaded: number; totalBytes: number; percentage: number; status: string }>>>({});
+  const [preparing, setPreparing] = useState(false);
+  const preparingRef = useRef(false);
+  const preparingStartedAtRef = useRef<number | null>(null);
+  const progressTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const backupsRef = useRef<any[]>([]);
+  const [deleteTarget, setDeleteTarget] = useState<any | null>(null);
+  const [deletingScope, setDeletingScope] = useState<string | null>(null);
+
+  const uploadInFlight = backups.some((b) =>
+    Array.isArray(b.uploads) && b.uploads.some((u: any) => u.status === "uploading"),
+  );
+
+  const fetchProgress = useCallback(async () => {
+    try {
+      const data = await api.get(`/api/servers/${id}/backups/progress`) as { uploads: Record<number, Record<string, { bytesUploaded: number; totalBytes: number; percentage: number; status: string }>> };
+      const uploads = data.uploads || {};
+      setUploadProgress(uploads);
+      const hasActive = Object.values(uploads).some((backup) =>
+        Object.values(backup).some((u) => u.status === "uploading"),
+      );
+      return hasActive;
+    } catch {
+      return false;
+    }
+  }, [id]);
+
   const fetchBackups = () => {
     api.get(`/api/servers/${id}/backups`)
-      .then(({ backups: b }) => setBackups(Array.isArray(b) ? b : []))
-      .catch(() => setBackups([]))
+      .then(({ backups: b }) => {
+        const list = Array.isArray(b) ? b : [];
+        setBackups(list);
+        backupsRef.current = list;
+      })
+      .catch(() => { setBackups([]); backupsRef.current = []; })
       .finally(() => setLoading(false));
   };
 
@@ -103,6 +134,19 @@ export default function BackupsPage() {
   useEffect(() => { fetchBackups(); fetchSchedules(); fetchBackupSettings(); }, [id]);
   useEffect(() => { if (ctxServer?.status) fetchBackups(); }, [ctxServer?.status]);
 
+  // On mount/refresh, resume progress polling if any loaded backup still has
+  // an in-flight upload. Progress is persisted in the DB, so a page refresh
+  // no longer loses live upload progress. Polling self-stops once idle.
+  useEffect(() => {
+    startProgressPolling();
+  }, [id]);
+
+  useEffect(() => {
+    return () => {
+      if (progressTimerRef.current) clearInterval(progressTimerRef.current);
+    };
+  }, []);
+
   const handleSaveSettings = async () => {
     setSavingSettings(true);
     try {
@@ -120,12 +164,49 @@ export default function BackupsPage() {
     }
   };
 
+  const startProgressPolling = useCallback(() => {
+    if (progressTimerRef.current) clearInterval(progressTimerRef.current);
+    fetchBackups();
+    progressTimerRef.current = setInterval(async () => {
+      // 1) In-memory live upload progress (only populated once an upload starts)
+      const hasLiveUpload = await fetchProgress();
+      // 2) DB-backed upload status across the latest backup list (covers the
+      //    long tar/checksum window and the period while uploads are still
+      //    recorded as 'uploading'/'pending' in the database)
+      const hasDbUpload = backupsRef.current.some((b) =>
+        Array.isArray(b.uploads) && b.uploads.some((u: any) => u.status === "uploading" || u.status === "pending"),
+      );
+      if (hasLiveUpload || hasDbUpload) {
+        setPreparing(false);
+        preparingRef.current = false;
+        preparingStartedAtRef.current = null;
+      } else if (preparingRef.current && preparingStartedAtRef.current &&
+                 Date.now() - preparingStartedAtRef.current > 5 * 60 * 1000) {
+        // Safety: if no upload ever materializes (background backup failed),
+        // clear the preparing indicator so the UI isn't stuck forever.
+        setPreparing(false);
+        preparingRef.current = false;
+        preparingStartedAtRef.current = null;
+      }
+      fetchBackups();
+      const stillActive = hasLiveUpload || hasDbUpload || preparingRef.current;
+      if (!stillActive && progressTimerRef.current) {
+        clearInterval(progressTimerRef.current);
+        progressTimerRef.current = null;
+        fetchBackups();
+      }
+    }, 2000);
+  }, [fetchProgress, fetchBackups]);
+
   const handleCreate = async () => {
     setCreating(true);
     try {
       await api.post(`/api/servers/${id}/backups`);
-      success("Backup created! Cloud upload starting...");
-      setTimeout(fetchBackups, 2000);
+      success("Backup started");
+      setPreparing(true);
+      preparingRef.current = true;
+      preparingStartedAtRef.current = Date.now();
+      startProgressPolling();
     } catch (err: any) {
       toastError("Failed to create backup", err.message);
     } finally {
@@ -143,15 +224,23 @@ export default function BackupsPage() {
     }
   };
 
-  const handleDelete = async (backupId: number) => {
-    if (!(await showConfirm({ title: "Delete Backup", message: "Delete this backup permanently?" }))) return;
+  const handleDelete = async (backupId: number, scope: string) => {
+    setDeletingScope(scope);
     try {
-      await api.delete(`/api/backups/${backupId}`);
+      await api.delete(`/api/backups/${backupId}?scope=${scope}`);
+      success(scope === "all" ? "Backup deleted" : scope === "local" ? "Local copy deleted" : "Cloud copy deleted");
+      setDeleteTarget(null);
       fetchBackups();
+      fetchProgress();
     } catch (err: any) {
       toastError("Failed to delete backup", err.message);
+    } finally {
+      setDeletingScope(null);
     }
   };
+
+  const hasCloudUploads = (backup: any) =>
+    Array.isArray(backup.uploads) && backup.uploads.some((u: any) => u.status !== "failed");
 
   const handleDownload = async (backupId: number) => {
     setDownloading(backupId);
@@ -237,6 +326,15 @@ export default function BackupsPage() {
       {ctxServer?.status !== "running" && (
         <div className="rounded-lg bg-yellow-500/10 px-4 py-3 text-sm text-yellow-500">
           Server must be running to create backups
+        </div>
+      )}
+
+      {(preparing || uploadInFlight) && (
+        <div className="flex items-center gap-2 rounded-lg bg-blue-500/10 px-4 py-3 text-sm text-blue-500">
+          <span className="h-3 w-3 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
+          {preparing
+            ? "Preparing backup… (compressing &amp; checksumming, upload starts shortly)"
+            : "Uploading backup… (progress shown below)"}
         </div>
       )}
 
@@ -457,17 +555,45 @@ export default function BackupsPage() {
                         </span>
                       )}
                     </p>
-                    {backup.uploads?.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {backup.uploads.map((u: any) => (
-                          <span
-                            key={u.id}
-                            className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs ${STATUS_BADGE[u.status] || ""}`}
-                          >
-                            {PROVIDER_ICONS[u.provider] || "☁️"} {PROVIDER_LABELS[u.provider] || u.provider}
-                            {u.status === "uploaded" ? " ✓" : u.status === "uploading" ? " ↻" : u.status === "failed" ? " ✗" : ""}
-                          </span>
-                        ))}
+                    {(backup.has_local || backup.uploads?.length > 0) && (
+                      <div className="mt-1 space-y-1">
+                        {backup.has_local && (
+                          <div className="flex items-center gap-2">
+                            <span className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs bg-zinc-500/10 text-zinc-400">
+                              💾 Local
+                            </span>
+                            <span className="text-xs text-green-500">Saved</span>
+                          </div>
+                        )}
+                        {backup.uploads.map((u: any) => {
+                          const prog = uploadProgress[backup.id]?.[u.provider];
+                          const isUploading = prog && prog.status === "uploading";
+                          const pct = prog?.percentage ?? (u.status === "uploaded" ? 100 : 0);
+                          return (
+                            <div key={u.id} className="flex items-center gap-2">
+                              <span className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs ${STATUS_BADGE[u.status] || ""}`}>
+                                {PROVIDER_ICONS[u.provider] || "☁️"} {PROVIDER_LABELS[u.provider] || u.provider}
+                              </span>
+                              {isUploading ? (
+                                <div className="flex flex-1 items-center gap-2">
+                                  <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-secondary">
+                                    <div
+                                      className="h-full rounded-full bg-blue-500 transition-all duration-500"
+                                      style={{ width: `${pct}%` }}
+                                    />
+                                  </div>
+                                  <span className="text-xs text-muted-foreground w-20 text-right">
+                                    {pct}% &middot; {formatBytes(prog.bytesUploaded)} / {formatBytes(prog.totalBytes)}
+                                  </span>
+                                </div>
+                              ) : u.status === "uploaded" ? (
+                                <span className="text-xs text-green-500">Done</span>
+                              ) : u.status === "failed" ? (
+                                <span className="text-xs text-red-500">Failed</span>
+                              ) : null}
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
                   </div>
@@ -476,12 +602,42 @@ export default function BackupsPage() {
                       {downloading === backup.id ? "..." : "Download"}
                     </Button>
                     <Button variant="outline" size="sm" onClick={() => handleRestore(backup.id)}>Restore</Button>
-                    <Button variant="destructive" size="sm" onClick={() => handleDelete(backup.id)}>Delete</Button>
+                    <Button variant="destructive" size="sm" onClick={() => setDeleteTarget(backup)}>Delete</Button>
                   </div>
                 </CardContent>
               </Card>
             );
           })}
+        </div>
+      )}
+
+      {deleteTarget && (
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center">
+          <div className="fixed inset-0 bg-black/50" onClick={() => setDeleteTarget(null)} />
+          <div className="relative z-10 mx-4 w-full max-w-md rounded-lg border bg-card p-6 shadow-xl">
+            <h3 className="text-lg font-semibold">Delete Backup</h3>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {deleteTarget.filename} — choose what to delete. This cannot be undone.
+            </p>
+            <div className="mt-6 flex flex-col gap-2">
+              {deleteTarget.has_local && (
+                <Button variant="destructive" onClick={() => handleDelete(deleteTarget.id, "local")} disabled={!!deletingScope}>
+                  {deletingScope === "local" ? "Deleting..." : "Delete Local copy only"}
+                </Button>
+              )}
+              {hasCloudUploads(deleteTarget) && (
+                <Button variant="destructive" onClick={() => handleDelete(deleteTarget.id, "cloud")} disabled={!!deletingScope}>
+                  {deletingScope === "cloud" ? "Deleting..." : "Delete from cloud only"}
+                </Button>
+              )}
+              <Button variant="destructive" onClick={() => handleDelete(deleteTarget.id, "all")} disabled={!!deletingScope}>
+                {deletingScope === "all" ? "Deleting..." : "Delete everywhere"}
+              </Button>
+              <Button variant="outline" onClick={() => setDeleteTarget(null)} disabled={!!deletingScope}>
+                Cancel
+              </Button>
+            </div>
+          </div>
         </div>
       )}
     </div>

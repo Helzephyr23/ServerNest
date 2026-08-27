@@ -683,15 +683,15 @@ describe("All Routes Integration", () => {
       const serverId = await createServer();
       svcCreateBackup.mockResolvedValue({ id: 1, filename: "s1.tar.gz" });
       const res = await app.inject({ method: "POST", url: `/api/servers/${serverId}/backups`, headers: admin() });
-      expect(res.statusCode).toBe(201);
-      expect(JSON.parse(res.payload).backup.id).toBe(1);
+      expect(res.statusCode).toBe(202);
+      expect(JSON.parse(res.payload).message).toBe("Backup started");
     });
 
-    it("returns 500 when backup creation fails", async () => {
+    it("returns 202 even when backup creation fails (async)", async () => {
       const serverId = await createServer();
       svcCreateBackup.mockRejectedValue(new Error("docker down"));
       const res = await app.inject({ method: "POST", url: `/api/servers/${serverId}/backups`, headers: admin() });
-      expect(res.statusCode).toBe(500);
+      expect(res.statusCode).toBe(202);
     });
 
     it("restores a backup", async () => {
@@ -707,7 +707,19 @@ describe("All Routes Integration", () => {
     it("deletes a backup", async () => {
       const res = await app.inject({ method: "DELETE", url: "/api/backups/1", headers: admin() });
       expect(res.statusCode).toBe(200);
-      expect(svcDeleteBackup).toHaveBeenCalledWith(1);
+      expect(svcDeleteBackup).toHaveBeenCalledWith(1, "all");
+    });
+
+    it("deletes a backup with a scope", async () => {
+      const res = await app.inject({ method: "DELETE", url: "/api/backups/1?scope=cloud", headers: admin() });
+      expect(res.statusCode).toBe(200);
+      expect(svcDeleteBackup).toHaveBeenCalledWith(1, "cloud");
+    });
+
+    it("defaults an invalid scope to all", async () => {
+      const res = await app.inject({ method: "DELETE", url: "/api/backups/1?scope=bogus", headers: admin() });
+      expect(res.statusCode).toBe(200);
+      expect(svcDeleteBackup).toHaveBeenCalledWith(1, "all");
     });
 
     it("returns 404 when downloading missing backup", async () => {
@@ -1132,7 +1144,7 @@ describe("All Routes Integration", () => {
       const serverId = await createServer();
       svcCreateBackup.mockResolvedValue({ id: 1, filename: "b.tar.gz" });
       const res = await app.inject({ method: "POST", url: `/api/servers/${serverId}/backups`, headers: op() });
-      expect(res.statusCode).toBe(201);
+      expect(res.statusCode).toBe(202);
     });
 
     it("blocks operator from listing users", async () => {

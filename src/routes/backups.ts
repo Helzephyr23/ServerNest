@@ -5,6 +5,7 @@ import {
   createBackup,
   restoreBackup,
   deleteBackup,
+  BackupDeleteScope,
 } from "../services/backup.service.js";
 import { downloadFromCloud, CloudStorageConfig } from "../services/cloud-storage.service.js";
 import db from "../config/database.js";
@@ -39,14 +40,40 @@ export default async function backupRoutes(app: FastifyInstance) {
     return { backups: getBackups(Number(id)) };
   });
 
-  app.post("/api/servers/:id/backups", opts, async (request, reply) => {
-    try {
-      const { id } = request.params as { id: string };
-      const backup = await createBackup(Number(id));
-      return reply.status(201).send({ backup });
-    } catch (err: unknown) {
-      return reply.status(500).send({ error: (err as Error).message });
+  app.get("/api/servers/:id/backups/progress", opts, async (request) => {
+    const { id } = request.params as { id: string };
+
+    // Persisted progress lives in backup_uploads, so it survives a page
+    // refresh. Aggregate per backup id + provider, mirroring the shape the
+    // frontend expects: { [backupId]: { [provider]: { bytesUploaded,
+    // totalBytes, percentage, status } } }.
+    const rows = db.prepare(`
+      SELECT bu.backup_id, csc.provider, bu.status, bu.bytes_uploaded, bu.total_bytes
+      FROM backup_uploads bu
+      JOIN cloud_storage_configs csc ON csc.id = bu.storage_id
+      JOIN backups b ON b.id = bu.backup_id
+      WHERE b.server_id = ?
+    `).all(Number(id)) as { backup_id: number; provider: string; status: string; bytes_uploaded: number; total_bytes: number }[];
+
+    const uploads: Record<number, Record<string, { bytesUploaded: number; totalBytes: number; percentage: number; status: string }>> = {};
+    for (const row of rows) {
+      if (!uploads[row.backup_id]) uploads[row.backup_id] = {};
+      uploads[row.backup_id][row.provider] = {
+        bytesUploaded: row.bytes_uploaded,
+        totalBytes: row.total_bytes,
+        percentage: row.total_bytes > 0 ? Math.round((row.bytes_uploaded / row.total_bytes) * 100) : 0,
+        status: row.status,
+      };
     }
+    return { uploads };
+  });
+
+  app.post("/api/servers/:id/backups", opts, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    createBackup(Number(id)).catch((err) => {
+      console.error("Background backup failed:", err.message);
+    });
+    return reply.status(202).send({ message: "Backup started" });
   });
 
   app.post("/api/servers/:id/backups/:backupId/restore", opts, async (request, reply) => {
@@ -61,7 +88,10 @@ export default async function backupRoutes(app: FastifyInstance) {
 
   app.delete("/api/backups/:backupId", opts, async (request) => {
     const { backupId } = request.params as { backupId: string };
-    deleteBackup(Number(backupId));
+    const { scope } = request.query as { scope?: string };
+    const valid: BackupDeleteScope[] = ["all", "local", "cloud"];
+    const resolvedScope: BackupDeleteScope = valid.includes(scope as BackupDeleteScope) ? (scope as BackupDeleteScope) : "all";
+    deleteBackup(Number(backupId), resolvedScope);
     return { success: true };
   });
 

@@ -2,6 +2,7 @@ import db from "../config/database.js";
 import docker from "../config/docker.js";
 import { notify } from "./notification.service.js";
 import { uploadBackupToCloud, deleteFromCloud, CloudStorageConfig } from "./cloud-storage.service.js";
+import { setUploadProgress, completeUpload } from "./backup-progress.js";
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
@@ -47,6 +48,7 @@ interface BackupUpload {
 
 interface BackupWithUploads extends Backup {
   uploads?: (BackupUpload & { provider: string; label: string })[];
+  has_local?: boolean;
 }
 
 const BACKUP_DIR = path.resolve("./data/backups");
@@ -64,6 +66,7 @@ export function getBackups(serverId: number): BackupWithUploads[] {
       JOIN cloud_storage_configs csc ON csc.id = bu.storage_id
       WHERE bu.backup_id = ?
     `).all(b.id) as (BackupUpload & { provider: string; label: string })[];
+    b.has_local = fs.existsSync(path.join(BACKUP_DIR, b.filename));
   }
   return backups;
 }
@@ -127,12 +130,19 @@ export async function createBackup(serverId: number): Promise<Backup> {
   // Async upload to all enabled cloud providers
   const cloudConfigs = db.prepare("SELECT * FROM cloud_storage_configs WHERE server_id = ? AND enabled = 1").all(serverId) as CloudStorageConfig[];
   for (const cfg of cloudConfigs) {
-    const uploadId = db.prepare("INSERT INTO backup_uploads (backup_id, storage_id, status) VALUES (?, ?, 'uploading')").run(backupId, cfg.id).lastInsertRowid;
-    uploadBackupToCloud(backupPath, filename, cfg)
+    const uploadId = db.prepare("INSERT INTO backup_uploads (backup_id, storage_id, status, total_bytes) VALUES (?, ?, 'uploading', ?)").run(backupId, cfg.id, stats.size).lastInsertRowid;
+    setUploadProgress(backupId, cfg.provider, serverId, 0, stats.size);
+    uploadBackupToCloud(backupPath, filename, cfg, stats.size, (bytesUploaded) => {
+      setUploadProgress(backupId, cfg.provider, serverId, bytesUploaded, stats.size);
+      // Persist byte progress so it survives a page refresh.
+      db.prepare("UPDATE backup_uploads SET bytes_uploaded = ?, status = 'uploading' WHERE id = ?").run(bytesUploaded, uploadId);
+    })
       .then(() => {
+        completeUpload(backupId, cfg.provider, "uploaded");
         db.prepare("UPDATE backup_uploads SET status = 'uploaded', checksum = ?, completed_at = datetime('now') WHERE id = ?").run(checksum, uploadId);
       })
       .catch((err: any) => {
+        completeUpload(backupId, cfg.provider, "failed");
         db.prepare("UPDATE backup_uploads SET status = 'failed', error = ?, completed_at = datetime('now') WHERE id = ?").run(err.message, uploadId);
         notify("backup_upload_failed", "Cloud Upload Failed", `Failed to upload "${filename}" to ${cfg.label}: ${err.message}`, 0xff0000);
       });
@@ -238,23 +248,44 @@ export async function restoreBackup(serverId: number, backupId: number): Promise
   notify("backup_restored", "Backup Restored", `Backup "${backup.filename}" restored for server "${server.name}"`, 0x00ff00);
 }
 
-export function deleteBackup(backupId: number) {
+export type BackupDeleteScope = "all" | "local" | "cloud";
+
+export function deleteBackup(backupId: number, scope: BackupDeleteScope = "all") {
   const backup = db.prepare("SELECT * FROM backups WHERE id = ?").get(backupId) as Backup | undefined;
-  if (backup) {
-    const backupPath = path.join(BACKUP_DIR, backup.filename);
+  if (!backup) return;
+
+  const backupPath = path.join(BACKUP_DIR, backup.filename);
+  const uploads = db.prepare(`
+    SELECT bu.id as upload_id, bu.status, csc.id as storage_id, csc.config_json, csc.provider
+    FROM backup_uploads bu
+    JOIN cloud_storage_configs csc ON csc.id = bu.storage_id
+    WHERE bu.backup_id = ?
+  `).all(backupId) as { upload_id: number; storage_id: number; config_json: string; provider: string; status: string }[];
+
+  if (scope === "local") {
     if (fs.existsSync(backupPath)) fs.unlinkSync(backupPath);
-    const uploads = db.prepare(`
-      SELECT bu.id as upload_id, bu.status, csc.id as storage_id, csc.config_json, csc.provider
-      FROM backup_uploads bu
-      JOIN cloud_storage_configs csc ON csc.id = bu.storage_id
-      WHERE bu.backup_id = ?
-    `).all(backupId) as { storage_id: number; config_json: string; provider: string; status: string }[];
+    return; // keep backup row + cloud uploads
+  }
+
+  if (scope === "cloud") {
     for (const u of uploads) {
       if (u.status === "uploaded") {
         deleteFromCloud({ id: u.storage_id, server_id: 0, provider: u.provider as CloudStorageConfig["provider"], label: "", config_json: u.config_json, enabled: 1, created_at: "" }, backup.filename).catch((err) => {
           console.error(`[backup] Failed to delete "${backup.filename}" from cloud:`, err.message);
         });
       }
+      db.prepare("DELETE FROM backup_uploads WHERE id = ?").run(u.upload_id);
+    }
+    return; // keep backup row + local file
+  }
+
+  // scope === "all" (default): remove local + cloud + backup row
+  if (fs.existsSync(backupPath)) fs.unlinkSync(backupPath);
+  for (const u of uploads) {
+    if (u.status === "uploaded") {
+      deleteFromCloud({ id: u.storage_id, server_id: 0, provider: u.provider as CloudStorageConfig["provider"], label: "", config_json: u.config_json, enabled: 1, created_at: "" }, backup.filename).catch((err) => {
+        console.error(`[backup] Failed to delete "${backup.filename}" from cloud:`, err.message);
+      });
     }
   }
   db.prepare("DELETE FROM backups WHERE id = ?").run(backupId);
