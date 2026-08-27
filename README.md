@@ -26,6 +26,7 @@ Biryani is a **free, open-source, self-hosted** Minecraft server management pane
 - **🌐 Multi-Node Cluster** — Manage servers across multiple machines from one dashboard
 - **📊 Live Metrics** — CPU, RAM, and player count monitoring per server with historical graphs
 - **💾 Backups** — Create, restore, download, and schedule backups with rotation
+- **🔄 Auto-Backups** — Automatic server backups on a configurable schedule (Aternos-style) with backup-on-stop
 - **☁️ Cloud Storage** — Sync backups to S3, Google Drive, or Dropbox
 - **🔧 Live Console** — Real-time console output and command input via xterm.js + Socket.IO
 - **👥 Player Management** — Whitelist, OP, and ban management

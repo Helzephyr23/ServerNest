@@ -143,6 +143,18 @@ export function migrate() {
   if (!serverColumns.some((c) => c.name === "icon")) {
     db.exec("ALTER TABLE servers ADD COLUMN icon TEXT DEFAULT NULL");
   }
+  if (!serverColumns.some((c) => c.name === "auto_backup")) {
+    db.exec("ALTER TABLE servers ADD COLUMN auto_backup INTEGER NOT NULL DEFAULT 1");
+  }
+  if (!serverColumns.some((c) => c.name === "backup_interval")) {
+    db.exec("ALTER TABLE servers ADD COLUMN backup_interval INTEGER NOT NULL DEFAULT 30");
+  }
+  if (!serverColumns.some((c) => c.name === "backup_retention")) {
+    db.exec("ALTER TABLE servers ADD COLUMN backup_retention INTEGER NOT NULL DEFAULT 10");
+  }
+  if (!serverColumns.some((c) => c.name === "last_auto_backup")) {
+    db.exec("ALTER TABLE servers ADD COLUMN last_auto_backup TEXT");
+  }
 
   const nodeColumns = db.prepare("PRAGMA table_info(nodes)").all() as { name: string }[];
   if (!nodeColumns.some((c) => c.name === "last_heartbeat")) {

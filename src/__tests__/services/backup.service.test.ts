@@ -122,7 +122,7 @@ describe("backup.service", () => {
         testDb.prepare("INSERT INTO backups (server_id, filename, size) VALUES (?, ?, ?)").run(serverId, `s1-${i}.tar.gz`, 100);
         testDb.prepare("INSERT INTO backups (server_id, filename, size) VALUES (?, ?, ?)").run(s2Id, `s2-${i}.tar.gz`, 100);
       }
-      rotateAllBackups(10);
+      rotateAllBackups();
       expect(getBackups(serverId).length).toBe(10);
       expect(getBackups(s2Id).length).toBe(10);
     });

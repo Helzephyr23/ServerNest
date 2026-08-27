@@ -227,6 +227,7 @@ describe("server.service", () => {
   describe("stopServer", () => {
     it("should stop a running server and set status to stopped", async () => {
       const server = createServer({ name: "Test", mc_version: "1.21.4", software: "vanilla", ram_mb: 2048, port: 25565, eula_accepted: true });
+      testDb.prepare("UPDATE servers SET auto_backup = 0 WHERE id = ?").run(server.id);
       vi.mocked(docker.getContainer).mockReturnValue({ ...mockContainer, remove: vi.fn().mockRejectedValue(new Error("no container")) } as any);
       await startServer(server.id);
       await stopServer(server.id);
@@ -242,6 +243,7 @@ describe("server.service", () => {
   describe("restartServer", () => {
     it("should stop then start a server", async () => {
       const server = createServer({ name: "Test", mc_version: "1.21.4", software: "vanilla", ram_mb: 2048, port: 25565, eula_accepted: true });
+      testDb.prepare("UPDATE servers SET auto_backup = 0 WHERE id = ?").run(server.id);
       vi.mocked(docker.getContainer).mockReturnValue({ ...mockContainer, remove: vi.fn().mockRejectedValue(new Error("no container")) } as any);
       await startServer(server.id);
       await restartServer(server.id);
