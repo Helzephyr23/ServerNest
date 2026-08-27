@@ -20,7 +20,7 @@ export default async function cloudStorageRoutes(app: FastifyInstance) {
   app.get("/api/servers/:id/cloud-storage", opts, async (request) => {
     const { id } = request.params as { id: string };
     const configs = db
-      .prepare("SELECT * FROM cloud_storage_configs WHERE server_id = ? ORDER BY created_at DESC")
+      .prepare("SELECT * FROM cloud_storage_configs WHERE server_id = ? AND provider != 'gdrive' ORDER BY created_at DESC")
       .all(Number(id)) as CloudStorageConfig[];
     return {
       configs: configs.map((c) => ({

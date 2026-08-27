@@ -262,6 +262,12 @@ export function migrate() {
       locked_until TEXT,
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     );
+
+    CREATE TABLE IF NOT EXISTS gdrive_oauth_states (
+      state      TEXT PRIMARY KEY,
+      server_id  INTEGER NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
   `);
 
   const userColumns = db.prepare("PRAGMA table_info(users)").all() as { name: string }[];

@@ -26,6 +26,8 @@ export const env = {
   NODE_NAME: process.env.NODE_NAME || "master",
   NODE_API_KEY: process.env.NODE_API_KEY || "",
   GRPC_PORT: parseInt(process.env.GRPC_PORT || "50051", 10),
+  GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID || "",
+  GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET || "",
 };
 
 export function checkJwtSecret(): void {
