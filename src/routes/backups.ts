@@ -40,13 +40,11 @@ export default async function backupRoutes(app: FastifyInstance) {
   });
 
   app.post("/api/servers/:id/backups", opts, async (request, reply) => {
-    try {
-      const { id } = request.params as { id: string };
-      const backup = await createBackup(Number(id));
-      return reply.status(201).send({ backup });
-    } catch (err: unknown) {
-      return reply.status(500).send({ error: (err as Error).message });
-    }
+    const { id } = request.params as { id: string };
+    createBackup(Number(id)).catch((err) => {
+      console.error("Background backup failed:", err.message);
+    });
+    return reply.status(202).send({ message: "Backup started" });
   });
 
   app.post("/api/servers/:id/backups/:backupId/restore", opts, async (request, reply) => {

@@ -106,6 +106,8 @@ export default async function googleDriveRoutes(app: FastifyInstance) {
 
       const configJson = JSON.stringify({
         refreshToken,
+        clientId: env.GOOGLE_CLIENT_ID,
+        clientSecret: env.GOOGLE_CLIENT_SECRET,
         email,
         connectedAt: new Date().toISOString(),
       });

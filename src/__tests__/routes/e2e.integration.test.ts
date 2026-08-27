@@ -556,8 +556,8 @@ describe("E2E Integration Scenarios", () => {
         method: "POST", url: `/api/servers/${serverId}/backups`,
         headers,
       });
-      expect(createRes.statusCode).toBe(201);
-      expect(JSON.parse(createRes.payload).backup.id).toBe(1);
+      expect(createRes.statusCode).toBe(202);
+      expect(JSON.parse(createRes.payload).message).toBe("Backup started");
 
       svcGetBackups.mockReturnValue([{ id: 1, filename: "backup-1.tar.gz", size: 1024 }]);
       const listRes = await app.inject({
@@ -589,7 +589,7 @@ describe("E2E Integration Scenarios", () => {
       expect(JSON.parse(emptyRes.payload).backups).toEqual([]);
     });
 
-    it("create returns 500 on failure", async () => {
+    it("create returns 202 even on failure (async)", async () => {
       const setup = await setupAdmin();
       const serverId = await createServer(setup.token);
 
@@ -598,7 +598,7 @@ describe("E2E Integration Scenarios", () => {
         method: "POST", url: `/api/servers/${serverId}/backups`,
         headers: await authHeader(setup.token),
       });
-      expect(res.statusCode).toBe(500);
+      expect(res.statusCode).toBe(202);
     });
   });
 
@@ -776,7 +776,7 @@ describe("E2E Integration Scenarios", () => {
       ]);
 
       for (const res of results) {
-        expect(res.statusCode).toBe(201);
+        expect(res.statusCode).toBe(202);
       }
     });
 
