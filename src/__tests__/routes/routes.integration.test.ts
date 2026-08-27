@@ -707,7 +707,19 @@ describe("All Routes Integration", () => {
     it("deletes a backup", async () => {
       const res = await app.inject({ method: "DELETE", url: "/api/backups/1", headers: admin() });
       expect(res.statusCode).toBe(200);
-      expect(svcDeleteBackup).toHaveBeenCalledWith(1);
+      expect(svcDeleteBackup).toHaveBeenCalledWith(1, "all");
+    });
+
+    it("deletes a backup with a scope", async () => {
+      const res = await app.inject({ method: "DELETE", url: "/api/backups/1?scope=cloud", headers: admin() });
+      expect(res.statusCode).toBe(200);
+      expect(svcDeleteBackup).toHaveBeenCalledWith(1, "cloud");
+    });
+
+    it("defaults an invalid scope to all", async () => {
+      const res = await app.inject({ method: "DELETE", url: "/api/backups/1?scope=bogus", headers: admin() });
+      expect(res.statusCode).toBe(200);
+      expect(svcDeleteBackup).toHaveBeenCalledWith(1, "all");
     });
 
     it("returns 404 when downloading missing backup", async () => {

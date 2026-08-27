@@ -48,11 +48,13 @@ vi.mock("../../services/cloud-storage.service.js", () => ({
 }));
 
 const { getBackups, deleteBackup, rotateBackups, rotateAllBackups, createBackup, restoreBackup } = await import("../../services/backup.service.js");
+const { deleteFromCloud } = await import("../../services/cloud-storage.service.js") as unknown as { deleteFromCloud: ReturnType<typeof vi.fn> };
 
 describe("backup.service", () => {
   let serverId: number;
 
   beforeEach(() => {
+    vi.clearAllMocks();
     testDb.exec("DELETE FROM backups");
     testDb.exec("DELETE FROM backup_uploads");
     testDb.exec("DELETE FROM server_config");
@@ -89,11 +91,38 @@ describe("backup.service", () => {
   });
 
   describe("deleteBackup", () => {
-    it("should delete backup from database", () => {
+    it("should delete backup (all scope) from database", () => {
       testDb.prepare("INSERT INTO backups (server_id, filename, size) VALUES (?, ?, ?)").run(serverId, "test.tar.gz", 1024);
       const backup = testDb.prepare("SELECT * FROM backups WHERE filename = 'test.tar.gz'").get() as any;
       deleteBackup(backup.id);
       expect((testDb.prepare("SELECT COUNT(*) as count FROM backups").get() as any).count).toBe(0);
+    });
+
+    it("should delete local scope only, keeping the backup row and cloud uploads", () => {
+      testDb.prepare("INSERT INTO cloud_storage_configs (server_id, provider, label, config_json, enabled) VALUES (?, 'gdrive', 'Drive', '{}', 1)").run(serverId);
+      const storageId = (testDb.prepare("SELECT id FROM cloud_storage_configs WHERE server_id = ?").get(serverId) as any).id;
+      testDb.prepare("INSERT INTO backups (server_id, filename, size) VALUES (?, ?, ?)").run(serverId, "test.tar.gz", 1024);
+      const backup = testDb.prepare("SELECT * FROM backups WHERE filename = 'test.tar.gz'").get() as any;
+      testDb.prepare("INSERT INTO backup_uploads (backup_id, storage_id, status) VALUES (?, ?, 'uploaded')").run(backup.id, storageId);
+
+      deleteBackup(backup.id, "local");
+
+      expect((testDb.prepare("SELECT COUNT(*) as count FROM backups").get() as any).count).toBe(1);
+      expect((testDb.prepare("SELECT COUNT(*) as count FROM backup_uploads").get() as any).count).toBe(1);
+    });
+
+    it("should delete cloud scope only, keeping the backup row and local copy", () => {
+      testDb.prepare("INSERT INTO cloud_storage_configs (server_id, provider, label, config_json, enabled) VALUES (?, 'gdrive', 'Drive', '{}', 1)").run(serverId);
+      const storageId = (testDb.prepare("SELECT id FROM cloud_storage_configs WHERE server_id = ?").get(serverId) as any).id;
+      testDb.prepare("INSERT INTO backups (server_id, filename, size) VALUES (?, ?, ?)").run(serverId, "test.tar.gz", 1024);
+      const backup = testDb.prepare("SELECT * FROM backups WHERE filename = 'test.tar.gz'").get() as any;
+      testDb.prepare("INSERT INTO backup_uploads (backup_id, storage_id, status) VALUES (?, ?, 'uploaded')").run(backup.id, storageId);
+
+      deleteBackup(backup.id, "cloud");
+
+      expect(deleteFromCloud).toHaveBeenCalled();
+      expect((testDb.prepare("SELECT COUNT(*) as count FROM backups").get() as any).count).toBe(1);
+      expect((testDb.prepare("SELECT COUNT(*) as count FROM backup_uploads").get() as any).count).toBe(0);
     });
   });
 

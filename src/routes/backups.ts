@@ -5,6 +5,7 @@ import {
   createBackup,
   restoreBackup,
   deleteBackup,
+  BackupDeleteScope,
 } from "../services/backup.service.js";
 import { downloadFromCloud, CloudStorageConfig } from "../services/cloud-storage.service.js";
 import db from "../config/database.js";
@@ -87,7 +88,10 @@ export default async function backupRoutes(app: FastifyInstance) {
 
   app.delete("/api/backups/:backupId", opts, async (request) => {
     const { backupId } = request.params as { backupId: string };
-    deleteBackup(Number(backupId));
+    const { scope } = request.query as { scope?: string };
+    const valid: BackupDeleteScope[] = ["all", "local", "cloud"];
+    const resolvedScope: BackupDeleteScope = valid.includes(scope as BackupDeleteScope) ? (scope as BackupDeleteScope) : "all";
+    deleteBackup(Number(backupId), resolvedScope);
     return { success: true };
   });
 

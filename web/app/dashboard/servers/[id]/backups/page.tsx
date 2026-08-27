@@ -78,6 +78,12 @@ export default function BackupsPage() {
   const preparingStartedAtRef = useRef<number | null>(null);
   const progressTimerRef = useRef<NodeJS.Timeout | null>(null);
   const backupsRef = useRef<any[]>([]);
+  const [deleteTarget, setDeleteTarget] = useState<any | null>(null);
+  const [deletingScope, setDeletingScope] = useState<string | null>(null);
+
+  const uploadInFlight = backups.some((b) =>
+    Array.isArray(b.uploads) && b.uploads.some((u: any) => u.status === "uploading"),
+  );
 
   const fetchProgress = useCallback(async () => {
     try {
@@ -218,15 +224,23 @@ export default function BackupsPage() {
     }
   };
 
-  const handleDelete = async (backupId: number) => {
-    if (!(await showConfirm({ title: "Delete Backup", message: "Delete this backup permanently?" }))) return;
+  const handleDelete = async (backupId: number, scope: string) => {
+    setDeletingScope(scope);
     try {
-      await api.delete(`/api/backups/${backupId}`);
+      await api.delete(`/api/backups/${backupId}?scope=${scope}`);
+      success(scope === "all" ? "Backup deleted" : scope === "local" ? "Local copy deleted" : "Cloud copy deleted");
+      setDeleteTarget(null);
       fetchBackups();
+      fetchProgress();
     } catch (err: any) {
       toastError("Failed to delete backup", err.message);
+    } finally {
+      setDeletingScope(null);
     }
   };
+
+  const hasCloudUploads = (backup: any) =>
+    Array.isArray(backup.uploads) && backup.uploads.some((u: any) => u.status !== "failed");
 
   const handleDownload = async (backupId: number) => {
     setDownloading(backupId);
@@ -315,10 +329,12 @@ export default function BackupsPage() {
         </div>
       )}
 
-      {preparing && (
+      {(preparing || uploadInFlight) && (
         <div className="flex items-center gap-2 rounded-lg bg-blue-500/10 px-4 py-3 text-sm text-blue-500">
           <span className="h-3 w-3 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
-          Preparing backup… (compressing &amp; checksumming, upload starts shortly)
+          {preparing
+            ? "Preparing backup… (compressing &amp; checksumming, upload starts shortly)"
+            : "Uploading backup… (progress shown below)"}
         </div>
       )}
 
@@ -539,8 +555,16 @@ export default function BackupsPage() {
                         </span>
                       )}
                     </p>
-                    {backup.uploads?.length > 0 && (
+                    {(backup.has_local || backup.uploads?.length > 0) && (
                       <div className="mt-1 space-y-1">
+                        {backup.has_local && (
+                          <div className="flex items-center gap-2">
+                            <span className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs bg-zinc-500/10 text-zinc-400">
+                              💾 Local
+                            </span>
+                            <span className="text-xs text-green-500">Saved</span>
+                          </div>
+                        )}
                         {backup.uploads.map((u: any) => {
                           const prog = uploadProgress[backup.id]?.[u.provider];
                           const isUploading = prog && prog.status === "uploading";
@@ -578,12 +602,42 @@ export default function BackupsPage() {
                       {downloading === backup.id ? "..." : "Download"}
                     </Button>
                     <Button variant="outline" size="sm" onClick={() => handleRestore(backup.id)}>Restore</Button>
-                    <Button variant="destructive" size="sm" onClick={() => handleDelete(backup.id)}>Delete</Button>
+                    <Button variant="destructive" size="sm" onClick={() => setDeleteTarget(backup)}>Delete</Button>
                   </div>
                 </CardContent>
               </Card>
             );
           })}
+        </div>
+      )}
+
+      {deleteTarget && (
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center">
+          <div className="fixed inset-0 bg-black/50" onClick={() => setDeleteTarget(null)} />
+          <div className="relative z-10 mx-4 w-full max-w-md rounded-lg border bg-card p-6 shadow-xl">
+            <h3 className="text-lg font-semibold">Delete Backup</h3>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {deleteTarget.filename} — choose what to delete. This cannot be undone.
+            </p>
+            <div className="mt-6 flex flex-col gap-2">
+              {deleteTarget.has_local && (
+                <Button variant="destructive" onClick={() => handleDelete(deleteTarget.id, "local")} disabled={!!deletingScope}>
+                  {deletingScope === "local" ? "Deleting..." : "Delete Local copy only"}
+                </Button>
+              )}
+              {hasCloudUploads(deleteTarget) && (
+                <Button variant="destructive" onClick={() => handleDelete(deleteTarget.id, "cloud")} disabled={!!deletingScope}>
+                  {deletingScope === "cloud" ? "Deleting..." : "Delete from cloud only"}
+                </Button>
+              )}
+              <Button variant="destructive" onClick={() => handleDelete(deleteTarget.id, "all")} disabled={!!deletingScope}>
+                {deletingScope === "all" ? "Deleting..." : "Delete everywhere"}
+              </Button>
+              <Button variant="outline" onClick={() => setDeleteTarget(null)} disabled={!!deletingScope}>
+                Cancel
+              </Button>
+            </div>
+          </div>
         </div>
       )}
     </div>
