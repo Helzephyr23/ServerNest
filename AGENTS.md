@@ -25,7 +25,9 @@ biryani/
 │   ├── routes/
 │   │   ├── auth.ts        # POST /api/auth/login, /setup, /me
 │   │   ├── servers.ts     # CRUD + start/stop/restart
-│   │   ├── backups.ts     # Backup CRUD + restore
+│   │   ├── backups.ts     # Backup CRUD + restore + live progress + scope delete
+│   │   ├── cloud-storage.ts # S3/Google Drive/Dropbox config CRUD
+│   │   ├── google-drive.ts  # Google OAuth (auth-url/callback/status/disconnect)
 │   │   ├── files.ts       # In-container file browser (ls/cat/write/mkdir/rm)
 │   │   ├── mods.ts        # Modrinth search + install
 │   │   ├── nodes.ts       # Multi-node agent management
@@ -33,7 +35,9 @@ biryani/
 │   ├── services/
 │   │   ├── auth.service.ts    # User setup, login, JWT
 │   │   ├── server.service.ts  # Server lifecycle (create/start/stop/destroy)
-│   │   ├── backup.service.ts  # Backup create/restore/delete
+│   │   ├── backup.service.ts  # Backup create/restore/delete (scope: all/local/cloud)
+│   │   ├── backup-progress.ts # In-memory progress store (legacy; endpoint reads DB)
+│   │   ├── cloud-storage.service.ts # S3/Google Drive/Dropbox; GDrive resumable upload via global fetch; _loadSdk/_setSdkLoader test seam
 │   │   ├── modrinth.service.ts # Modrinth API client
 │   │   ├── node.service.ts    # Node agent communication
 │   │   └── metrics.service.ts # System metrics collection
@@ -85,9 +89,12 @@ biryani/
 - `PUT /api/servers/:id/files/content` - Write file content
 - `POST /api/servers/:id/files/mkdir` - Create directory
 - `DELETE /api/servers/:id/files?path=` - Delete file/folder
-- `GET/POST /api/servers/:id/backups` - Backup list/create
+- `GET/POST /api/servers/:id/backups` - Backup list/create (async, 202)
+- `GET /api/servers/:id/backups/progress` - Live upload progress (DB-backed)
 - `POST /api/servers/:id/backups/:id/restore` - Restore backup
-- `DELETE /api/backups/:id` - Delete backup
+- `DELETE /api/backups/:id?scope=all|local|cloud` - Delete backup (default all)
+- `GET/POST/PUT/DELETE /api/servers/:id/cloud-storage[/:configId]` - Cloud config CRUD
+- `GET/POST/DELETE /api/google-drive/auth-url|callback|status|disconnect` - Google Drive OAuth
 - `GET /api/servers/:id/mods/search?q=&facets=` - Search Modrinth
 - `POST /api/servers/:id/mods/install` - Install mod
 - `GET/POST/DELETE /api/servers/:id/players/whitelist` - Whitelist CRUD
@@ -106,6 +113,7 @@ biryani/
 - Frontend uses `useAuth()` hook from `web/lib/auth.tsx` for auth state
 - shadcn/ui components in `web/components/ui/`
 - `formatBytes` and `formatDate` utils in `web/lib/utils.ts`
+- Backup upload progress is persisted to DB (`bytes_uploaded`/`total_bytes` on `backup_uploads`) so progress survives page refresh; Google Drive uploads use a resumable protocol via Node's global `fetch` (not gaxios)
 
 ## Development
 - `npm run dev` - Start both API and frontend in dev mode

@@ -28,6 +28,7 @@ Biryani is a **free, open-source, self-hosted** Minecraft server management pane
 - **💾 Backups** — Create, restore, download, and schedule backups with rotation
 - **🔄 Auto-Backups** — Automatic server backups on a configurable schedule (Aternos-style) with backup-on-stop
 - **☁️ Cloud Storage** — Sync backups to S3, Google Drive, or Dropbox
+- **📈 Upload Progress** — Live upload progress bars that persist across page refreshes; backups can be deleted locally-only, cloud-only, or everywhere
 - **🔧 Live Console** — Real-time console output and command input via xterm.js + Socket.IO
 - **👥 Player Management** — Whitelist, OP, and ban management
 - **📁 File Manager** — Browse, edit, upload, and download files inside your server container
@@ -387,9 +388,10 @@ All endpoints are prefixed with `/api` and require JWT authentication (`Authoriz
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
 | `GET` | `/api/servers/:id/backups` | auth | List backups |
-| `POST` | `/api/servers/:id/backups` | auth | Create backup |
+| `POST` | `/api/servers/:id/backups` | auth | Create backup (async, returns 202) |
+| `GET` | `/api/servers/:id/backups/progress` | auth | Get live upload progress for a server's backups |
 | `POST` | `/api/servers/:id/backups/:backupId/restore` | auth | Restore backup |
-| `DELETE` | `/api/backups/:backupId` | auth | Delete backup |
+| `DELETE` | `/api/backups/:backupId` | auth | Delete backup (`?scope=all\|local\|cloud`) |
 | `GET` | `/api/servers/:id/backups/:backupId/download` | auth | Download backup |
 
 ### Files
@@ -557,6 +559,8 @@ pnpm install && pnpm start
 ## Cloud Storage Setup
 
 Backups can be synced to S3-compatible storage, Google Drive, or Dropbox. Configure under **Server → Cloud Storage** tab.
+
+Cloud uploads use a resumable protocol (for Google Drive) so large backups won't time out, with a live progress bar that persists across page refreshes. Deleted backups can be removed locally-only, from the cloud only, or everywhere (`DELETE /api/backups/:backupId?scope=local|cloud|all`).
 
 ### S3-Compatible (AWS, Backblaze B2, MinIO, DigitalOcean Spaces)
 
