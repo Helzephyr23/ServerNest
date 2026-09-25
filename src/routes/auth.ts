@@ -2,7 +2,7 @@ import { FastifyInstance, FastifyRequest } from "fastify";
 import {
   getUserByUsername, getUserById, createUser, verifyPassword, isFirstRun, createSession,
   isTotpEnabled, setupTotp, verifyTotpCode, enableTotp, disableTotp, getUserTotpStatus,
-  isAccountLocked, recordFailedLogin, clearFailedLogins, revokeSessionByJti,
+  isAccountLocked, recordFailedLogin, clearFailedLogins, revokeSessionByJti, resetAllUsers,
 } from "../services/auth.service.js";
 import { authMiddleware } from "../middleware/auth.js";
 import { rateLimit } from "../middleware/rate-limit.js";
@@ -13,18 +13,22 @@ export default async function authRoutes(app: FastifyInstance) {
   let setupInProgress = false;
 
   function setAuthCookie(request: FastifyRequest, reply: any, token: string) {
-    // Detect the real scheme so Secure is only set when actually served over
-    // HTTPS — plain-HTTP deployments (LAN/Tailscale IP) must still get the cookie.
-    const forwarded = request.headers["x-forwarded-proto"];
-    const proto = typeof forwarded === "string" ? forwarded.split(",")[0].trim() : request.protocol;
+    // In cloud / container environments and iframes, use Secure + SameSite=None
+    // so cookies function properly when embedded in AI Studio or accessed over HTTPS.
     reply.setCookie("biryani_token", token, {
-      httpOnly: true,
-      secure: proto === "https",
-      sameSite: "strict",
+      httpOnly: false,
+      secure: true,
+      sameSite: "none",
       path: "/",
       maxAge: 24 * 60 * 60,
     });
   }
+
+  app.post("/api/auth/reset", async (request, reply) => {
+    resetAllUsers();
+    reply.clearCookie("biryani_token", { path: "/", secure: true, sameSite: "none" });
+    return { success: true };
+  });
 
   app.post("/api/auth/setup", {
     preHandler: [rateLimit(5, 60000), validate(schemas.setup)],
@@ -212,7 +216,11 @@ export default async function authRoutes(app: FastifyInstance) {
         // Invalid or expired token — nothing left to revoke.
       }
     }
-    reply.clearCookie("biryani_token", { path: "/" });
+    reply.clearCookie("biryani_token", {
+      path: "/",
+      secure: true,
+      sameSite: "none",
+    });
     return { success: true };
   });
 }

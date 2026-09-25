@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useRef, useState, ReactNode } from "react";
-import { api } from "./api";
+import { api, clearToken, setToken } from "./api";
 import { disconnectSocket } from "./socket";
 import { useToast } from "@/components/toast";
 
@@ -55,6 +55,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (res.requiresTotp) {
       return { requiresTotp: true, tempToken: res.tempToken };
     }
+    if (res.token) {
+      setToken(res.token);
+    }
     setUser(res.user);
     api.get("/api/auth/me")
       .then((response: any) => setExpiresAt(response?.expiresAt ?? null))
@@ -63,6 +66,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const verifyTotp = async (tempToken: string, code: string) => {
     const res = await api.post("/api/auth/2fa/challenge", { tempToken, code });
+    if (res.token) {
+      setToken(res.token);
+    }
     setUser(res.user);
     api.get("/api/auth/me")
       .then((response: any) => setExpiresAt(response?.expiresAt ?? null))
@@ -71,6 +77,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = async () => {
     disconnectSocket();
+    clearToken();
     try {
       await api.post("/api/auth/logout");
     } catch {}

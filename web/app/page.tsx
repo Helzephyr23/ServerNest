@@ -1,36 +1,33 @@
-"use client";
+import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { api } from "@/lib/api";
+const API_HOST = process.env.API_HOST || "127.0.0.1";
+const API_PORT = process.env.API_PORT || "3001";
 
-export default function Home() {
-  const router = useRouter();
-
-  useEffect(() => {
-    api.get("/api/auth/status").then(({ firstRun }) => {
-      if (firstRun) {
-        router.replace("/setup");
-      } else {
-        api.get("/api/auth/me")
-          .then(() => {
-            router.replace("/dashboard");
-          })
-          .catch(() => {
-            router.replace("/login");
-          });
-      }
-    }).catch(() => {
-      router.replace("/login");
+export default async function Home() {
+  let firstRun = false;
+  try {
+    const res = await fetch(`http://${API_HOST}:${API_PORT}/api/auth/status`, {
+      cache: "no-store",
     });
-  }, [router]);
+    if (res.ok) {
+      const data = await res.json();
+      firstRun = !!data.firstRun;
+    }
+  } catch {
+    // Fallback to setup if status cannot be determined
+    firstRun = true;
+  }
 
-  return (
-    <div className="flex min-h-screen items-center justify-center">
-      <div className="flex flex-col items-center gap-4">
-        <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-        <p className="text-sm text-muted-foreground">Loading Biryani...</p>
-      </div>
-    </div>
-  );
+  if (firstRun) {
+    redirect("/setup");
+  }
+
+  const cookieStore = await cookies();
+  const token = cookieStore.get("biryani_token")?.value;
+  if (token) {
+    redirect("/dashboard");
+  }
+
+  redirect("/login");
 }
