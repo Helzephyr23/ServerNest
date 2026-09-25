@@ -4,14 +4,19 @@
   "description": "Free, self-hosted Minecraft server management panel",
   "license": "GPL-3.0-only",
   "private": true,
+  "workspaces": [
+    "src",
+    "web",
+    "agent"
+  ],
   "scripts": {
-    "dev": "concurrently \"pnpm --filter @biryani/api dev\" \"pnpm --filter @biryani/web dev\"",
-    "build": "pnpm --filter @biryani/api build && pnpm --filter @biryani/web build",
-    "start": "pnpm --filter @biryani/api start",
-    "lint": "pnpm -r lint",
-    "typecheck": "pnpm -r typecheck",
-    "test": "pnpm -r test",
-    "test:watch": "pnpm -r test:watch"
+    "dev": "concurrently \"npm run dev --workspace=src\" \"npm run dev --workspace=web\"",
+    "build": "npm run build --workspace=src && npm run build --workspace=web",
+    "start": "npm run start --workspace=src",
+    "lint": "npm run lint --workspace=src && npm run lint --workspace=web",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm test --workspaces --if-present",
+    "test:watch": "npm run test:watch --workspaces --if-present"
   },
   "devDependencies": {
     "@eslint/js": "8.57.1",
@@ -22,8 +27,11 @@
   "engines": {
     "node": ">=20.0.0"
   },
-  "packageManager": "pnpm@9.15.0",
   "dependencies": {
     "cron-parser": "^5.10.0"
+  },
+  "overrides": {
+    "sharp": ">=0.35.0",
+    "postcss": ">=8.5.23"
   }
 }

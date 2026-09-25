@@ -55,7 +55,7 @@ await app.register(helmet, {
   hsts: env.NODE_ENV === "production" ? { maxAge: 31536000, includeSubDomains: true } : false,
   xssFilter: true,
   noSniff: true,
-  frameguard: { action: "deny" },
+  frameguard: false,
   referrerPolicy: { policy: "strict-origin-when-cross-origin" },
 });
 
