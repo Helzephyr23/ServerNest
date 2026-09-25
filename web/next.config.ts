@@ -30,6 +30,10 @@ const nextConfig: NextConfig = {
         source: "/api/:path*",
         destination: `http://${API_HOST}:${API_PORT}/api/:path*`,
       },
+      {
+        source: "/socket.io/:path*",
+        destination: `http://${API_HOST}:${API_PORT}/socket.io/:path*`,
+      },
     ];
   },
   async headers() {

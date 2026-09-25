@@ -533,7 +533,7 @@ All endpoints are prefixed with `/api` and require JWT authentication (`Authoriz
 | `NODE_API_KEY` | - | API key for agent authentication |
 | `GRPC_PORT` | `50051` | Agent Express port |
 | `CORS_ORIGIN` | `false` (prod) | CORS origin. Set to frontend URL in production. |
-| `NEXT_PUBLIC_SOCKET_URL` | - | Optional Socket.IO origin override |
+| `NEXT_PUBLIC_SOCKET_URL` | - | Socket.IO origin override (unset = same-origin via the Next.js `/socket.io` proxy) |
 | `GOOGLE_CLIENT_ID` | - | Google OAuth client ID (for Google Drive cloud storage) |
 | `GOOGLE_CLIENT_SECRET` | - | Google OAuth client secret |
 

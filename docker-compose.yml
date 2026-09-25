@@ -43,8 +43,6 @@ services:
     build:
       context: .
       target: web-runtime
-      args:
-        NEXT_PUBLIC_SOCKET_URL: ${NEXT_PUBLIC_SOCKET_URL:-}
     restart: unless-stopped
     networks:
       - biryani

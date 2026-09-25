@@ -21,10 +21,9 @@ COPY web/package.json ./web/
 RUN pnpm install --frozen-lockfile
 COPY web/ ./web/
 ENV NEXT_TELEMETRY_DISABLED=1
-# REST is same-origin via the Next.js /api proxy. Socket.IO defaults to the
-# page origin too; override only for exotic reverse-proxy topologies.
-ARG NEXT_PUBLIC_SOCKET_URL=""
-ENV NEXT_PUBLIC_SOCKET_URL=$NEXT_PUBLIC_SOCKET_URL
+# REST and Socket.IO are both same-origin via the Next.js /api and /socket.io
+# proxies (see next.config.ts), so they work from any host (localhost, LAN,
+# Tailscale, custom domain) without build-time URL overrides.
 WORKDIR /app/web
 ENV NODE_ENV=production
 RUN NEXT_BIN=$(find /app/node_modules/.pnpm -type f -path "*/next/dist/bin/next" 2>/dev/null | head -1) && \
