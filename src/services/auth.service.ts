@@ -218,3 +218,9 @@ export function getUserTotpStatus(userId: number): { enabled: boolean; setup: bo
     setup: !!user?.totp_secret,
   };
 }
+
+export function resetAllUsers(): void {
+  db.prepare("DELETE FROM users").run();
+  db.prepare("DELETE FROM sessions").run();
+  db.prepare("DELETE FROM failed_logins").run();
+}

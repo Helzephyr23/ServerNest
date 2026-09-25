@@ -44,18 +44,20 @@ const app = Fastify({
   serverFactory: (handler) => http.createServer((req, res) => handler(req, res)),
 });
 
-const corsOrigin = process.env.CORS_ORIGIN || (env.NODE_ENV === "production" ? false : true);
+const corsOrigin: string | boolean = process.env.CORS_ORIGIN || true;
 await app.register(cors, { origin: corsOrigin, credentials: true });
 await app.register(jwt, { secret: env.JWT_SECRET, sign: { expiresIn: env.JWT_EXPIRES_IN } });
 await app.register(cookie);
 await app.register(multipart, { limits: { fileSize: 2048 * 1024 * 1024 } });
 
 await app.register(helmet, {
-  contentSecurityPolicy: env.NODE_ENV === "production" ? undefined : false,
+  contentSecurityPolicy: false,
+  crossOriginOpenerPolicy: false,
+  crossOriginResourcePolicy: false,
   hsts: env.NODE_ENV === "production" ? { maxAge: 31536000, includeSubDomains: true } : false,
   xssFilter: true,
   noSniff: true,
-  frameguard: { action: "deny" },
+  frameguard: false,
   referrerPolicy: { policy: "strict-origin-when-cross-origin" },
 });
 
@@ -103,7 +105,7 @@ app.log.info(`Biryani API running on port ${env.API_PORT}`);
 
 const io = new SocketIOServer(app.server as ReturnType<typeof http.createServer>, {
   cors: {
-    origin: corsOrigin === true ? true : corsOrigin === false ? false : corsOrigin,
+    origin: corsOrigin,
     credentials: true,
   },
 });

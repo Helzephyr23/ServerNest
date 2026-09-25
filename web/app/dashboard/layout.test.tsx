@@ -1,10 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
+import React from "react";
 
 const mockReplace = vi.fn();
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace: mockReplace }),
+  usePathname: () => "/dashboard",
 }));
+vi.mock("next/link", () => {
+  const Link = ({ children, ...props }: any) => <a {...props}>{children}</a>;
+  return { default: Link };
+});
 
 vi.mock("@/components/error-boundary", () => ({
   ErrorBoundary: ({ children }: any) => <div>{children}</div>,
@@ -48,7 +54,7 @@ describe("DashboardLayout AuthGuard", () => {
         <div>Child content</div>
       </DashboardLayout>
     );
-    expect(screen.getByText("Loading...")).toBeInTheDocument();
+    expect(screen.getByText("Connecting to control plane...")).toBeInTheDocument();
     expect(mockReplace).not.toHaveBeenCalled();
   });
 

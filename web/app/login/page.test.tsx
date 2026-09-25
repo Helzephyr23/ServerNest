@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import React from "react";
@@ -13,10 +13,6 @@ vi.mock("@/lib/auth", () => ({
     login: mockLogin,
     verifyTotp: mockVerifyTotp,
   }),
-}));
-
-vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
 }));
 
 vi.mock("@/components/ui/button", () => ({
@@ -38,26 +34,31 @@ import LoginPage from "@/app/login/page";
 describe("LoginPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ json: async () => ({ firstRun: false }) }));
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it("renders username and password fields", () => {
     render(<LoginPage />);
-    expect(screen.getByPlaceholderText("admin")).toBeInTheDocument();
-    expect(screen.getByPlaceholderText("••••••••")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Administrator username")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("••••••••••••")).toBeInTheDocument();
   });
 
   it("renders a sign in button", () => {
     render(<LoginPage />);
-    expect(screen.getByRole("button", { name: /sign in/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /enter control plane/i })).toBeInTheDocument();
   });
 
   it("calls login with credentials on submit", async () => {
     mockLogin.mockResolvedValueOnce(undefined);
     render(<LoginPage />);
     const user = userEvent.setup();
-    await user.type(screen.getByPlaceholderText("admin"), "admin");
-    await user.type(screen.getByPlaceholderText("••••••••"), "password123");
-    await user.click(screen.getByRole("button", { name: /sign in/i }));
+    await user.type(screen.getByPlaceholderText("Administrator username"), "admin");
+    await user.type(screen.getByPlaceholderText("••••••••••••"), "password123");
+    await user.click(screen.getByRole("button", { name: /enter control plane/i }));
     await waitFor(() => {
       expect(mockLogin).toHaveBeenCalledWith("admin", "password123");
     });
@@ -67,11 +68,11 @@ describe("LoginPage", () => {
     mockLogin.mockResolvedValueOnce({ requiresTotp: true, tempToken: "tok123" });
     render(<LoginPage />);
     const user = userEvent.setup();
-    await user.type(screen.getByPlaceholderText("admin"), "admin");
-    await user.type(screen.getByPlaceholderText("••••••••"), "password123");
-    await user.click(screen.getByRole("button", { name: /sign in/i }));
+    await user.type(screen.getByPlaceholderText("Administrator username"), "admin");
+    await user.type(screen.getByPlaceholderText("••••••••••••"), "password123");
+    await user.click(screen.getByRole("button", { name: /enter control plane/i }));
     await waitFor(() => {
-      expect(screen.getByPlaceholderText("000000")).toBeInTheDocument();
+      expect(screen.getByPlaceholderText("000 000")).toBeInTheDocument();
     });
   });
 
@@ -79,9 +80,9 @@ describe("LoginPage", () => {
     mockLogin.mockRejectedValueOnce(new Error("Invalid credentials"));
     render(<LoginPage />);
     const user = userEvent.setup();
-    await user.type(screen.getByPlaceholderText("admin"), "admin");
-    await user.type(screen.getByPlaceholderText("••••••••"), "wrong");
-    await user.click(screen.getByRole("button", { name: /sign in/i }));
+    await user.type(screen.getByPlaceholderText("Administrator username"), "admin");
+    await user.type(screen.getByPlaceholderText("••••••••••••"), "wrong");
+    await user.click(screen.getByRole("button", { name: /enter control plane/i }));
     await waitFor(() => {
       expect(screen.getByText(/invalid credentials/i)).toBeInTheDocument();
     });
@@ -91,9 +92,9 @@ describe("LoginPage", () => {
     mockLogin.mockImplementation(() => new Promise((r) => setTimeout(r, 5000)));
     render(<LoginPage />);
     const user = userEvent.setup();
-    await user.type(screen.getByPlaceholderText("admin"), "admin");
-    await user.type(screen.getByPlaceholderText("••••••••"), "password123");
-    const btn = screen.getByRole("button", { name: /sign in/i });
+    await user.type(screen.getByPlaceholderText("Administrator username"), "admin");
+    await user.type(screen.getByPlaceholderText("••••••••••••"), "password123");
+    const btn = screen.getByRole("button", { name: /enter control plane/i });
     await user.click(btn);
     await user.click(btn);
     expect(mockLogin).toHaveBeenCalledTimes(1);
