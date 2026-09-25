@@ -13,12 +13,25 @@ import {
   findNodeForNewServer,
 } from "../services/node.service.js";
 import { getNodeMetrics } from "../services/metrics.service.js";
+import { getSystemUsage } from "../services/system.service.js";
 export default async function nodeRoutes(app: FastifyInstance) {
   const opts = { preHandler: [authMiddleware] };
   const adminOpts = { preHandler: [authMiddleware, adminMiddleware] };
 
   app.get("/api/nodes", opts, async () => {
-    return { nodes: getAllNodes() };
+    const nodes = getAllNodes().map((node) => {
+      if (node.name === "master") {
+        const usage = getSystemUsage();
+        return {
+          ...node,
+          cpu_percent: usage.cpu_percent,
+          memory_percent: usage.memory_percent,
+          disk_percent: usage.disk_percent,
+        };
+      }
+      return node;
+    });
+    return { nodes };
   });
 
   app.get("/api/nodes/:id", opts, async (request, reply) => {

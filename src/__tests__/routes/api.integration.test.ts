@@ -132,14 +132,15 @@ describe("Auth API Integration", () => {
       return list.find((c: string) => c.startsWith("biryani_token="));
     }
 
-    it("sets the auth cookie without Secure over plain http", async () => {
+    it("sets the auth cookie with Secure + SameSite=None and readable by JS", async () => {
       await app.inject({ method: "POST", url: "/api/auth/setup", payload: { username: "admin", password: "password123" } });
       const res = await app.inject({ method: "POST", url: "/api/auth/login", payload: { username: "admin", password: "password123" } });
       expect(res.statusCode).toBe(200);
       const cookie = getAuthCookie(res);
       expect(cookie).toBeDefined();
-      expect(cookie).toContain("HttpOnly");
-      expect(cookie).not.toContain("Secure");
+      expect(cookie).not.toContain("HttpOnly");
+      expect(cookie).toContain("Secure");
+      expect(cookie).toContain("SameSite=None");
     });
 
     it("marks the auth cookie Secure when forwarded via https", async () => {

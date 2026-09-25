@@ -17,7 +17,9 @@ import {
   ShoppingBag,
   Terminal,
   RefreshCw,
+  Timer,
 } from "lucide-react";
+import { formatBytes } from "@/lib/utils";
 
 interface NodeData {
   id: number | string;
@@ -42,6 +44,20 @@ interface ServerData {
   icon?: string;
 }
 
+interface SystemData {
+  hostname: string;
+  platform: string;
+  cores: number;
+  uptime_seconds: number;
+  cpu_percent: number;
+  memory_total_mb: number;
+  memory_used_mb: number;
+  memory_percent: number;
+  disk_total_mb: number;
+  disk_used_mb: number;
+  disk_percent: number;
+}
+
 interface OverviewData {
   nodes: NodeData[];
   metrics: {
@@ -50,6 +66,48 @@ interface OverviewData {
     total_memory_mb: number;
     used_memory_mb: number;
   };
+  system?: SystemData;
+}
+
+const mbToBytes = (mb: number) => mb * 1024 * 1024;
+
+function formatUptime(seconds: number): string {
+  if (!seconds || seconds <= 0) return "N/A";
+  const d = Math.floor(seconds / 86400);
+  const h = Math.floor((seconds % 86400) / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  if (d > 0) return `${d}d ${h}h ${m}m`;
+  if (h > 0) return `${h}h ${m}m`;
+  return `${m}m`;
+}
+
+function SysGauge({
+  label,
+  percent,
+  detail,
+  barClass,
+}: {
+  label: string;
+  percent: number;
+  detail: string;
+  barClass: string;
+}) {
+  const value = Math.min(Math.max(percent || 0, 0), 100);
+  return (
+    <div className="rounded-lg border border-border/60 bg-background/50 p-3">
+      <div className="flex items-center justify-between text-xs">
+        <span className="font-mono font-medium uppercase tracking-wider text-muted-foreground">{label}</span>
+        <span className="font-mono font-semibold text-foreground tabular-nums">{value.toFixed(1)}%</span>
+      </div>
+      <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-muted/80">
+        <div
+          className={`h-full rounded-full bg-gradient-to-r ${barClass} transition-all duration-500`}
+          style={{ width: `${value}%` }}
+        />
+      </div>
+      <p className="mt-2 text-[11px] font-mono text-muted-foreground">{detail}</p>
+    </div>
+  );
 }
 
 export default function DashboardPage() {
@@ -76,6 +134,7 @@ export default function DashboardPage() {
           total_memory_mb: 0,
           used_memory_mb: 0,
         },
+        system: overview?.system,
       };
       setData(safeData);
       const list = Array.isArray(serverRes?.servers) ? serverRes.servers : [];
@@ -327,6 +386,57 @@ export default function DashboardPage() {
           </div>
         </Card>
       </div>
+
+      {/* Host Machine Usage */}
+      {data?.system && (
+        <Card className="border-border/80 bg-card/60 backdrop-blur-sm">
+          <CardHeader className="p-4 pb-3 border-b border-border/60">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary border border-primary/20">
+                  <Cpu className="h-4 w-4" />
+                </div>
+                <div>
+                  <CardTitle className="text-sm font-semibold">Host Machine</CardTitle>
+                  <p className="text-[11px] font-mono text-muted-foreground">
+                    {data.system.hostname} · {data.system.platform}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-4 text-[11px] font-mono text-muted-foreground">
+                <span className="flex items-center gap-1">
+                  <Cpu className="h-3 w-3" /> {data.system.cores} cores
+                </span>
+                <span className="flex items-center gap-1">
+                  <Timer className="h-3 w-3" /> up {formatUptime(data.system.uptime_seconds)}
+                </span>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="p-4">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <SysGauge
+                label="CPU"
+                percent={data.system.cpu_percent}
+                detail={`${data.system.cpu_percent}% of ${data.system.cores} cores`}
+                barClass="from-primary to-emerald-400"
+              />
+              <SysGauge
+                label="Memory"
+                percent={data.system.memory_percent}
+                detail={`${formatBytes(mbToBytes(data.system.memory_used_mb))} / ${formatBytes(mbToBytes(data.system.memory_total_mb))}`}
+                barClass="from-emerald-400 to-cyan-400"
+              />
+              <SysGauge
+                label="Disk"
+                percent={data.system.disk_percent}
+                detail={`${formatBytes(mbToBytes(data.system.disk_used_mb))} / ${formatBytes(mbToBytes(data.system.disk_total_mb))}`}
+                barClass="from-amber-400 to-orange-400"
+              />
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Servers Management Section */}
       <div>

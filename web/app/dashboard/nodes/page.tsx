@@ -54,6 +54,8 @@ export default function NodesPage() {
   const totalServers = nodes.reduce((acc: number, n: any) => acc + (n.current_servers || 0), 0);
   const onlineNodes = nodes.filter((n: any) => n.status === "online").length;
 
+  const pct = (v?: number | null) => (v == null ? "0" : Number(v).toFixed(1));
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -154,10 +156,24 @@ export default function NodesPage() {
           {nodes.map((node) => (
             <Card key={node.id}>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-lg">{node.name}</CardTitle>
-                <span className={`rounded-full px-2 py-1 text-xs font-medium ${
-                  node.status === "online" ? "bg-green-500/10 text-green-500" : "bg-red-500/10 text-red-500"
-                }`}>{node.status}</span>
+                <div>
+                  <CardTitle className="text-lg">{node.name}</CardTitle>
+                  {node.name === "master" && (
+                    <p className="text-[11px] font-mono text-muted-foreground">
+                      Local control plane · this machine
+                    </p>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  {node.name === "master" && (
+                    <span className="rounded-full border border-primary/30 bg-primary/10 px-2 py-1 text-xs font-medium text-primary">
+                      Local
+                    </span>
+                  )}
+                  <span className={`rounded-full px-2 py-1 text-xs font-medium ${
+                    node.status === "online" ? "bg-green-500/10 text-green-500" : "bg-red-500/10 text-red-500"
+                  }`}>{node.status}</span>
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
@@ -174,7 +190,7 @@ export default function NodesPage() {
                       <div>
                         <div className="flex justify-between text-xs">
                           <span>CPU</span>
-                          <span>{node.cpu_percent || 0}%</span>
+                          <span>{pct(node.cpu_percent)}%</span>
                         </div>
                         <div className="h-1.5 rounded-full bg-zinc-800">
                           <div className="h-full rounded-full bg-blue-500" style={{ width: `${Math.min(node.cpu_percent || 0, 100)}%` }} />
@@ -183,7 +199,7 @@ export default function NodesPage() {
                       <div>
                         <div className="flex justify-between text-xs">
                           <span>Memory</span>
-                          <span>{node.memory_percent || 0}%</span>
+                          <span>{pct(node.memory_percent)}%</span>
                         </div>
                         <div className="h-1.5 rounded-full bg-zinc-800">
                           <div className="h-full rounded-full bg-green-500" style={{ width: `${Math.min(node.memory_percent || 0, 100)}%` }} />
@@ -192,7 +208,7 @@ export default function NodesPage() {
                       <div>
                         <div className="flex justify-between text-xs">
                           <span>Disk</span>
-                          <span>{node.disk_percent || 0}%</span>
+                          <span>{pct(node.disk_percent)}%</span>
                         </div>
                         <div className="h-1.5 rounded-full bg-zinc-800">
                           <div className="h-full rounded-full bg-yellow-500" style={{ width: `${Math.min(node.disk_percent || 0, 100)}%` }} />
