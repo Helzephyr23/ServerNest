@@ -16,6 +16,10 @@ const nextConfig: NextConfig = {
         destination: `http://${API_HOST}:${API_PORT}/api/:path*`,
       },
       {
+        source: "/socket.io",
+        destination: `http://${API_HOST}:${API_PORT}/socket.io/`,
+      },
+      {
         source: "/socket.io/:path*",
         destination: `http://${API_HOST}:${API_PORT}/socket.io/:path*`,
       },
