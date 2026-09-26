@@ -1,7 +1,7 @@
 import { FastifyInstance } from "fastify";
 import { authMiddleware } from "../middleware/auth.js";
 import { validate, schemas } from "../middleware/validate.js";
-import { searchMods, searchPlugins, getProject, getProjectVersions, downloadMod } from "../services/modrinth.service.js";
+import { searchMods, searchPlugins, getProject, getProjectVersions, downloadMod, toModrinthLoader } from "../services/modrinth.service.js";
 import { getServerById } from "../services/server.service.js";
 import db from "../config/database.js";
 import { readdirSync, statSync, unlinkSync, existsSync } from "fs";
@@ -122,7 +122,7 @@ export default async function modsRoutes(app: FastifyInstance) {
 
     for (const mod of dbMods) {
       try {
-        const versions = await getProjectVersions(mod.slug, server.mc_version);
+        const versions = await getProjectVersions(mod.slug, server.mc_version, toModrinthLoader(server.software));
         if (versions.length === 0) {
           db.prepare("UPDATE installed_mods SET has_update = 0, latest_version = NULL WHERE server_id = ? AND filename = ?")
             .run(Number(id), mod.filename);
@@ -169,7 +169,7 @@ export default async function modsRoutes(app: FastifyInstance) {
     if (!mod || !mod.slug) return reply.status(400).send({ error: "Mod slug not found — cannot check for updates" });
 
     try {
-      const versions = await getProjectVersions(mod.slug, server.mc_version);
+      const versions = await getProjectVersions(mod.slug, server.mc_version, toModrinthLoader(server.software));
       if (versions.length === 0) return reply.status(404).send({ error: "No versions found" });
       const latest = versions[0];
 

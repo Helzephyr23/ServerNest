@@ -3,6 +3,26 @@ import { join } from "path";
 
 const MODRINTH_API = "https://api.modrinth.com/v2";
 
+const MODRINTH_LOADERS = new Set([
+  "fabric",
+  "forge",
+  "neoforge",
+  "quilt",
+  "paper",
+  "spigot",
+  "purpur",
+  "bukkit",
+  "folia",
+  "sponge",
+  "velocity",
+  "bungeecord",
+  "waterfall",
+]);
+
+export function toModrinthLoader(software: string): string | undefined {
+  return MODRINTH_LOADERS.has(software) ? software : undefined;
+}
+
 export interface ModrinthProject {
   slug: string;
   title: string;

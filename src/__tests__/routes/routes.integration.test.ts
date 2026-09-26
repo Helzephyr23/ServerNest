@@ -50,8 +50,11 @@ const searchPlugins = vi.hoisted(() => vi.fn());
 const getProject = vi.hoisted(() => vi.fn());
 const getProjectVersions = vi.hoisted(() => vi.fn());
 const downloadMod = vi.hoisted(() => vi.fn());
+const toModrinthLoader = vi.hoisted(() => vi.fn((software: string) =>
+  ["fabric", "forge", "neoforge", "quilt", "paper", "spigot", "purpur", "bukkit", "folia", "sponge", "velocity", "bungeecord", "waterfall"].includes(software) ? software : undefined
+));
 vi.mock("../../services/modrinth.service.js", () => ({
-  searchMods, searchPlugins, getProject, getProjectVersions, downloadMod,
+  searchMods, searchPlugins, getProject, getProjectVersions, downloadMod, toModrinthLoader,
 }));
 
 const getNodeMetrics = vi.hoisted(() => vi.fn());
@@ -1034,6 +1037,42 @@ describe("All Routes Integration", () => {
         method: "POST", url: `/api/servers/${serverId}/mods/update/manual.jar`, headers: admin(),
       });
       expect(noSlug.statusCode).toBe(400);
+    });
+
+    it("flags updates only for the server's loader, not the latest published version", async () => {
+      const serverId = await createServer("Fabric Check");
+      testDb.prepare("UPDATE servers SET software = 'fabric' WHERE id = ?").run(serverId);
+      testDb.prepare("INSERT INTO installed_mods (server_id, slug, mod_name, filename, version) VALUES (?, ?, ?, ?, ?)")
+        .run(serverId, "sodium", "Sodium", "sodium-old.jar", "0.5");
+
+      getProjectVersions.mockResolvedValue([{ id: "v-fabric", version_number: "1.0-fabric" }]);
+      const res = await app.inject({
+        method: "POST", url: `/api/servers/${serverId}/mods/check-updates`, headers: admin(),
+      });
+      expect(res.statusCode).toBe(200);
+      expect(JSON.parse(res.payload).updates[0]).toMatchObject({ slug: "sodium", latestVersion: "1.0-fabric", latestVersionId: "v-fabric" });
+      expect(getProjectVersions).toHaveBeenCalledWith("sodium", "1.21.4", "fabric");
+    });
+
+    it("updates with a version matching the server's loader, not a newer different-loader build", async () => {
+      const serverId = await createServer("Fabric Update");
+      testDb.prepare("UPDATE servers SET software = 'fabric' WHERE id = ?").run(serverId);
+      testDb.prepare("INSERT INTO installed_mods (server_id, slug, mod_name, filename, version) VALUES (?, ?, ?, ?, ?)")
+        .run(serverId, "sodium", "Sodium", "sodium-old.jar", "0.5");
+
+      const fabricVersion = { id: "v-fabric", version_number: "1.0-fabric", loaders: ["fabric"] };
+      const neoforgeVersion = { id: "v-neoforge", version_number: "2.0-neoforge", loaders: ["neoforge"] };
+      getProjectVersions.mockImplementation((_slug: string, _ver: string, loader?: string) =>
+        Promise.resolve(loader === "fabric" ? [fabricVersion] : [neoforgeVersion])
+      );
+      downloadMod.mockResolvedValue({ success: true, slug: "sodium", filename: "sodium-fabric.jar", version_number: "1.0-fabric" });
+
+      const res = await app.inject({
+        method: "POST", url: `/api/servers/${serverId}/mods/update/sodium-old.jar`, headers: admin(),
+      });
+      expect(res.statusCode).toBe(200);
+      expect(JSON.parse(res.payload)).toMatchObject({ filename: "sodium-fabric.jar", version: "1.0-fabric" });
+      expect(downloadMod).toHaveBeenCalledWith("v-fabric", expect.any(String));
     });
 
     it("returns 500 when deleting a missing mod file", async () => {

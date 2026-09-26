@@ -14,7 +14,7 @@ afterEach(() => {
   fetchMock.mockReset();
 });
 
-const { searchMods, searchPlugins, getProject, getProjectVersions, downloadMod } = await import(
+const { searchMods, searchPlugins, getProject, getProjectVersions, downloadMod, toModrinthLoader } = await import(
   "../../services/modrinth.service.js"
 );
 
@@ -89,6 +89,25 @@ describe("getProject", () => {
   it("throws for a missing project", async () => {
     fetchMock.mockResolvedValue(jsonResponse(404, { error: "not found" }));
     await expect(getProject("nope")).rejects.toThrow("Project not found");
+  });
+});
+
+describe("toModrinthLoader", () => {
+  it.each([
+    ["fabric", "fabric"],
+    ["forge", "forge"],
+    ["neoforge", "neoforge"],
+    ["paper", "paper"],
+    ["spigot", "spigot"],
+    ["purpur", "purpur"],
+    ["sponge", "sponge"],
+    ["velocity", "velocity"],
+    ["bungeecord", "bungeecord"],
+    ["vanilla", undefined],
+    ["bedrock", undefined],
+    ["custom-stuff", undefined],
+  ])("maps %s -> %s", (software, expected) => {
+    expect(toModrinthLoader(software)).toBe(expected);
   });
 });
 
