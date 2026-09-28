@@ -15,7 +15,7 @@ export default async function authRoutes(app: FastifyInstance) {
   function setAuthCookie(request: FastifyRequest, reply: any, token: string) {
     // In cloud / container environments and iframes, use Secure + SameSite=None
     // so cookies function properly when embedded in AI Studio or accessed over HTTPS.
-    reply.setCookie("biryani_token", token, {
+    reply.setCookie("servernest_token", token, {
       httpOnly: false,
       secure: true,
       sameSite: "none",
@@ -26,7 +26,7 @@ export default async function authRoutes(app: FastifyInstance) {
 
   app.post("/api/auth/reset", async (request, reply) => {
     resetAllUsers();
-    reply.clearCookie("biryani_token", { path: "/", secure: true, sameSite: "none" });
+    reply.clearCookie("servernest_token", { path: "/", secure: true, sameSite: "none" });
     return { success: true };
   });
 
@@ -180,7 +180,7 @@ export default async function authRoutes(app: FastifyInstance) {
   app.get("/api/auth/me", {
     preHandler: [async (req, reply) => {
       try {
-        const token = req.cookies?.biryani_token
+        const token = req.cookies?.servernest_token
           ?? req.headers.authorization?.replace("Bearer ", "");
         if (!token) return reply.status(401).send({ error: "No token" });
         const decoded = app.jwt.verify<{ id: number; username: string; role: string }>(token);
@@ -190,7 +190,7 @@ export default async function authRoutes(app: FastifyInstance) {
       }
     }]
   }, async (request) => {
-    const token = request.cookies?.biryani_token
+    const token = request.cookies?.servernest_token
       ?? request.headers.authorization?.replace("Bearer ", "");
     let expiresAt: number | null = null;
     if (token) {
@@ -206,7 +206,7 @@ export default async function authRoutes(app: FastifyInstance) {
   app.post("/api/auth/logout", async (request, reply) => {
     // Best-effort: revoke the server-side session tied to this token so it
     // disappears from the active sessions list and stops being accepted.
-    const token = request.cookies?.biryani_token
+    const token = request.cookies?.servernest_token
       ?? request.headers.authorization?.replace("Bearer ", "");
     if (token) {
       try {
@@ -216,7 +216,7 @@ export default async function authRoutes(app: FastifyInstance) {
         // Invalid or expired token — nothing left to revoke.
       }
     }
-    reply.clearCookie("biryani_token", {
+    reply.clearCookie("servernest_token", {
       path: "/",
       secure: true,
       sameSite: "none",

@@ -230,7 +230,7 @@ export default async function serverRoutes(app: FastifyInstance) {
     const server = getServerById(Number(id));
     if (!server) return reply.status(404).send({ error: "Server not found" });
 
-    const containerName = `biryani-mc-${server.id}`;
+    const containerName = `servernest-mc-${server.id}`;
     try {
       const container = docker.getContainer(containerName);
       await container.stop({ t: 30 }).catch(() => {});

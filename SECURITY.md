@@ -11,7 +11,7 @@ Currently, only the latest commit on the `main` branch receives security updates
 
 ## Reporting a Vulnerability
 
-Biryani handles authentication (JWT, Argon2), Docker container management, and file system access — making security a top priority.
+ServerNest handles authentication (JWT, Argon2), Docker container management, and file system access — making security a top priority.
 
 If you discover a security vulnerability, please **do not open a public issue**. Instead, report it privately:
 
@@ -34,7 +34,7 @@ We believe in responsible disclosure and will credit you in the release notes on
 
 ## Security Measures
 
-Biryani implements the following security measures out of the box:
+ServerNest implements the following security measures out of the box:
 
 - **Password hashing** — Argon2id (memory-hard, tuned parameters)
 - **JWT authentication** — Tokens expire every 24 hours

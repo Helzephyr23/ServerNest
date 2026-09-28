@@ -3,7 +3,7 @@ import { getUserById, getSessionByJti, touchSession } from "../services/auth.ser
 
 export async function authMiddleware(request: FastifyRequest, reply: FastifyReply) {
   try {
-    const token = request.cookies?.biryani_token
+    const token = request.cookies?.servernest_token
       ?? request.headers.authorization?.replace("Bearer ", "");
     if (!token) {
       return reply.status(401).send({ error: "No token provided" });

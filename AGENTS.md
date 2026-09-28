@@ -1,7 +1,7 @@
-# AGENTS.md - Biryani Project Context
+# AGENTS.md - ServerNest Project Context
 
 ## Project Overview
-**Biryani** is an open-source, self-hosted Minecraft server management panel (a free, self-hosted alternative to proprietary panels).
+**ServerNest** is an open-source, self-hosted Minecraft server management panel (a free, self-hosted alternative to proprietary panels).
 
 ## Tech Stack
 - **Backend**: Node.js + TypeScript + Fastify (port 3001)
@@ -14,7 +14,7 @@
 
 ## Project Structure
 ```
-biryani/
+servernest/
 ├── src/                    # Fastify API backend
 │   ├── index.ts           # Entry point, registers all routes
 │   ├── config/
@@ -69,7 +69,7 @@ biryani/
 │       ├── api.ts          # API client wrapper (same-origin, Next proxies /api/*)
 │       └── auth.tsx        # Auth context provider
 ├── Dockerfile              # Multi-stage build
-├── docker-compose.yml      # Single biryani service
+├── docker-compose.yml      # Single servernest service
 ├── .dockerignore
 ├── .env.example
 └── package.json

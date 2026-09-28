@@ -184,7 +184,7 @@ export async function setupTotp(userId: number): Promise<{ secret: string; uri: 
   const { otplib, qrcode } = await loadTotpLibs();
   const secret = otplib.generateSecret();
   const user = db.prepare("SELECT username FROM users WHERE id = ?").get(userId) as { username: string } | undefined;
-  const uri = otplib.generateURI({ issuer: "Biryani", label: user?.username || "user", secret });
+  const uri = otplib.generateURI({ issuer: "ServerNest", label: user?.username || "user", secret });
   const qr = await qrcode.toDataURL(uri);
 
   db.prepare("UPDATE users SET totp_secret = ? WHERE id = ?").run(encryptSecret(secret), userId);

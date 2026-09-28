@@ -21,7 +21,7 @@ export const env = {
   API_PORT: parseInt(process.env.API_PORT || "3001", 10),
   JWT_SECRET: resolveJwtSecret(),
   JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || "24h",
-  DATABASE_PATH: process.env.DATABASE_PATH || "./data/biryani.db",
+  DATABASE_PATH: process.env.DATABASE_PATH || "./data/servernest.db",
   DOCKER_IMAGE: process.env.DOCKER_IMAGE || "itzg/minecraft-server",
   SERVER_PORT_RANGE_START: parseInt(process.env.SERVER_PORT_RANGE_START || "25565", 10),
   SERVER_PORT_RANGE_END: parseInt(process.env.SERVER_PORT_RANGE_END || "25665", 10),

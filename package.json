@@ -1,5 +1,5 @@
 {
-  "name": "biryani",
+  "name": "servernest",
   "version": "0.1.0",
   "description": "Free, self-hosted Minecraft server management panel",
   "license": "GPL-3.0-only",
@@ -16,16 +16,16 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Helzephyr23/biryani.git"
+    "url": "git+https://github.com/Helzephyr23/servernest.git"
   },
   "bugs": {
-    "url": "https://github.com/Helzephyr23/biryani/issues"
+    "url": "https://github.com/Helzephyr23/servernest/issues"
   },
-  "homepage": "https://github.com/Helzephyr23/biryani",
+  "homepage": "https://github.com/Helzephyr23/servernest",
   "scripts": {
-    "dev": "concurrently \"pnpm --filter @biryani/api dev\" \"pnpm --filter @biryani/web dev\"",
-    "build": "pnpm --filter @biryani/api build && pnpm --filter @biryani/web build",
-    "start": "pnpm --filter @biryani/api start",
+    "dev": "concurrently \"pnpm --filter @servernest/api dev\" \"pnpm --filter @servernest/web dev\"",
+    "build": "pnpm --filter @servernest/api build && pnpm --filter @servernest/web build",
+    "start": "pnpm --filter @servernest/api start",
     "lint": "pnpm -r lint",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",

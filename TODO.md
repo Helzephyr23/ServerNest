@@ -1,4 +1,4 @@
-# Biryani Development Phases
+# ServerNest Development Phases
 
 ## Phase 1: Backend Core (Fastify + SQLite) ✅
 - [x] Project scaffolding & monorepo setup

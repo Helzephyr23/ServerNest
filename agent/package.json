@@ -1,7 +1,7 @@
 {
-  "name": "@biryani/agent",
+  "name": "@servernest/agent",
   "version": "0.1.0",
-  "description": "Biryani node agent for multi-node support",
+  "description": "ServerNest node agent for multi-node support",
   "type": "module",
   "main": "dist/index.js",
   "scripts": {

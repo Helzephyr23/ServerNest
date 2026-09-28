@@ -19,7 +19,7 @@ A full codebase audit was conducted before launch. Below is a summary of finding
 - **Error handler** — centralized `setErrorHandler` sanitizes 500 errors in production (no stack traces leaked)
 
 ### Infrastructure
-- **Docker Compose networking** — added `biryani` bridge network; `web` container now reaches `api` via hostname
+- **Docker Compose networking** — added `servernest` bridge network; `web` container now reaches `api` via hostname
 - **Next.js proxy** — rewrite destination uses `API_HOST`/`API_PORT` env vars (defaults `localhost:3001`)
 - **`.gitignore`** — added `web/.env`, `.env.*.local`, `.vscode/`, `.idea/`
 
@@ -84,7 +84,7 @@ A full codebase audit was conducted before launch. Below is a summary of finding
 - [x] **Hardcoded Minecraft versions** — `new/page.tsx` and `import/page.tsx` now fetch from `/api/mc-versions` with fallback
 - [x] **Shared constants** — extracted `SOFTWARE_OPTIONS`, `RAM_OPTIONS`, `FALLBACK_VERSIONS` to `web/lib/constants.ts`
 - [x] **Server context error state** — `ServerContextType` now includes `error: string | null`
-- [x] **Install script** — uses `BIRYANI_REPO` env var, checks for `docker compose` v2
+- [x] **Install script** — uses `SERVERNEST_REPO` env var, checks for `docker compose` v2
 - [x] **Docker socket warning** — inline security comment in `docker-compose.yml`
 - [x] **web/public** — created with `robots.txt`
 
@@ -106,7 +106,7 @@ A full codebase audit was conducted before launch. Below is a summary of finding
 |---|---|---|
 | `.gitignore` | Added patterns for `web/.env`, `.env.*.local`, `.vscode/`, `.idea/` |
 | `.github/workflows/ci.yml` | Created CI pipeline (lint → typecheck → test → build) |
-| `docker-compose.yml` | Added `biryani` network; `API_HOST=api` env for web container |
+| `docker-compose.yml` | Added `servernest` network; `API_HOST=api` env for web container |
 | `src/config/env.ts` | `JWT_EXPIRES_IN` 24h; `checkJwtSecret()` startup guard |
 | `src/config/database.ts` | Added `failed_logins` table for brute-force lockout tracking |
 | `src/index.ts` | CORS, CSP, HSTS, error handler, Socket.IO CORS; added `@fastify/helmet` |

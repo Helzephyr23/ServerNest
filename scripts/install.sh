@@ -1,10 +1,10 @@
 #!/bin/bash
 set -e
 
-echo "🍛 Installing Biryani - Minecraft Server Panel"
+echo "🍛 Installing ServerNest - Minecraft Server Panel"
 echo "=============================================="
 
-REPO_URL="${BIRYANI_REPO:-https://github.com/Helzephyr23/biryani.git}"
+REPO_URL="${SERVERNEST_REPO:-https://github.com/Helzephyr23/servernest.git}"
 
 # Check prerequisites
 command -v docker >/dev/null 2>&1 || { echo "Error: Docker is required. Install it from https://docker.com"; exit 1; }
@@ -14,13 +14,13 @@ command -v git >/dev/null 2>&1 || { echo "Error: Git is required."; exit 1; }
 docker compose version >/dev/null 2>&1 || { echo "Error: Docker Compose v2 is required. Install Docker Compose plugin: https://docs.docker.com/compose/install"; exit 1; }
 
 # Clone repo
-INSTALL_DIR="${BIRYANI_DIR:-$HOME/biryani}"
+INSTALL_DIR="${SERVERNEST_DIR:-$HOME/servernest}"
 if [ -d "$INSTALL_DIR" ]; then
   echo "Updating existing installation..."
   cd "$INSTALL_DIR"
   git pull
 else
-  echo "Cloning Biryani to $INSTALL_DIR..."
+  echo "Cloning ServerNest to $INSTALL_DIR..."
   git clone "$REPO_URL" "$INSTALL_DIR"
   cd "$INSTALL_DIR"
 fi
@@ -35,11 +35,11 @@ if [ ! -f .env ]; then
 fi
 
 # Start with Docker
-echo "Starting Biryani..."
+echo "Starting ServerNest..."
 docker compose up -d
 
 echo ""
-echo "✅ Biryani is running!"
+echo "✅ ServerNest is running!"
 echo "   Panel:  http://localhost:3000"
 echo "   API:    http://localhost:3001"
 echo ""

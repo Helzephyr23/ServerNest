@@ -1,4 +1,4 @@
-# Biryani — Remaining Issues & Backlog
+# ServerNest — Remaining Issues & Backlog
 
 > **Updated:** 2026-09-28
 > All critical bugs, high-severity issues, security fixes, and test coverage gaps are resolved.

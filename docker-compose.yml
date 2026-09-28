@@ -1,16 +1,16 @@
 networks:
-  biryani:
+  servernest:
     driver: bridge
 
 services:
   api:
-    container_name: biryani-api
+    container_name: servernest-api
     build:
       context: .
       target: api-runtime
     restart: unless-stopped
     networks:
-      - biryani
+      - servernest
     ports:
       - "${API_PORT:-3001}:3001"
       - "${SERVER_PORT_RANGE_START:-25565}-${SERVER_PORT_RANGE_END:-25665}:25565-25665"
@@ -18,12 +18,12 @@ services:
       - NODE_ENV=production
       - API_PORT=3001
       - JWT_SECRET=${JWT_SECRET:-change-me-in-production}
-      - DATABASE_PATH=/app/data/biryani.db
+      - DATABASE_PATH=/app/data/servernest.db
       - DOCKER_IMAGE=itzg/minecraft-server
       - SERVER_PORT_RANGE_START=25565
       - SERVER_PORT_RANGE_END=25665
     volumes:
-      - biryani-data:/app/data
+      - servernest-data:/app/data
       - /var/run/docker.sock:/var/run/docker.sock # WARNING: Grants container root access to host Docker daemon. Use rootless Docker or a socket proxy in production.
     deploy:
       resources:
@@ -39,13 +39,13 @@ services:
       retries: 3
 
   web:
-    container_name: biryani-web
+    container_name: servernest-web
     build:
       context: .
       target: web-runtime
     restart: unless-stopped
     networks:
-      - biryani
+      - servernest
     ports:
       - "${PANEL_PORT:-3000}:3000"
     environment:
@@ -62,4 +62,4 @@ services:
           cpus: "1.0"
 
 volumes:
-  biryani-data:
+  servernest-data:

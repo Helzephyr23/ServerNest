@@ -99,7 +99,7 @@ export default function LoginPage() {
             </div>
             <div className="flex items-center justify-center gap-1.5">
               <CardTitle className="text-2xl font-bold tracking-tight text-foreground">
-                BIRYANI
+                SERVERNEST
               </CardTitle>
               <span className="rounded bg-primary/15 border border-primary/30 px-1.5 py-0.5 text-[9px] font-mono font-semibold tracking-wider text-primary">
                 ORCHESTRATOR
@@ -180,7 +180,7 @@ export default function LoginPage() {
                       ) {
                         try {
                           await fetch("/api/auth/reset", { method: "POST" });
-                          localStorage.removeItem("biryani_token");
+                          localStorage.removeItem("servernest_token");
                           window.location.href = "/setup";
                         } catch {
                           setError("Failed to reset admin account");

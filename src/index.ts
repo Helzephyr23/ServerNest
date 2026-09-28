@@ -101,7 +101,7 @@ loadRateLimits();
 app.log.info("Database migrated");
 
 await app.listen({ port: env.API_PORT, host: "0.0.0.0" });
-app.log.info(`Biryani API running on port ${env.API_PORT}`);
+app.log.info(`ServerNest API running on port ${env.API_PORT}`);
 
 const io = new SocketIOServer(app.server as ReturnType<typeof http.createServer>, {
   cors: {
@@ -186,7 +186,7 @@ io.use(async (socket, next) => {
     } else {
       const cookieHeader = socket.handshake.headers?.cookie;
       if (cookieHeader) {
-        const match = cookieHeader.match(/biryani_token=([^;]+)/);
+        const match = cookieHeader.match(/servernest_token=([^;]+)/);
         if (match) token = match[1];
       }
     }

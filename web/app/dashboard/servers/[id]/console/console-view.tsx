@@ -85,7 +85,7 @@ export default function ConsoleView() {
     searchAddonRef.current = searchAddon;
 
     term.writeln("\x1b[1;36m╔══════════════════════════════════════════╗\x1b[0m");
-    term.writeln("\x1b[1;36m║          Biryani Server Console          ║\x1b[0m");
+    term.writeln("\x1b[1;36m║          ServerNest Server Console          ║\x1b[0m");
     term.writeln("\x1b[1;36m╚══════════════════════════════════════════╝\x1b[0m");
     term.writeln("");
     term.write("\x1b[90mConnecting to server...\x1b[0m");

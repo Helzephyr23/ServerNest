@@ -79,7 +79,7 @@ export default function Sidebar() {
           </div>
           <div className="flex-1 truncate">
             <div className="flex items-center gap-1.5">
-              <span className="font-bold tracking-tight text-foreground">BIRYANI</span>
+              <span className="font-bold tracking-tight text-foreground">SERVERNEST</span>
               <span className="rounded bg-primary/15 px-1 py-0.2 text-[9px] font-mono font-semibold tracking-wider text-primary uppercase">
                 PANEL
               </span>

@@ -244,7 +244,7 @@ describe("Google Drive provider", () => {
     expect(driveFiles.list).not.toHaveBeenCalled();
   });
 
-  it("discovers an existing BiryaniBackups folder when none configured", async () => {
+  it("discovers an existing ServerNestBackups folder when none configured", async () => {
     const localFile = join(tempDir, "f.txt");
     writeFileSync(localFile, "data");
     driveFiles.list.mockResolvedValueOnce({ data: { files: [{ id: "found-1" }] } });
@@ -257,7 +257,7 @@ describe("Google Drive provider", () => {
     expect(driveFiles.create).not.toHaveBeenCalled();
   });
 
-  it("creates the BiryaniBackups folder when discovery comes up empty", async () => {
+  it("creates the ServerNestBackups folder when discovery comes up empty", async () => {
     const localFile = join(tempDir, "f.txt");
     writeFileSync(localFile, "data");
     driveFiles.list.mockResolvedValueOnce({ data: { files: [] } });
@@ -269,7 +269,7 @@ describe("Google Drive provider", () => {
     await uploadBackupToCloud(localFile, "f.txt", gdriveConfig(), 4);
     expect(driveFiles.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        requestBody: expect.objectContaining({ name: "BiryaniBackups", mimeType: "application/vnd.google-apps.folder" }),
+        requestBody: expect.objectContaining({ name: "ServerNestBackups", mimeType: "application/vnd.google-apps.folder" }),
       })
     );
   });
@@ -335,10 +335,10 @@ describe("Dropbox provider", () => {
     expect(contents.toString()).toBe("dropbox-bytes");
   });
 
-  it("defaults the prefix to /BiryaniBackups/", async () => {
+  it("defaults the prefix to /ServerNestBackups/", async () => {
     const provider = createCloudProvider(dropboxConfig());
     await provider.delete("x.tar.gz");
-    expect(dbxInstance.filesDeleteV2).toHaveBeenCalledWith({ path: "/BiryaniBackups/x.tar.gz" });
+    expect(dbxInstance.filesDeleteV2).toHaveBeenCalledWith({ path: "/ServerNestBackups/x.tar.gz" });
   });
 
   it("writes downloaded fileBinary to disk", async () => {

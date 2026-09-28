@@ -120,7 +120,7 @@ export default async function playersRoutes(app: FastifyInstance) {
     try {
       const output = await execInContainer(Number(id), ["cat", "/data/banned-players.json"]);
       const list = JSON.parse(output || "[]");
-      list.push({ name, reason: reason || "Banned by operator", created: new Date().toISOString(), source: "Biryani" });
+      list.push({ name, reason: reason || "Banned by operator", created: new Date().toISOString(), source: "ServerNest" });
       await writeInContainer(Number(id), ["tee", "/data/banned-players.json"], JSON.stringify(list, null, 2));
       return { success: true };
     } catch (err: unknown) {

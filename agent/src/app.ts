@@ -49,7 +49,7 @@ export function createApp({ docker, apiKey = "", nodeName = "agent" }: CreateApp
     ]);
 
     const containers = await docker.listContainers();
-    const mcContainers = containers.filter((c) => c.Labels?.["biryani.managed"] === "true");
+    const mcContainers = containers.filter((c) => c.Labels?.["servernest.managed"] === "true");
 
     let totalRamMb = 0;
     for (const container of mcContainers) {
@@ -78,7 +78,7 @@ export function createApp({ docker, apiKey = "", nodeName = "agent" }: CreateApp
 
   app.get("/containers", authMiddleware, async (req, res) => {
     const containers = await docker.listContainers({ all: true });
-    const mcContainers = containers.filter((c) => c.Labels?.["biryani.managed"] === "true");
+    const mcContainers = containers.filter((c) => c.Labels?.["servernest.managed"] === "true");
     res.json({
       servers: mcContainers.map((c) => ({
         id: c.Id,
@@ -119,7 +119,7 @@ export function createApp({ docker, apiKey = "", nodeName = "agent" }: CreateApp
         Image: image,
         name,
         Env: env || [],
-        Labels: { "biryani.managed": "true", ...labels },
+        Labels: { "servernest.managed": "true", ...labels },
         HostConfig: {
           PortBindings: ports || {},
           Memory: memory_mb ? memory_mb * 1024 * 1024 : undefined,

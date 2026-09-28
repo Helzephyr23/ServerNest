@@ -9,7 +9,7 @@ COPY package.json pnpm-workspace.yaml pnpm-lock.yaml tsconfig.base.json ./
 COPY src/package.json ./src/
 RUN pnpm install --frozen-lockfile
 COPY src/ ./src/
-RUN pnpm --filter @biryani/api exec tsc
+RUN pnpm --filter @servernest/api exec tsc
 
 # Stage 2: Build Frontend
 FROM node:20-alpine AS build-web
@@ -36,14 +36,14 @@ FROM node:20-alpine AS api-runtime
 ARG PNPM_VERSION
 RUN apk add --no-cache docker-cli curl
 RUN corepack enable && corepack prepare pnpm@${PNPM_VERSION} --activate
-RUN addgroup -S biryani && adduser -S biryani -G biryani
+RUN addgroup -S servernest && adduser -S servernest -G servernest
 WORKDIR /app
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
 COPY src/package.json ./src/
 RUN pnpm install --frozen-lockfile --prod
 COPY --from=build-api /app/src/dist ./src/dist
-RUN mkdir -p /app/data && chown -R biryani:biryani /app
-USER biryani
+RUN mkdir -p /app/data && chown -R servernest:servernest /app
+USER servernest
 EXPOSE 3001 25565-25665
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD curl -f http://localhost:3001/api/health || exit 1
@@ -53,15 +53,15 @@ CMD ["node", "src/dist/index.js"]
 FROM node:20-alpine AS web-runtime
 ARG PNPM_VERSION
 RUN corepack enable && corepack prepare pnpm@${PNPM_VERSION} --activate
-RUN addgroup -S biryani && adduser -S biryani -G biryani
+RUN addgroup -S servernest && adduser -S servernest -G servernest
 WORKDIR /app
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
 COPY web/package.json ./web/
 RUN pnpm install --frozen-lockfile --prod
 COPY --from=build-web /app/web/.next/standalone ./
 COPY --from=build-web /app/web/.next/static ./.next/static
-RUN chown -R biryani:biryani /app
-USER biryani
+RUN chown -R servernest:servernest /app
+USER servernest
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD curl -f http://localhost:3000/ || exit 1

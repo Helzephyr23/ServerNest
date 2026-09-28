@@ -75,7 +75,7 @@ export async function createBackup(serverId: number): Promise<Backup> {
   const server = db.prepare("SELECT * FROM servers WHERE id = ?").get(serverId) as ServerRow | undefined;
   if (!server) throw new Error("Server not found");
 
-  const containerName = `biryani-mc-${server.id}`;
+  const containerName = `servernest-mc-${server.id}`;
   const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
   const filename = `${server.name}-${timestamp}.tar.gz`;
   const backupPath = path.join(BACKUP_DIR, filename);
@@ -161,7 +161,7 @@ export async function restoreBackup(serverId: number, backupId: number): Promise
   const server = db.prepare("SELECT * FROM servers WHERE id = ?").get(serverId) as ServerRow | undefined;
   if (!server) throw new Error("Server not found");
 
-  const containerName = `biryani-mc-${server.id}`;
+  const containerName = `servernest-mc-${server.id}`;
   const dataDir = `${process.cwd()}/data/server-${server.id}`;
 
   // Ensure data directory exists
@@ -218,7 +218,7 @@ export async function restoreBackup(serverId: number, backupId: number): Promise
         RestartPolicy: { Name: "unless-stopped" },
       },
       WorkingDir: "/data",
-      Labels: { "biryani.managed": "true", "biryani.server_id": server.id.toString() },
+      Labels: { "servernest.managed": "true", "servernest.server_id": server.id.toString() },
     });
   }
 

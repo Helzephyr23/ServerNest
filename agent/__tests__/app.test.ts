@@ -127,10 +127,10 @@ describe("agent app", () => {
   });
 
   describe("GET /metrics", () => {
-    it("aggregates only biryani-managed containers and rounds percentages", async () => {
-      const managed = { Id: "mc1", Labels: { "biryani.managed": "true" }, State: "running" };
+    it("aggregates only servernest-managed containers and rounds percentages", async () => {
+      const managed = { Id: "mc1", Labels: { "servernest.managed": "true" }, State: "running" };
       const unmanaged = { Id: "other", Labels: {}, State: "running" };
-      const stoppedManaged = { Id: "mc2", Labels: { "biryani.managed": "true" }, State: "exited" };
+      const stoppedManaged = { Id: "mc2", Labels: { "servernest.managed": "true" }, State: "exited" };
       const container = makeContainer({
         stats: vi.fn().mockResolvedValue({ memory_stats: { usage: 512 * 1024 * 1024 } }),
       });
@@ -151,7 +151,7 @@ describe("agent app", () => {
     });
 
     it("tolerates a failing container stats call", async () => {
-      const managed = { Id: "mc1", Labels: { "biryani.managed": "true" }, State: "running" };
+      const managed = { Id: "mc1", Labels: { "servernest.managed": "true" }, State: "running" };
       const container = makeContainer({ stats: vi.fn().mockRejectedValue(new Error("gone")) });
       const docker = makeDocker({
         listContainers: vi.fn().mockResolvedValue([managed]),
@@ -174,7 +174,7 @@ describe("agent app", () => {
             State: "running",
             Ports: [{ PrivatePort: 25565 }],
             Created: 1700000000,
-            Labels: { "biryani.managed": "true" },
+            Labels: { "servernest.managed": "true" },
           },
           { Id: "zzz", Names: ["/unmanaged"], Labels: {} },
         ]),
@@ -254,7 +254,7 @@ describe("agent app", () => {
           Image: "itzg/minecraft-server",
           name: "mc",
           Env: ["EULA=TRUE"],
-          Labels: { "biryani.managed": "true", tier: "game" },
+          Labels: { "servernest.managed": "true", tier: "game" },
           HostConfig: expect.objectContaining({
             Memory: 2048 * 1024 * 1024,
             RestartPolicy: { Name: "unless-stopped" },

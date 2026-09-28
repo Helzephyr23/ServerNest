@@ -113,10 +113,10 @@ describe("authMiddleware", () => {
     expect(row.last_used).not.toBe("2020-01-01 00:00:00");
   });
 
-  it("also accepts the token from the biryani_token cookie", async () => {
+  it("also accepts the token from the servernest_token cookie", async () => {
     const admin = await createAdmin();
     const token = sign({ id: admin.id, username: "admin", role: "admin" });
-    const res = await app.inject({ method: "GET", url: "/guarded", cookies: { biryani_token: token } });
+    const res = await app.inject({ method: "GET", url: "/guarded", cookies: { servernest_token: token } });
     expect(res.statusCode).toBe(200);
   });
 });

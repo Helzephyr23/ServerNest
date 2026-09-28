@@ -87,7 +87,7 @@ export async function sendDiscordNotification(webhookUrl: string, title: string,
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         embeds: [{
-          title: `🥔 Biryani - ${title}`,
+          title: `🥔 ServerNest - ${title}`,
           description: message,
           color,
           timestamp: new Date().toISOString(),

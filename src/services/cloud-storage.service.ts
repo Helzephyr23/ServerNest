@@ -121,7 +121,7 @@ class GoogleDriveStorageProvider implements CloudStorageProvider {
   private async ensureFolder(_name: string): Promise<string> {
     if (!this.folderId) {
       const res = await this.drive.files.list({
-        q: "name='BiryaniBackups' and mimeType='application/vnd.google-apps.folder' and trashed=false",
+        q: "name='ServerNestBackups' and mimeType='application/vnd.google-apps.folder' and trashed=false",
         fields: "files(id)",
         spaces: "drive",
       });
@@ -130,7 +130,7 @@ class GoogleDriveStorageProvider implements CloudStorageProvider {
       } else {
         const folder = await this.drive.files.create({
           requestBody: {
-            name: "BiryaniBackups",
+            name: "ServerNestBackups",
             mimeType: "application/vnd.google-apps.folder",
           },
           fields: "id",
@@ -150,7 +150,7 @@ class GoogleDriveStorageProvider implements CloudStorageProvider {
   }
 
   async upload(localPath: string, remotePath: string, totalBytes: number, onProgress?: OnProgress): Promise<void> {
-    const folderId = await this.ensureFolder("BiryaniBackups");
+    const folderId = await this.ensureFolder("ServerNestBackups");
     const accessToken = await GoogleDriveStorageProvider.getAccessToken(this.auth);
 
     // 1. Initiate a resumable upload session. This returns a Location header
@@ -262,7 +262,7 @@ class GoogleDriveStorageProvider implements CloudStorageProvider {
   }
 
   async download(remotePath: string, localPath: string): Promise<void> {
-    const folderId = await this.ensureFolder("BiryaniBackups");
+    const folderId = await this.ensureFolder("ServerNestBackups");
     const safePath = GoogleDriveStorageProvider.escapeGdriveQuery(remotePath);
     const res = await this.drive.files.list({
       q: `name='${safePath}' and '${folderId}' in parents and trashed=false`,
@@ -279,7 +279,7 @@ class GoogleDriveStorageProvider implements CloudStorageProvider {
   }
 
   async delete(remotePath: string): Promise<void> {
-    const folderId = await this.ensureFolder("BiryaniBackups");
+    const folderId = await this.ensureFolder("ServerNestBackups");
     const safePath = GoogleDriveStorageProvider.escapeGdriveQuery(remotePath);
     const res = await this.drive.files.list({
       q: `name='${safePath}' and '${folderId}' in parents and trashed=false`,
@@ -308,7 +308,7 @@ class DropboxStorageProvider implements CloudStorageProvider {
   constructor(config: any) {
     const { Dropbox } = _loadSdk("dropbox");
     this.dbx = new Dropbox({ accessToken: config.accessToken });
-    this.pathPrefix = (config.path || "/BiryaniBackups").replace(/\/?$/, "/");
+    this.pathPrefix = (config.path || "/ServerNestBackups").replace(/\/?$/, "/");
   }
 
   async upload(localPath: string, remotePath: string, totalBytes: number, onProgress?: OnProgress): Promise<void> {

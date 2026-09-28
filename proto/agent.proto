@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package biryani.agent;
+package servernest.agent;
 
 service Agent {
   rpc GetMetrics(Empty) returns (MetricsResponse);

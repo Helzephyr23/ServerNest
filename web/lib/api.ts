@@ -2,7 +2,7 @@
 // Fastify API (see next.config.ts rewrites). This keeps cookies first-party
 // so the panel works from any host (localhost, LAN IP, Tailscale, etc.).
 const TIMEOUT_MS = 15000;
-const TOKEN_KEY = "biryani_token";
+const TOKEN_KEY = "servernest_token";
 
 export function getToken(): string | null {
   if (typeof window === "undefined") return null;

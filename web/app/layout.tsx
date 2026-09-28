@@ -6,7 +6,7 @@ import { AuthProvider } from "@/lib/auth";
 import { RouteProgress } from "@/components/route-progress";
 
 export const metadata: Metadata = {
-  title: "Biryani - Minecraft Server Panel",
+  title: "ServerNest - Minecraft Server Panel",
   description: "Free, self-hosted Minecraft server management panel",
 };
 

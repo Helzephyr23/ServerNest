@@ -24,7 +24,7 @@ export default async function Home() {
   }
 
   const cookieStore = await cookies();
-  const token = cookieStore.get("biryani_token")?.value;
+  const token = cookieStore.get("servernest_token")?.value;
   if (token) {
     redirect("/dashboard");
   }

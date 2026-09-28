@@ -1,7 +1,7 @@
 {
-  "name": "@biryani/api",
+  "name": "@servernest/api",
   "version": "0.1.0",
-  "description": "Biryani API server",
+  "description": "ServerNest API server",
   "type": "module",
   "main": "dist/index.js",
   "scripts": {

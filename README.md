@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🍛 Biryani
+# 🍛 ServerNest
 
 **Free, self-hosted Minecraft server management panel**
 
@@ -12,7 +12,7 @@
 
 ---
 
-Biryani is a **free, open-source, self-hosted** Minecraft server management panel with a modern UI, built-in mod marketplace, and multi-node clustering.
+ServerNest is a **free, open-source, self-hosted** Minecraft server management panel with a modern UI, built-in mod marketplace, and multi-node clustering.
 
 ### Screenshots
 
@@ -68,8 +68,8 @@ Biryani is a **free, open-source, self-hosted** Minecraft server management pane
 ### Docker Compose (Recommended)
 
 ```bash
-git clone https://github.com/Helzephyr23/biryani.git
-cd biryani
+git clone https://github.com/Helzephyr23/servernest.git
+cd servernest
 cp .env.example .env
 # Edit .env — set a secure JWT_SECRET
 docker compose up -d
@@ -82,8 +82,8 @@ Open **http://localhost:3000** and follow the setup wizard to create your admin 
 **Requirements:** Node.js 20+, [pnpm](https://pnpm.io), Docker
 
 ```bash
-git clone https://github.com/Helzephyr23/biryani.git
-cd biryani
+git clone https://github.com/Helzephyr23/servernest.git
+cd servernest
 pnpm install
 cp .env.example .env
 # Edit .env — set a secure JWT_SECRET
@@ -120,7 +120,7 @@ cp .env.example .env
 | `pnpm test:watch` | Run tests in watch mode |
 | `pnpm lint` | Lint all packages |
 | `pnpm typecheck` | Type-check all packages |
-| `pnpm --filter @biryani/api run test:coverage` | Run API tests with coverage |
+| `pnpm --filter @servernest/api run test:coverage` | Run API tests with coverage |
 
 ### Testing
 
@@ -164,7 +164,7 @@ web/e2e/
 ## Project Structure
 
 ```
-biryani/
+servernest/
 ├── src/                              # Fastify API backend
 │   ├── index.ts                      # Entry point, route registration, Socket.IO setup
 │   ├── config/
@@ -269,7 +269,7 @@ biryani/
 
 ```
 ┌──────────────────────────────────────────┐
-│              Biryani Panel                │
+│              ServerNest Panel                │
 │  ┌──────────────┐  ┌──────────────────┐  │
 │  │   Next.js    │  │     Fastify      │  │
 │  │   Frontend   │◄─┤      API         │  │
@@ -525,7 +525,7 @@ All endpoints are prefixed with `/api` and require JWT authentication (`Authoriz
 | `API_PORT` | `3001` | API port |
 | `JWT_SECRET` | - | **Required.** Secret for JWT tokens (change in production!) |
 | `JWT_EXPIRES_IN` | `24h` | Token expiration time |
-| `DATABASE_PATH` | `./data/biryani.db` | SQLite database file path |
+| `DATABASE_PATH` | `./data/servernest.db` | SQLite database file path |
 | `DOCKER_IMAGE` | `itzg/minecraft-server` | Default Docker image for servers |
 | `SERVER_PORT_RANGE_START` | `25565` | Start of Minecraft server port range |
 | `SERVER_PORT_RANGE_END` | `25665` | End of Minecraft server port range |
@@ -600,7 +600,7 @@ The refresh token is stored server-side and never exposed to the frontend. You c
 | Field | Required | Description |
 |-------|----------|-------------|
 | Access Token | Yes | Dropbox API access token |
-| Path | No | Folder path inside Dropbox (default `/BiryaniBackups`) |
+| Path | No | Folder path inside Dropbox (default `/ServerNestBackups`) |
 
 ---
 
@@ -617,8 +617,8 @@ Check **[ROADMAP.md](./ROADMAP.md)** for upcoming features and **[ISSUES.md](./I
 1. Fork the repository
 2. Clone your fork:
    ```bash
-   git clone https://github.com/Helzephyr23/biryani.git
-   cd biryani
+   git clone https://github.com/Helzephyr23/servernest.git
+   cd servernest
    ```
 3. Install dependencies:
    ```bash

@@ -185,7 +185,7 @@ export default function SetupPage() {
         {/* Ambient bottom status */}
         <div className="mt-4 flex items-center justify-center gap-2 text-[11px] font-mono text-muted-foreground/60">
           <span className="flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
-          <span>Biryani Orchestrator</span>
+          <span>ServerNest Orchestrator</span>
           <span>·</span>
           <span>Docker Engine Local</span>
         </div>

@@ -129,7 +129,7 @@ describe("Auth API Integration", () => {
     function getAuthCookie(res: any): string {
       const raw = res.headers["set-cookie"];
       const list = Array.isArray(raw) ? raw : [raw];
-      return list.find((c: string) => c.startsWith("biryani_token="));
+      return list.find((c: string) => c.startsWith("servernest_token="));
     }
 
     it("sets the auth cookie with Secure + SameSite=None and readable by JS", async () => {

@@ -180,7 +180,7 @@ export async function startServer(id: number): Promise<string | null> {
     }
   }
 
-  const containerName = `biryani-mc-${server.id}`;
+  const containerName = `servernest-mc-${server.id}`;
   const dataDir = `${process.cwd()}/data/server-${server.id}`;
 
   if (!existsSync(dataDir)) {
@@ -209,7 +209,7 @@ export async function startServer(id: number): Promise<string | null> {
         RestartPolicy: { Name: "unless-stopped" },
       },
       WorkingDir: "/data",
-      Labels: { "biryani.managed": "true", "biryani.server_id": server.id.toString() },
+      Labels: { "servernest.managed": "true", "servernest.server_id": server.id.toString() },
     });
 
     await container.start();
@@ -238,7 +238,7 @@ export async function stopServer(id: number, skipBackup: boolean = false): Promi
     }
   }
 
-  const containerName = `biryani-mc-${server.id}`;
+  const containerName = `servernest-mc-${server.id}`;
 
   try {
     const container = docker.getContainer(containerName);

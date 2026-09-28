@@ -5,7 +5,7 @@ const testDb = createTestDb();
 
 const otplibMocks = vi.hoisted(() => ({
   generateSecret: vi.fn(() => "MOCKSECRET234567"),
-  generateURI: vi.fn(() => "otpauth://totp/Biryani:admin?secret=MOCKSECRET234567"),
+  generateURI: vi.fn(() => "otpauth://totp/ServerNest:admin?secret=MOCKSECRET234567"),
   verifySync: vi.fn(),
 }));
 vi.mock("otplib", () => otplibMocks);
@@ -156,10 +156,10 @@ describe("auth.service", () => {
       const admin = await createUser("admin", "password123");
       const result = await setupTotp(admin.id);
       expect(result.secret).toBe("MOCKSECRET234567");
-      expect(result.uri).toContain("Biryani:admin");
+      expect(result.uri).toContain("ServerNest:admin");
       expect(result.qr).toBe("data:image/png;base64,QRDATA");
       expect(otplibMocks.generateURI).toHaveBeenCalledWith(
-        expect.objectContaining({ issuer: "Biryani", label: "admin", secret: "MOCKSECRET234567" })
+        expect.objectContaining({ issuer: "ServerNest", label: "admin", secret: "MOCKSECRET234567" })
       );
     });
 
