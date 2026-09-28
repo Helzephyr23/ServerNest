@@ -34,9 +34,31 @@ import { notify } from "./services/notification.service.js";
 import { markStaleNodesOffline } from "./services/node.service.js";
 
 import docker, { dockerStreamDemux } from "./config/docker.js";
+import { serverDataRoot } from "./utils/data-dir.js";
+import { mkdirSync, accessSync, constants as fsConstants } from "fs";
 
 if (env.NODE_ENV === "production") {
   checkJwtSecret();
+}
+
+// Fail loudly on the one misconfiguration that is otherwise invisible: the
+// shared Minecraft data directory not being writable. Without this, every
+// panel-side write (mod install, file upload, server import, clone) throws
+// EACCES deep inside a route handler and the failure looks like a route bug
+// rather than a filesystem ownership problem.
+try {
+  mkdirSync(serverDataRoot(), { recursive: true });
+  accessSync(serverDataRoot(), fsConstants.W_OK);
+} catch (err) {
+  console.error(
+    `\n🚨 Server data directory "${serverDataRoot()}" is not writable by uid ${process.getuid?.() ?? "unknown"}.\n` +
+    "   The panel and the Minecraft containers share this directory, so it must be\n" +
+    "   owned by uid 1000 (the `node` user in the api image, which is also the uid\n" +
+    "   the itzg/minecraft-server image runs as).\n" +
+    `   Fix:  mkdir -p "${serverDataRoot()}" && chown 1000:1000 "${serverDataRoot()}"\n` +
+    `   Under Docker this is the volume bind source set by SERVER_DATA_DIR in .env.\n` +
+    `   Detail: ${(err as Error).message}\n`,
+  );
 }
 
 const app = Fastify({

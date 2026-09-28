@@ -17,7 +17,7 @@ vi.mock("qrcode", () => ({ default: qrcodeMocks }));
 
 vi.mock("../../config/database.js", () => ({ default: testDb, migrate: vi.fn() }));
 vi.mock("../../config/docker.js", () => ({
-  default: { ping: vi.fn(), pull: vi.fn(), getContainer: vi.fn(), createContainer: vi.fn() },
+  default: { ping: vi.fn(), pull: vi.fn(), getContainer: vi.fn(), createContainer: vi.fn(), listContainers: vi.fn().mockResolvedValue([]) },
   isDockerAvailable: vi.fn().mockResolvedValue(true),
   getImageName: vi.fn().mockReturnValue("itzg/minecraft-server"),
 }));
@@ -26,7 +26,7 @@ vi.mock("../../config/env.js", () => ({
     NODE_ENV: "test", PANEL_HOST: "127.0.0.1", PANEL_PORT: 3000, API_PORT: 3001,
     JWT_SECRET: "test-secret", JWT_EXPIRES_IN: "1d", DATABASE_PATH: ":memory:",
     DOCKER_IMAGE: "itzg/minecraft-server", SERVER_PORT_RANGE_START: 25565,
-    SERVER_PORT_RANGE_END: 25665, NODE_NAME: "master", NODE_API_KEY: "test-key", GRPC_PORT: 50051,
+    SERVER_PORT_RANGE_END: 25665, SERVER_DATA_DIR: "./data", NODE_NAME: "master", NODE_API_KEY: "test-key", GRPC_PORT: 50051,
   },
 }));
 

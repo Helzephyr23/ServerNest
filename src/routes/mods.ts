@@ -3,6 +3,7 @@ import { authMiddleware } from "../middleware/auth.js";
 import { validate, schemas } from "../middleware/validate.js";
 import { searchMods, searchPlugins, getProject, getProjectVersions, downloadMod, toModrinthLoader } from "../services/modrinth.service.js";
 import { getServerById } from "../services/server.service.js";
+import { serverDataDir } from "../utils/data-dir.js";
 import db from "../config/database.js";
 import { readdirSync, statSync, unlinkSync, existsSync } from "fs";
 import { join, resolve } from "path";
@@ -51,7 +52,7 @@ export default async function modsRoutes(app: FastifyInstance) {
     const server = getServerById(Number(id));
     if (!server) return reply.status(404).send({ error: "Server not found" });
 
-    const modsDir = join(`${process.cwd()}/data/server-${server.id}`, "mods");
+    const modsDir = join(serverDataDir(server.id), "mods");
     try {
       const files = readdirSync(modsDir);
       const mods = files
@@ -74,7 +75,7 @@ export default async function modsRoutes(app: FastifyInstance) {
     const server = getServerById(Number(id));
     if (!server) return reply.status(404).send({ error: "Server not found" });
 
-    const dataDir = `${process.cwd()}/data/server-${server.id}`;
+    const dataDir = serverDataDir(server.id);
     const result = await downloadMod(versionId, dataDir);
     if (!result.success) {
       return reply.status(500).send({ error: result.error });
@@ -95,7 +96,7 @@ export default async function modsRoutes(app: FastifyInstance) {
     const server = getServerById(Number(id));
     if (!server) return reply.status(404).send({ error: "Server not found" });
 
-    const dataDir = `${process.cwd()}/data/server-${server.id}`;
+    const dataDir = serverDataDir(server.id);
     const results = [];
 
     for (const versionId of versionIds) {
@@ -166,14 +167,14 @@ export default async function modsRoutes(app: FastifyInstance) {
     if (!server) return reply.status(404).send({ error: "Server not found" });
 
     const mod = db.prepare("SELECT slug, version FROM installed_mods WHERE server_id = ? AND filename = ?").get(Number(id), filename) as { slug: string; version: string } | undefined;
-    if (!mod || !mod.slug) return reply.status(400).send({ error: "Mod slug not found — cannot check for updates" });
+    if (!mod || !mod.slug) return reply.status(400).send({ error: "Mod slug not found â€” cannot check for updates" });
 
     try {
       const versions = await getProjectVersions(mod.slug, server.mc_version, toModrinthLoader(server.software));
       if (versions.length === 0) return reply.status(404).send({ error: "No versions found" });
       const latest = versions[0];
 
-      const dataDir = `${process.cwd()}/data/server-${server.id}`;
+      const dataDir = serverDataDir(server.id);
       const modsDir = resolve(dataDir, "mods");
       const oldPath = resolve(dataDir, "mods", filename);
       if (!oldPath.startsWith(modsDir)) return reply.status(400).send({ error: "Invalid filename" });
@@ -199,7 +200,7 @@ export default async function modsRoutes(app: FastifyInstance) {
     if (!server) return reply.status(404).send({ error: "Server not found" });
 
     try {
-      const modsDir = resolve(`${process.cwd()}/data/server-${server.id}/mods`);
+      const modsDir = resolve(serverDataDir(server.id), "mods");
       const filePath = resolve(modsDir, filename);
       if (!filePath.startsWith(modsDir)) return reply.status(400).send({ error: "Invalid filename" });
       unlinkSync(filePath);

@@ -4,6 +4,7 @@ import { env } from "../config/env.js";
 import { notify } from "./notification.service.js";
 import { mkdirSync, existsSync } from "fs";
 import { cp } from "fs/promises";
+import { serverDataDir } from "../utils/data-dir.js";
 
 // Per-server locks to prevent concurrent start/stop race conditions
 const serverLocks = new Map<number, Promise<void>>();
@@ -106,7 +107,7 @@ export async function cloneServer(id: number): Promise<Server> {
   const source = getServerById(id);
   if (!source) throw new Error("Server not found");
 
-  const port = findAvailablePort();
+  const port = await findAvailablePort();
   const newName = `Copy of ${source.name}`;
 
   const cloneTx = db.transaction(() => {
@@ -131,8 +132,8 @@ export async function cloneServer(id: number): Promise<Server> {
 
   const newId = cloneTx();
 
-  const srcDir = `${process.cwd()}/data/server-${id}`;
-  const dstDir = `${process.cwd()}/data/server-${newId}`;
+  const srcDir = serverDataDir(id);
+  const dstDir = serverDataDir(newId);
   if (existsSync(srcDir)) {
     mkdirSync(dstDir, { recursive: true });
     await cp(srcDir, dstDir, { recursive: true, force: true });
@@ -171,6 +172,13 @@ export async function startServer(id: number): Promise<string | null> {
     MEMORY: `${Math.floor(server.ram_mb / 1024)}G`,
     SERVER_PORT: "25565",
     TZ: "UTC",
+    // Run the Minecraft server as the same 1000:1000 the panel runs as. The
+    // image drops privileges to these values by default, but setting them
+    // explicitly means the shared SERVER_DATA_DIR stays mutually writable
+    // instead of silently depending on an upstream default. See the api-runtime
+    // stage in the Dockerfile.
+    UID: "1000",
+    GID: "1000",
   };
 
   const configs = db.prepare("SELECT key, value FROM server_config WHERE server_id = ?").all(id) as ServerConfig[];
@@ -181,7 +189,7 @@ export async function startServer(id: number): Promise<string | null> {
   }
 
   const containerName = `servernest-mc-${server.id}`;
-  const dataDir = `${process.cwd()}/data/server-${server.id}`;
+  const dataDir = serverDataDir(server.id);
 
   if (!existsSync(dataDir)) {
     mkdirSync(dataDir, { recursive: true });
@@ -320,10 +328,41 @@ export function deleteServerConfig(id: number, key: string) {
   db.prepare("DELETE FROM server_config WHERE server_id = ? AND key = ?").run(id, key);
 }
 
-export function findAvailablePort(): number {
+/**
+ * Host ports currently bound by a running container.
+ *
+ * The database is not the only thing that can hold a port: any container on the
+ * daemon can. This shipped a real bug -- docker-compose published the whole
+ * `25565-25665` range on the api container, `findAvailablePort` handed out
+ * 25565 from the database alone, and every server then died at
+ * `container.start()` with "port is already allocated", surfacing only as a
+ * bare 500. Returns an empty set if Docker cannot be reached, so a Docker
+ * outage degrades to the old database-only behaviour rather than blocking
+ * server creation outright.
+ */
+async function portsBoundByContainers(): Promise<Set<number>> {
+  const bound = new Set<number>();
+  try {
+    const containers = await docker.listContainers({ all: true });
+    for (const c of containers) {
+      // listContainers returns ContainerSummary, whose Ports is a flat array of
+      // { PublicPort, PrivatePort } -- not the keyed map that container.inspect
+      // returns.
+      for (const p of c.Ports ?? []) {
+        if (p.PublicPort) bound.add(p.PublicPort);
+      }
+    }
+  } catch {
+    // Docker unavailable: fall through with an empty set.
+  }
+  return bound;
+}
+
+export async function findAvailablePort(): Promise<number> {
   const usedPorts = (db.prepare("SELECT port FROM servers").all() as { port: number }[]).map((r) => r.port);
+  const dockerBound = await portsBoundByContainers();
   for (let port = env.SERVER_PORT_RANGE_START; port <= env.SERVER_PORT_RANGE_END; port++) {
-    if (!usedPorts.includes(port)) return port;
+    if (!usedPorts.includes(port) && !dockerBound.has(port)) return port;
   }
   throw new Error("No available ports");
 }

@@ -123,6 +123,17 @@ All endpoints are prefixed `/api` and require auth unless noted. The full annota
 - **Every mutating route needs auth** — pick the narrowest middleware that fits.
 - **Never interpolate into shell strings** for container commands. Use `execInContainer` /
   `writeInContainer` from `src/utils/container.ts` and pipe content over stdin.
+- **Never hardcode a per-server data path.** Use `serverDataDir(id)` / `serverDataRoot()` from
+  `src/utils/data-dir.ts`. The panel writes these directories on the host *and* hands them to
+  Docker as bind sources, so the path must come from `env.SERVER_DATA_DIR` and be absolute.
+  A literal `${process.cwd()}/data/server-${id}` inside a container points at a directory the
+  Minecraft container never mounts, and the failure is silent — the write "succeeds" into
+  nowhere.
+- **Panel containers run as the built-in `node` user (uid/gid `1000:1000`)** and rely on
+  Compose `group_add: ["0"]` for the Docker socket. Do not add a root entrypoint that drops
+  privileges with `su-exec`: that loses the supplementary group and silently breaks
+  `isDockerAvailable` (`/api/health` reports `"docker": false`). Ownership is fixed instead by
+  the short-lived root `data-init` service in `docker-compose.yml`, which the api waits on.
 - **Routes are thin.** Validate with Zod, then delegate to a service. Business logic belongs in `src/services/`.
 - **Frontend is same-origin.** Next.js rewrites `/api/*` and `/socket.io/*` to the API
   (`API_HOST`/`API_PORT`, default `localhost:3001`). There is no `NEXT_PUBLIC_API_URL`. Use the
@@ -151,6 +162,8 @@ See `.env.example`. The ones that matter:
 | `DATABASE_PATH` | `./data/servernest.db` | |
 | `DOCKER_IMAGE` | `itzg/minecraft-server` | |
 | `SERVER_PORT_RANGE_START`/`_END` | `25565`/`25665` | Dynamic host port allocation |
+| `SERVER_DATA_DIR` | `./data` | Root of per-server Minecraft data (`server-<id>`) |
+| `DOCKER_GID` | *(unset)* | Compose only: `group_add` for `/var/run/docker.sock` |
 | `NODE_NAME`, `NODE_API_KEY`, `GRPC_PORT` | `master`, `""`, `50051` | Agent identity and shared secret |
 | `CORS_ORIGIN` | *(all, dev)* | **Set this in production** |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | `""` | Google Drive OAuth |
@@ -184,7 +197,17 @@ pnpm audit --audit-level high && pnpm lint && pnpm typecheck && pnpm test && pnp
   no live Docker or network required.
 - `src/__tests__/schema.ts` is the single source of truth for the test DB schema. When you add a
   column in `src/config/database.ts`, mirror it there or tests will drift and fail confusingly.
+- The same trap applies to `env`. Most test files hand-roll a `vi.mock("../../config/env.js")`
+  with a literal object, so **adding a field to `src/config/env.ts` breaks every one of them**
+  (usually as `path.resolve(undefined)` or "cannot read property of undefined", not as a
+  missing-key error). When you add an env var, grep for `SERVER_PORT_RANGE_END: 25665` and add
+  the field to each mock. Same for `config/docker.js`: a mock missing a method the service now
+  calls fails with `undefined is not a function`.
 - `src/__tests__/helpers.ts` holds `createTestDb`, `seedServer`, `mockDocker`.
+- `src/__tests__/config/docker-compose.test.ts` guards two deployment footguns that cannot be
+  caught by unit tests: the api container must not publish `SERVER_PORT_RANGE`, and
+  `SERVER_DATA_DIR` must be bind-mounted at an identical source and target. It parses
+  `docker-compose.yml` as text — keep the block formatting it expects.
 - Playwright specs live in `web/e2e/`.
 
 ## Server Lifecycle

@@ -3,6 +3,45 @@ networks:
     driver: bridge
 
 services:
+  # Runs once, to completion, before the api starts. It exists purely to hand the
+  # two writable directories to uid 1000 -- the user both the panel and the
+  # Minecraft containers run as -- and then get out of the way.
+  #
+  # It has to be a separate root container because the api deliberately runs
+  # non-root. The obvious alternative, a root entrypoint in the api image that
+  # chowns and then drops privileges with su-exec, is a trap: su-exec replaces
+  # the process, and the resulting process keeps only the groups su-exec grants,
+  # discarding Compose's `group_add: ["0"]`. The api then cannot read
+  # /var/run/docker.sock and /api/health reports "docker": false with no other
+  # symptom. Keeping the chown here leaves the api image's USER node untouched.
+  data-init:
+    image: node:20-alpine
+    user: "0:0"
+    restart: "no"
+    command:
+      - sh
+      - -c
+      - |
+        set -e
+        mkdir -p "${SERVER_DATA_DIR}" /app/data
+        # Only the top level: worlds can be huge, and everything underneath is
+        # created by uid 1000 once the panel is running, so a recursive chown
+        # here would cost a full tree walk on every `docker compose up`.
+        chown 1000:1000 "${SERVER_DATA_DIR}"
+        # Panel state is small (SQLite plus backup archives) and recursive is
+        # both cheap and necessary here: installs upgrading from an image that
+        # ran as a different user still have those files owned by the old uid,
+        # which surfaces as SqliteError: attempt to write a readonly database.
+        chown -R 1000:1000 /app/data
+        echo "data-init: ${SERVER_DATA_DIR} and /app/data owned by 1000:1000"
+    environment:
+      - SERVER_DATA_DIR=${SERVER_DATA_DIR:?set SERVER_DATA_DIR in .env to an absolute host path}
+    volumes:
+      - servernest-data:/app/data
+      - type: bind
+        source: ${SERVER_DATA_DIR:?set SERVER_DATA_DIR in .env to an absolute host path}
+        target: ${SERVER_DATA_DIR:?set SERVER_DATA_DIR in .env to an absolute host path}
+
   api:
     container_name: servernest-api
     build:
@@ -25,19 +64,40 @@ services:
       - API_PORT=3001
       - JWT_SECRET=${JWT_SECRET:-change-me-in-production}
       - DATABASE_PATH=/app/data/servernest.db
+      # Root of the per-server Minecraft data. The panel passes
+      # ${SERVER_DATA_DIR}/server-<id> straight to Docker as a bind source for
+      # each Minecraft container, so the daemon resolves it on the host. If the
+      # panel read it from anywhere else, mod install / file upload / server
+      # import / clone would silently write to a directory the Minecraft
+      # container never mounts. The bind below uses the SAME variable as source
+      # and target so the path is identical inside and outside by construction.
+      # Long syntax: the short form cannot express a Windows drive letter here.
+      - SERVER_DATA_DIR=${SERVER_DATA_DIR:?set SERVER_DATA_DIR in .env to an absolute host path}
       - DOCKER_IMAGE=itzg/minecraft-server
       - SERVER_PORT_RANGE_START=25565
       - SERVER_PORT_RANGE_END=25665
     volumes:
+      # Panel-owned state: the SQLite database and backup archives. Kept as a
+      # named volume so a stray `rm -rf` on the host cannot take the panel with
+      # it. Minecraft worlds deliberately live OUTSIDE this volume, under
+      # SERVER_DATA_DIR, so operators can see and copy them with ordinary tools.
       - servernest-data:/app/data
+      # Minecraft world data. Long syntax, identical source and target.
+      # Create the host directory first:  mkdir -p "$(dirname "$SERVER_DATA_DIR")"
+      - type: bind
+        source: ${SERVER_DATA_DIR:?set SERVER_DATA_DIR in .env to an absolute host path}
+        target: ${SERVER_DATA_DIR:?set SERVER_DATA_DIR in .env to an absolute host path}
       - /var/run/docker.sock:/var/run/docker.sock # WARNING: Grants container root access to host Docker daemon. Use rootless Docker or a socket proxy in production.
-    # The container runs as the non-root `servernest` user, but the Docker socket
-    # is typically root:root 660, so it is unreadable without a matching
-    # supplementary group. Default 0 works on stock Docker/Docker Desktop; set
-    # DOCKER_GID in .env to your host's socket group (e.g. `stat -c '%g'
-    # /var/run/docker.sock`) to avoid granting group 0.
+    # The container runs as the built-in `node` user (uid/gid 1000), but the
+    # Docker socket is typically root:root 660, so it is unreadable without a
+    # matching supplementary group. Default 0 works on stock Docker/Docker
+    # Desktop; set DOCKER_GID in .env to your host's socket group (e.g.
+    # `stat -c '%g' /var/run/docker.sock`) to avoid granting group 0.
     group_add:
       - "${DOCKER_GID:-0}"
+    depends_on:
+      data-init:
+        condition: service_completed_successfully
     deploy:
       resources:
         limits:

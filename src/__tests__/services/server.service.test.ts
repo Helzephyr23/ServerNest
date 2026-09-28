@@ -24,6 +24,7 @@ vi.mock("../../config/docker.js", () => ({
     pull: vi.fn().mockResolvedValue(null),
     getContainer: vi.fn().mockReturnValue(mockContainer),
     createContainer: vi.fn().mockResolvedValue({ id: "test-id", start: vi.fn().mockResolvedValue(undefined) }),
+    listContainers: vi.fn().mockResolvedValue([]),
   },
   isDockerAvailable: vi.fn().mockResolvedValue(true),
   getImageName: vi.fn().mockReturnValue("itzg/minecraft-server"),
@@ -34,7 +35,7 @@ vi.mock("../../config/env.js", () => ({
     NODE_ENV: "test", PANEL_HOST: "127.0.0.1", PANEL_PORT: 3000, API_PORT: 3001,
     JWT_SECRET: "test-secret", JWT_EXPIRES_IN: "1d", DATABASE_PATH: ":memory:",
     DOCKER_IMAGE: "itzg/minecraft-server", SERVER_PORT_RANGE_START: 25565,
-    SERVER_PORT_RANGE_END: 25665, NODE_NAME: "master", NODE_API_KEY: "test-key", GRPC_PORT: 50051,
+    SERVER_PORT_RANGE_END: 25665, SERVER_DATA_DIR: "./data", NODE_NAME: "master", NODE_API_KEY: "test-key", GRPC_PORT: 50051,
   },
 }));
 vi.mock("../../services/notification.service.js", () => ({
@@ -185,13 +186,38 @@ describe("server.service", () => {
   });
 
   describe("findAvailablePort", () => {
-    it("should find the first available port", () => {
-      expect(findAvailablePort()).toBe(25565);
+    it("should find the first available port", async () => {
+      expect(await findAvailablePort()).toBe(25565);
     });
 
-    it("should skip used ports", () => {
+    it("should skip used ports", async () => {
       createServer({ name: "S1", mc_version: "1.21.4", software: "vanilla", ram_mb: 2048,       port: 25565, eula_accepted: true });
-      expect(findAvailablePort()).toBe(25566);
+      expect(await findAvailablePort()).toBe(25566);
+    });
+
+    // Regression: docker-compose published the whole SERVER_PORT_RANGE on the
+    // api container. findAvailablePort only consulted the database, so it handed
+    // out a port the daemon had already reserved, and every server then failed at
+    // container.start() with "port is already allocated" -- visible only as a
+    // bare 500 on /start.
+    it("should skip a port already bound by a running container", async () => {
+      vi.mocked(docker.listContainers).mockResolvedValueOnce([
+        { Ports: [{ PublicPort: 25565, PrivatePort: 25565, Type: "tcp" }] },
+      ] as any);
+      expect(await findAvailablePort()).toBe(25566);
+    });
+
+    it("should fall back to database-only when Docker is unreachable", async () => {
+      vi.mocked(docker.listContainers).mockRejectedValueOnce(new Error("daemon down"));
+      expect(await findAvailablePort()).toBe(25565);
+    });
+
+    it("should combine database and container allocations", async () => {
+      createServer({ name: "S1", mc_version: "1.21.4", software: "vanilla", ram_mb: 2048,       port: 25565, eula_accepted: true });
+      vi.mocked(docker.listContainers).mockResolvedValueOnce([
+        { Ports: [{ PublicPort: 25566, PrivatePort: 25565, Type: "tcp" }] },
+      ] as any);
+      expect(await findAvailablePort()).toBe(25567);
     });
   });
 

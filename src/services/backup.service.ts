@@ -3,6 +3,7 @@ import docker from "../config/docker.js";
 import { notify } from "./notification.service.js";
 import { uploadBackupToCloud, deleteFromCloud, CloudStorageConfig } from "./cloud-storage.service.js";
 import { setUploadProgress, completeUpload } from "./backup-progress.js";
+import { serverDataDir } from "../utils/data-dir.js";
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
@@ -162,7 +163,7 @@ export async function restoreBackup(serverId: number, backupId: number): Promise
   if (!server) throw new Error("Server not found");
 
   const containerName = `servernest-mc-${server.id}`;
-  const dataDir = `${process.cwd()}/data/server-${server.id}`;
+  const dataDir = serverDataDir(server.id);
 
   // Ensure data directory exists
   if (!existsSync(dataDir)) {

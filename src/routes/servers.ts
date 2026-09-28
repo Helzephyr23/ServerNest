@@ -18,6 +18,7 @@ import {
   findAvailablePort,
 } from "../services/server.service.js";
 import { getServerMetrics, getMetricsHistory } from "../services/metrics.service.js";
+import { serverDataDir } from "../utils/data-dir.js";
 import { logAudit } from "../services/audit.service.js";
 import docker from "../config/docker.js";
 import { rmSync, existsSync, mkdirSync, readdirSync, readFileSync, createWriteStream, statSync } from "fs";
@@ -53,7 +54,7 @@ export default async function serverRoutes(app: FastifyInstance) {
 
   app.post("/api/servers", { preHandler: [authMiddleware, adminMiddleware, validate(schemas.createServer)] }, async (request, reply) => {
     const { name, description, icon, mc_version, software, ram_mb, image, eula_accepted } = request.body as { name: string; description?: string; icon?: string; mc_version: string; software?: string; ram_mb?: number; image?: string; eula_accepted: boolean };
-    const port = findAvailablePort();
+    const port = await findAvailablePort();
     const server = createServer({
       name,
       description,
@@ -87,10 +88,10 @@ export default async function serverRoutes(app: FastifyInstance) {
       if (serverName.length > 50) return reply.status(400).send({ error: "Name must be 50 characters or less" });
       if (isNaN(ram_mb) || ram_mb < 512 || ram_mb > 32768) return reply.status(400).send({ error: "RAM must be between 512 and 32768 MB" });
 
-      const port = findAvailablePort();
+      const port = await findAvailablePort();
       importedServer = createServer({ name: serverName, software, mc_version, ram_mb, port, eula_accepted });
-      const serverDataDir = `${process.cwd()}/data/server-${importedServer.id}`;
-      if (!existsSync(serverDataDir)) mkdirSync(serverDataDir, { recursive: true });
+      const importDataDir = serverDataDir(importedServer.id!);
+      if (!existsSync(importDataDir)) mkdirSync(importDataDir, { recursive: true });
 
       const filename = data.filename.toLowerCase();
       if (filename.endsWith(".zip")) {
@@ -104,9 +105,9 @@ export default async function serverRoutes(app: FastifyInstance) {
           yauzl.open(tmpPath, { lazyEntries: true }, (err: any, zipfile: any) => {
             if (err) { reject(err); return; }
             zipfile.on("entry", (entry: any) => {
-              const entryPath = pathResolve(serverDataDir, entry.fileName);
-              if (!entryPath.startsWith(pathResolve(serverDataDir))) {
-                request.log.warn({ fileName: entry.fileName }, "Zip Slip path traversal attempt — skipping entry");
+              const entryPath = pathResolve(importDataDir, entry.fileName);
+              if (!entryPath.startsWith(pathResolve(importDataDir))) {
+                request.log.warn({ fileName: entry.fileName }, "Zip Slip path traversal attempt â€” skipping entry");
                 zipfile.readEntry();
                 return;
               }
@@ -156,14 +157,14 @@ export default async function serverRoutes(app: FastifyInstance) {
             else { callback(); }
           }
         });
-        await pipeline(data.file, gunzip1, dedouble, tar.extract(serverDataDir));
+            await pipeline(data.file, gunzip1, dedouble, tar.extract(importDataDir));
       } else {
         throw new Error("Unsupported archive format. Upload a .zip or .tar.gz file");
       }
 
       const detected: { software?: string; version?: string } = {};
       try {
-        const files = readdirSync(serverDataDir);
+        const files = readdirSync(importDataDir);
         for (const file of files) {
           const lower = file.toLowerCase();
           if (lower.startsWith("paper-") && lower.endsWith(".jar")) {
@@ -182,7 +183,7 @@ export default async function serverRoutes(app: FastifyInstance) {
             detected.software = "spigot"; break;
           }
         }
-        const versionPath = join(serverDataDir, "version.json");
+        const versionPath = join(importDataDir, "version.json");
         if (existsSync(versionPath)) {
           try {
             const vdata = JSON.parse(readFileSync(versionPath, "utf-8"));
@@ -205,7 +206,7 @@ export default async function serverRoutes(app: FastifyInstance) {
       return reply.status(201).send({ server: getServerById(importedServer.id!), detected });
     } catch (err: unknown) {
       if (importedServer) {
-        const dir = `${process.cwd()}/data/server-${importedServer.id}`;
+        const dir = serverDataDir(importedServer.id!);
         try { rmSync(dir, { recursive: true, force: true }); } catch {}
         try { db.prepare("DELETE FROM servers WHERE id = ?").run(importedServer.id); } catch {}
       }
@@ -238,7 +239,7 @@ export default async function serverRoutes(app: FastifyInstance) {
     } catch {}
 
     deleteServer(Number(id));
-    const dataDir = `${process.cwd()}/data/server-${server.id}`;
+      const dataDir = serverDataDir(server.id);
     try { if (existsSync(dataDir)) rmSync(dataDir, { recursive: true, force: true }); } catch {}
     logAudit({ user_id: (request as any).user?.id, username: (request as any).user?.username, action: "server.delete", target_type: "server", target_id: Number(id), details: server.name, ip: request.ip });
     return { success: true };

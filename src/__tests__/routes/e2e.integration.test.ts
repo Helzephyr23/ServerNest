@@ -28,6 +28,7 @@ vi.mock("../../config/docker.js", () => ({
       inspect: vi.fn().mockResolvedValue({ State: { Running: true } }),
     }),
     createContainer: vi.fn().mockResolvedValue({ id: "test-container-id", start: vi.fn().mockResolvedValue(undefined) }),
+    listContainers: vi.fn().mockResolvedValue([]),
   },
   isDockerAvailable: vi.fn().mockResolvedValue(true),
   getImageName: vi.fn().mockReturnValue("itzg/minecraft-server"),
@@ -37,7 +38,7 @@ vi.mock("../../config/env.js", () => ({
     NODE_ENV: "test", PANEL_HOST: "127.0.0.1", PANEL_PORT: 3000, API_PORT: 3001,
     JWT_SECRET: "e2e-test-secret-key", JWT_EXPIRES_IN: "1d", DATABASE_PATH: ":memory:",
     DOCKER_IMAGE: "itzg/minecraft-server", SERVER_PORT_RANGE_START: 25565,
-    SERVER_PORT_RANGE_END: 25665, NODE_NAME: "master", NODE_API_KEY: "test-key", GRPC_PORT: 50051,
+    SERVER_PORT_RANGE_END: 25665, SERVER_DATA_DIR: "./data", NODE_NAME: "master", NODE_API_KEY: "test-key", GRPC_PORT: 50051,
   },
 }));
 
@@ -257,7 +258,7 @@ describe("E2E Integration Scenarios", () => {
   }
 
   describe("1. Full auth lifecycle", () => {
-    it("setup → login → session → revoke → verify 401", async () => {
+    it("setup â†’ login â†’ session â†’ revoke â†’ verify 401", async () => {
       const setup = await setupAdmin();
       expect(setup.token).toBeDefined();
       expect(setup.user.role).toBe("admin");
@@ -343,7 +344,7 @@ describe("E2E Integration Scenarios", () => {
   });
 
   describe("2. 2FA flow", () => {
-    it("setup → enable → login challenge → verify → disable", async () => {
+    it("setup â†’ enable â†’ login challenge â†’ verify â†’ disable", async () => {
       const setup = await setupAdmin();
       const headers = await authHeader(setup.token);
 
@@ -453,7 +454,7 @@ describe("E2E Integration Scenarios", () => {
   });
 
   describe("3. Server lifecycle", () => {
-    it("create → start → verify running → stop → verify stopped → restart → delete", async () => {
+    it("create â†’ start â†’ verify running â†’ stop â†’ verify stopped â†’ restart â†’ delete", async () => {
       const setup = await setupAdmin();
       const headers = await authHeader(setup.token);
 
@@ -546,7 +547,7 @@ describe("E2E Integration Scenarios", () => {
   });
 
   describe("4. Backup lifecycle", () => {
-    it("create → list → restore → delete → list empty", async () => {
+    it("create â†’ list â†’ restore â†’ delete â†’ list empty", async () => {
       const setup = await setupAdmin();
       const headers = await authHeader(setup.token);
       const serverId = await createServer(setup.token);
@@ -603,7 +604,7 @@ describe("E2E Integration Scenarios", () => {
   });
 
   describe("5. Rate limiting rules lifecycle", () => {
-    it("create → list → update → disable → delete → verify empty", async () => {
+    it("create â†’ list â†’ update â†’ disable â†’ delete â†’ verify empty", async () => {
       const setup = await setupAdmin();
       const headers = await authHeader(setup.token);
 

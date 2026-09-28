@@ -22,6 +22,22 @@ export const env = {
   JWT_SECRET: resolveJwtSecret(),
   JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || "24h",
   DATABASE_PATH: process.env.DATABASE_PATH || "./data/servernest.db",
+  // Root directory holding per-server Minecraft data (`server-<id>/`).
+  //
+  // This is NOT just an API-side path. The panel passes it straight to Docker
+  // as a bind source when creating the Minecraft container, so the daemon
+  // resolves it against the *host* filesystem. If the panel reads it from a
+  // different location than the daemon writes it, every host-path code path
+  // (mod install, file upload/download, server import, clone, the restore
+  // safety snapshot) silently operates on an empty directory while the
+  // Minecraft container is perfectly happy. See src/utils/data-dir.ts.
+  //
+  // In Docker it must be an absolute path that is identical inside and outside
+  // the API container, so the bind below resolves to the same directory:
+  //   - type: bind
+  //     source: ${SERVER_DATA_DIR}
+  //     target: ${SERVER_DATA_DIR}
+  SERVER_DATA_DIR: process.env.SERVER_DATA_DIR || "./data",
   DOCKER_IMAGE: process.env.DOCKER_IMAGE || "itzg/minecraft-server",
   SERVER_PORT_RANGE_START: parseInt(process.env.SERVER_PORT_RANGE_START || "25565", 10),
   SERVER_PORT_RANGE_END: parseInt(process.env.SERVER_PORT_RANGE_END || "25665", 10),

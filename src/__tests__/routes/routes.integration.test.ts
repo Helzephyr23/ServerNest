@@ -28,6 +28,7 @@ vi.mock("../../config/docker.js", () => ({
       inspect: vi.fn().mockResolvedValue({ State: { Running: true } }),
     }),
     createContainer: vi.fn().mockResolvedValue({ id: "test-id", start: vi.fn().mockResolvedValue(undefined) }),
+    listContainers: vi.fn().mockResolvedValue([]),
   },
   isDockerAvailable: vi.fn().mockResolvedValue(true),
   getImageName: vi.fn().mockReturnValue("itzg/minecraft-server"),
@@ -37,7 +38,7 @@ vi.mock("../../config/env.js", () => ({
     NODE_ENV: "test", PANEL_HOST: "127.0.0.1", PANEL_PORT: 3000, API_PORT: 3001,
     JWT_SECRET: "integration-test-secret-key", JWT_EXPIRES_IN: "1d", DATABASE_PATH: ":memory:",
     DOCKER_IMAGE: "itzg/minecraft-server", SERVER_PORT_RANGE_START: 25565,
-    SERVER_PORT_RANGE_END: 25665, NODE_NAME: "master", NODE_API_KEY: "test-key", GRPC_PORT: 50051,
+    SERVER_PORT_RANGE_END: 25665, SERVER_DATA_DIR: "./data", NODE_NAME: "master", NODE_API_KEY: "test-key", GRPC_PORT: 50051,
   },
 }));
 
@@ -1282,7 +1283,7 @@ describe("All Routes Integration", () => {
       });
       const serverId = JSON.parse(createRes.payload).server.id;
 
-      // HTTP parser resolves ../ before reaching handler → 404 (no route match)
+      // HTTP parser resolves ../ before reaching handler â†’ 404 (no route match)
       const del = await app.inject({
         method: "DELETE", url: `/api/servers/${serverId}/mods/../../etc/passwd`, headers: admin(),
       });
@@ -1296,7 +1297,7 @@ describe("All Routes Integration", () => {
       });
       const serverId = JSON.parse(createRes.payload).server.id;
 
-      // URL-encoded traversal: ..%2F..%2Fetc%2Fpasswd → filename arrives as ../../etc/passwd
+      // URL-encoded traversal: ..%2F..%2Fetc%2Fpasswd â†’ filename arrives as ../../etc/passwd
       const del = await app.inject({
         method: "DELETE", url: `/api/servers/${serverId}/mods/..%2F..%2Fetc%2Fpasswd`, headers: admin(),
       });

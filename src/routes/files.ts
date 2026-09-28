@@ -3,6 +3,7 @@ import { authMiddleware, operatorOrAboveMiddleware } from "../middleware/auth.js
 import { validate, validateQuery, schemas } from "../middleware/validate.js";
 import db from "../config/database.js";
 import { execInContainer, writeInContainer } from "../utils/container.js";
+import { serverDataDir } from "../utils/data-dir.js";
 import { join, normalize } from "path";
 import { existsSync, mkdirSync, writeFileSync, createReadStream, statSync } from "fs";
 
@@ -151,9 +152,9 @@ export default async function filesRoutes(app: FastifyInstance) {
       }
       const buffer = Buffer.concat(chunks);
 
-      const serverDataDir = join(process.cwd(), "data", `server-${serverId}`);
-      const fullPath = join(serverDataDir, filePath);
-      if (!fullPath.startsWith(serverDataDir)) {
+      const serverDataDirPath = serverDataDir(serverId);
+      const fullPath = join(serverDataDirPath, filePath);
+      if (!fullPath.startsWith(serverDataDirPath)) {
         return reply.status(400).send({ error: "Invalid path" });
       }
       const dir = fullPath.substring(0, fullPath.lastIndexOf("/"));
@@ -178,9 +179,9 @@ export default async function filesRoutes(app: FastifyInstance) {
 
     try {
       const safePath = sanitizePath(filePath);
-      const serverDataDir = join(process.cwd(), "data", `server-${serverId}`);
-      const fullPath = join(serverDataDir, safePath);
-      if (!fullPath.startsWith(serverDataDir)) {
+      const serverDataDirPath = serverDataDir(serverId);
+      const fullPath = join(serverDataDirPath, safePath);
+      if (!fullPath.startsWith(serverDataDirPath)) {
         return reply.status(400).send({ error: "Invalid path" });
       }
       if (!existsSync(fullPath)) return reply.status(404).send({ error: "File not found" });

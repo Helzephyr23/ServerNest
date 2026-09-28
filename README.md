@@ -71,11 +71,48 @@ ServerNest is a **free, open-source, self-hosted** Minecraft server management p
 git clone https://github.com/Helzephyr23/servernest.git
 cd servernest
 cp .env.example .env
-# Edit .env — set a secure JWT_SECRET
+# Edit .env — set a secure JWT_SECRET, DOCKER_GID, and SERVER_DATA_DIR
 docker compose up -d
 ```
 
 Open **http://localhost:3000** and follow the setup wizard to create your admin account.
+
+#### Minecraft data directory
+
+Every Minecraft server's world lives in its own directory, `<SERVER_DATA_DIR>/server-<id>`.
+The panel reads and writes those files directly (mod installs, file upload/download, server
+import, clone, restore snapshots), while the Minecraft container mounts the same directory as
+`/data`. The panel and the daemon must therefore agree on **one identical path**, so
+`docker-compose.yml` bind-mounts `SERVER_DATA_DIR` at exactly the same source and target:
+
+```yaml
+- type: bind
+  source: ${SERVER_DATA_DIR}   # resolved by the daemon, on the host
+  target: ${SERVER_DATA_DIR}   # the same path inside the container
+```
+
+Two consequences worth knowing before you deploy:
+
+- **`SERVER_DATA_DIR` must be an absolute path.** Compose refuses to start without it. There is
+  no need to create the directory yourself: the `data-init` service runs once before the API,
+  creates the directory, and hands it to uid/gid `1000`, which is the user both the panel
+  containers and the Minecraft containers run as.
+- **On Docker Desktop (Windows/macOS) that path is inside the Linux VM, not on your host
+  filesystem.** `/srv/servernest/data` persists across restarts and is not visible from Windows
+  Explorer. If you need the worlds in a real host folder, point `SERVER_DATA_DIR` at a shared
+  path instead (e.g. `/run/desktop/mnt/host/c/Users/you/servernest-data` on Windows).
+
+`data-init` exists because the API deliberately runs as a non-root user and therefore cannot
+fix ownership itself. It is a separate short-lived root container rather than a root entrypoint
+inside the API image, because an entrypoint that chowns and then drops privileges with `su-exec`
+discards Compose's `group_add` — the API then cannot read `/var/run/docker.sock` and
+`/api/health` reports `"docker": false` with no other symptom.
+
+Panel state (the SQLite database and backup archives) is stored separately in the named volume
+`servernest-data` mounted at `/app/data`, so it is unaffected by `SERVER_DATA_DIR`. `data-init`
+fixes that volume recursively, which also repairs installations upgraded from an image that ran
+as a different user — otherwise the API starts but fails every write with
+`SqliteError: attempt to write a readonly database`.
 
 ### Manual Setup
 
@@ -91,6 +128,10 @@ pnpm dev
 ```
 
 Open **http://localhost:3000** for the frontend and **http://localhost:3001** for the API.
+
+`pnpm dev` and `pnpm start` both run the API and the web app together. When running without
+Docker, set `SERVER_DATA_DIR` to wherever you want per-server Minecraft data kept; the default
+`./data` puts it next to the API process.
 
 ---
 
@@ -115,7 +156,7 @@ cp .env.example .env
 |---------|-------------|
 | `pnpm dev` | Start API + frontend in development mode |
 | `pnpm build` | Build both API and frontend for production |
-| `pnpm start` | Start production server |
+| `pnpm start` | Start API + web in production mode |
 | `pnpm test` | Run all tests |
 | `pnpm test:watch` | Run tests in watch mode |
 | `pnpm lint` | Lint all packages |
@@ -529,6 +570,8 @@ All endpoints are prefixed with `/api` and require JWT authentication (`Authoriz
 | `DOCKER_IMAGE` | `itzg/minecraft-server` | Default Docker image for servers |
 | `SERVER_PORT_RANGE_START` | `25565` | Start of Minecraft server port range |
 | `SERVER_PORT_RANGE_END` | `25665` | End of Minecraft server port range |
+| `SERVER_DATA_DIR` | `./data` | Root for per-server Minecraft data (`server-<id>` subdirs). See [Minecraft data directory](#minecraft-data-directory). |
+| `DOCKER_GID` | - | Docker Compose only. Group id of `/var/run/docker.sock`, used to grant the API container socket access without running it as root. |
 | `NODE_NAME` | `master` | Name for this node |
 | `NODE_API_KEY` | - | API key for agent authentication |
 | `GRPC_PORT` | `50051` | Agent Express port |

@@ -25,7 +25,7 @@
   "scripts": {
     "dev": "concurrently \"pnpm --filter @servernest/api dev\" \"pnpm --filter @servernest/web dev\"",
     "build": "pnpm --filter @servernest/api build && pnpm --filter @servernest/web build",
-    "start": "pnpm --filter @servernest/api start",
+    "start": "concurrently -n api,web -c blue,green -k \"pnpm --filter @servernest/api start\" \"pnpm --filter @servernest/web start\"",
     "lint": "pnpm -r lint",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
