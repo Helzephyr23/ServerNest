@@ -1,6 +1,6 @@
 # Biryani — Remaining Issues & Backlog
 
-> **Updated:** 2026-08-26
+> **Updated:** 2026-09-28
 > All critical bugs, high-severity issues, security fixes, and test coverage gaps are resolved.
 > This document tracks the remaining post-launch backlog only.
 > Full history of resolved items lives in git history (`git log --oneline`) and prior revisions of this file.
@@ -9,12 +9,12 @@
 
 | Check | Status |
 | ----- | ------ |
-| Tests | 452 passing (369 api + 52 web + 31 agent) |
+| Tests | 470 passing (387 api + 52 web + 31 agent) |
 | Typecheck | Clean across all workspaces |
-| Lint | 0 errors (~191 `no-explicit-any` warnings) |
+| Lint | 0 errors (96 `no-explicit-any` warnings) |
 | Test DB schema | Single source: `src/__tests__/schema.ts` |
-| CI | lint → typecheck → tests → coverage → build → Docker image → `pnpm audit` |
-| Known dependency vulnerabilities | 0 |
+| CI | lint → typecheck → tests → coverage → build → Docker image → `pnpm audit` (gate: high) |
+| Known dependency vulnerabilities | 0 (`pnpm audit --prod` clean) |
 
 ---
 

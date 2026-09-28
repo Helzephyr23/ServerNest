@@ -27,7 +27,7 @@ A full codebase audit was conducted before launch. Below is a summary of finding
 - **Zod validation** — `POST /api/nodes` now uses `schemas.createNode`; `PUT /files/content` now uses `schemas.fileContent`
 - **Python dependency removed** — `routes/players.ts` no longer uses `python3 -c`; replaced with native `cat`/`tee` + Node.js JSON manipulation
 - **TypeScript** — both backend and frontend pass `tsc --noEmit`
-- **Tests** — 114/115 pass (1 pre-existing failure unrelated to audit)
+- **Tests** — 470/470 pass (387 api + 52 web + 31 agent)
 
 ### Infrastructure
 - **CI/CD pipeline** — `.github/workflows/ci.yml` created with lint → typecheck → test → build on push/PR to `main`/`feat/*`
@@ -56,7 +56,7 @@ A full codebase audit was conducted before launch. Below is a summary of finding
 ### Infrastructure
 - [x] **Add CI/CD pipeline (GitHub Actions)** — created `.github/workflows/ci.yml` (audit → lint → typecheck → test → build, plus Docker image build job)
 - [x] **Pin dependency versions** — all `^` ranges replaced with exact versions across all 4 package.json files. Removed unused `adm-zip`, `@fastify/static` and duplicated root `@fastify/multipart`
-- [x] **Run `pnpm audit`** — 0 known vulnerabilities (Aug 2026): all 28 findings resolved via scoped pnpm overrides + `next` bumped to 15.5.21; audit step added to CI (`--audit-level high`)
+- [x] **Run `pnpm audit`** — 0 known vulnerabilities (Sep 2026): findings resolved via scoped pnpm overrides (`sharp`, `postcss`, `js-yaml`, `uuid`, `qs`) + `fastify` bumped to 5.12.1 + `next` on 15.5.26; audit step added to CI (`--audit-level high`)
 
 ### Code Quality
 - [x] **Replace Python JSON manipulation in `players.ts`** — now reads via `cat`, modifies in Node.js, writes via `tee`; no Python dependency

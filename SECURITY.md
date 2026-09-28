@@ -15,8 +15,7 @@ Biryani handles authentication (JWT, Argon2), Docker container management, and f
 
 If you discover a security vulnerability, please **do not open a public issue**. Instead, report it privately:
 
-- **Email:** [your-email@example.com](mailto:your-email@example.com) *(TODO: replace with maintainer email)*
-- **GitHub:** Use the **Security** tab → **Report a vulnerability** (if enabled)
+- **GitHub:** Use the **Security** tab → **Report a vulnerability**
 
 Please include:
 

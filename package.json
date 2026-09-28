@@ -4,6 +4,24 @@
   "description": "Free, self-hosted Minecraft server management panel",
   "license": "GPL-3.0-only",
   "private": true,
+  "author": "Helzephyr23",
+  "keywords": [
+    "minecraft",
+    "server",
+    "panel",
+    "docker",
+    "self-hosted",
+    "management",
+    "modrinth"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Helzephyr23/biryani.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Helzephyr23/biryani/issues"
+  },
+  "homepage": "https://github.com/Helzephyr23/biryani",
   "scripts": {
     "dev": "concurrently \"pnpm --filter @biryani/api dev\" \"pnpm --filter @biryani/web dev\"",
     "build": "pnpm --filter @biryani/api build && pnpm --filter @biryani/web build",
@@ -25,5 +43,14 @@
   "packageManager": "pnpm@9.15.0",
   "dependencies": {
     "cron-parser": "^5.10.0"
+  },
+  "pnpm": {
+    "overrides": {
+      "sharp": "^0.35.4",
+      "postcss": "^8.5.22",
+      "js-yaml": "^4.3.2",
+      "uuid": "^11.1.1",
+      "qs": "^6.16.0"
+    }
   }
 }
