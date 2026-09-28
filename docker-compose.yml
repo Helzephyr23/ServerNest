@@ -25,6 +25,13 @@ services:
     volumes:
       - servernest-data:/app/data
       - /var/run/docker.sock:/var/run/docker.sock # WARNING: Grants container root access to host Docker daemon. Use rootless Docker or a socket proxy in production.
+    # The container runs as the non-root `servernest` user, but the Docker socket
+    # is typically root:root 660, so it is unreadable without a matching
+    # supplementary group. Default 0 works on stock Docker/Docker Desktop; set
+    # DOCKER_GID in .env to your host's socket group (e.g. `stat -c '%g'
+    # /var/run/docker.sock`) to avoid granting group 0.
+    group_add:
+      - "${DOCKER_GID:-0}"
     deploy:
       resources:
         limits:
@@ -43,6 +50,12 @@ services:
     build:
       context: .
       target: web-runtime
+      args:
+        # Next bakes rewrites() into routes-manifest.json at build time, so the
+        # proxy target has to be known here. "api" is the compose service name,
+        # resolvable on the shared bridge network.
+        API_HOST: api
+        API_PORT: "3001"
     restart: unless-stopped
     networks:
       - servernest

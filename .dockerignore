@@ -1,10 +1,25 @@
-node_modules
-.next
-dist
+# Dependencies and build output must never enter the context. On Windows these
+# are Junctions pointing at absolute C:/Users/... paths; copied into the image
+# they overwrite pnpm's correct relative symlinks and dangle on Linux, which
+# surfaces as "Module not found" for an arbitrary subset of packages. The **
+# prefix is explicit because the bare-name patterns below were not reliably
+# matching at depth.
+**/node_modules
+**/.next
+**/dist
+**/coverage
+**/test-results
+**/playwright-report
+**/*.tsbuildinfo
 .git
 data
 __tests__
-agent/
+# NOTE: agent/ is deliberately NOT excluded. pnpm-workspace.yaml declares
+# src, web, and agent as workspace packages, and the Dockerfile copies
+# agent/package.json into every stage that runs `pnpm install` so the
+# workspace matches pnpm-lock.yaml's four importers. Excluding the directory
+# would make that copy fail. No stage does `COPY agent/`, so agent source
+# still never enters the image.
 scripts/
 .github/
 *.test.ts
