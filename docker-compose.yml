@@ -13,7 +13,13 @@ services:
       - servernest
     ports:
       - "${API_PORT:-3001}:3001"
-      - "${SERVER_PORT_RANGE_START:-25565}-${SERVER_PORT_RANGE_END:-25665}:25565-25665"
+      # Do NOT publish SERVER_PORT_RANGE_START-END here. Minecraft containers
+      # are created on the host daemon with their own host port bindings, so the
+      # API container has no reason to reserve that range. Publishing it squatted
+      # all 101 ports, and since findAvailablePort() only checks the database
+      # (src/services/server.service.ts), it happily allocated a port that the
+      # daemon then refused: "Bind for 0.0.0.0:25565 failed: port is already
+      # allocated", which surfaced as a server stuck in the `error` state.
     environment:
       - NODE_ENV=production
       - API_PORT=3001
