@@ -74,7 +74,7 @@ A full codebase audit was conducted before launch. Below is a summary of finding
 - [x] **Fix silent catch blocks** — `server.service.ts` and `backup.service.ts` now log warnings/errors
 - [x] **Add Zod validation to remaining routes** — `rate-limits.ts` POST/PUT now use `schemas.createRateLimit`/`schemas.updateRateLimit`
 - [x] **Deduplicate `execInContainer`/`writeInContainer`** — extracted to `src/utils/container.ts`, both `files.ts` and `players.ts` import from shared utility
-- [ ] **Reduce `as any` usage** (~143 lint warnings) — erodes type safety and suppresses real errors
+- [ ] **Reduce `as any` usage** (237 lint warnings: 96 src + 141 web) — erodes type safety and suppresses real errors
 - [x] **Pin dependency versions** — all 4 package.json files now use exact versions (no `^`)
 
 ### Additional Fixes (July 2026 audit)
@@ -91,8 +91,8 @@ A full codebase audit was conducted before launch. Below is a summary of finding
 ### Low Priority
 - [ ] Replace `console.log` in agent with proper logger
 - [x] Add `ISSUES.md` (referenced in ROADMAP) — already existed, updated with fixes
-- [ ] Add Code of Conduct
-- [ ] Add `author`, `repository`, `bugs`, `homepage` fields to `package.json`
+- [x] Add Code of Conduct — `CODE_OF_CONDUCT.md` (Contributor Covenant 2.1), linked from README
+- [x] Add `author`, `repository`, `bugs`, `homepage` fields to `package.json`
 - [x] **Remove unused dependencies** — `adm-zip`, `@fastify/static` already removed
 - [x] **Deduplicate root dependency** — `@fastify/multipart` no longer duplicated
 - [x] **Update ROADMAP.md checkboxes** — several items already implemented

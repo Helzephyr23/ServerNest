@@ -33,7 +33,7 @@ ServerNest is a **free, open-source, self-hosted** Minecraft server management p
 - **👥 Player Management** — Whitelist, OP, and ban management
 - **📁 File Manager** — Browse, edit, upload, and download files inside your server container
 - **⏰ Scheduled Tasks** — Cron-based backup, restart, stop, start, and command tasks
-- **🔐 Two-Factor Auth** — TOTP-based 2FA with QR code setup and recovery
+- **🔐 Two-Factor Auth** — TOTP-based 2FA with QR code setup
 - **👤 Multi-User** — Role-based access control (admin/operator/user) with session management
 - **📝 Audit Log** — Track all administrative actions with full history
 - **🔔 Notifications** — Discord webhook alerts with enable/disable toggle

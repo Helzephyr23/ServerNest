@@ -1,0 +1,99 @@
+# Keep the lockfile honest between dependabot PRs.
+#
+# This project's security posture depends on hand-pinned versions plus the
+# overrides in pnpm-workspace.yaml and package.json (see AGENTS.md). A silent
+# transitive bump can reintroduce advisories that `pnpm audit` would catch, so
+# every PR runs the full CI gate: audit -> lint -> typecheck -> test -> build.
+
+version: 2
+
+updates:
+  # The workspace root (devDependencies + cron-parser + the pnpm.overrides block)
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Etc/UTC
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+    labels:
+      - dependencies
+    groups:
+      # Dependabot opens a single PR for all minor/patch bumps so the overrides
+      # in pnpm-workspace.yaml are re-validated in one go rather than piecemeal.
+      non-major:
+        update-types:
+          - minor
+          - patch
+        exclude-types:
+          - major
+
+  # Per-workspace packages
+  - package-ecosystem: npm
+    directories:
+      - "/src"
+      - "/web"
+      - "/agent"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Etc/UTC
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+    labels:
+      - dependencies
+    groups:
+      non-major:
+        update-types:
+          - minor
+          - patch
+        exclude-types:
+          - major
+
+  # Actions are pinned to major tags (actions/checkout@v4 etc.), so watch them
+  # explicitly - a compromised action tag is a supply-chain risk here because CI
+  # is the only thing validating the dependency tree.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Etc/UTC
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(ci)"
+    labels:
+      - dependencies
+      - ci
+    groups:
+      non-major:
+        update-types:
+          - minor
+          - patch
+        exclude-types:
+          - major
+
+  # Security-only, faster cadence than the weekly sweep. Because CI runs
+  # `pnpm audit --prod --audit-level=high`, a new advisory shows up as a red
+  # build even before Dependabot proposes the fix.
+  - package-ecosystem: npm
+    directories:
+      - "/"
+      - "/src"
+      - "/web"
+      - "/agent"
+    schedule:
+      interval: daily
+    open-pull-requests-limit: 5
+    vulnerability-fix-only: true
+    commit-message:
+      prefix: "fix(deps)"
+    labels:
+      - dependencies
+      - security
