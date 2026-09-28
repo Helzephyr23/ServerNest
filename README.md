@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🍛 ServerNest
+# 🪺 ServerNest
 
 **Free, self-hosted Minecraft server management panel**
 
@@ -606,67 +606,15 @@ The refresh token is stored server-side and never exposed to the frontend. You c
 
 ## Contributing
 
-Contributions are welcome! Here's how to get started:
+Contributions are welcome. See **[CONTRIBUTING.md](./CONTRIBUTING.md)** for setup, the development workflow, commit conventions, and architecture notes you should know before opening a pull request.
+
+Participation in this project is governed by the **[Code of Conduct](./CODE_OF_CONDUCT.md)**.
 
 ### Project Roadmap
 
 Check **[ROADMAP.md](./ROADMAP.md)** for upcoming features and **[ISSUES.md](./ISSUES.md)** for known bugs and technical debt.
 
-### Getting Started
-
-1. Fork the repository
-2. Clone your fork:
-   ```bash
-   git clone https://github.com/Helzephyr23/servernest.git
-   cd servernest
-   ```
-3. Install dependencies:
-   ```bash
-   pnpm install
-   ```
-4. Copy and configure environment:
-   ```bash
-   cp .env.example .env
-   ```
-5. Start the development server:
-   ```bash
-   pnpm dev
-   ```
-
-### Making Changes
-
-1. Create a feature branch:
-   ```bash
-   git checkout -b feature/amazing-feature
-   ```
-2. Make your changes
-3. Run linting and type checking:
-   ```bash
-   pnpm lint
-   pnpm typecheck
-   ```
-4. Run the test suite:
-   ```bash
-   pnpm test
-   ```
-5. Commit your changes with a clear message:
-   ```bash
-   git commit -m 'Add amazing feature'
-   ```
-6. Push to the branch:
-   ```bash
-   git push origin feature/amazing-feature
-   ```
-7. Open a Pull Request
-
-### Guidelines
-
-- Follow existing code conventions (TypeScript, ESLint rules, existing patterns)
-- Write tests for new service functions when possible
-- Keep commits focused and messages descriptive
-- Update documentation if your change affects the public API or setup process
-
----
+Found a security issue? Please don't open a public issue — see **[SECURITY.md](./SECURITY.md)** for private reporting.
 
 ## License
 

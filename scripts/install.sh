@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-echo "🍛 Installing ServerNest - Minecraft Server Panel"
+echo "🪺 Installing ServerNest - Minecraft Server Panel"
 echo "=============================================="
 
 REPO_URL="${SERVERNEST_REPO:-https://github.com/Helzephyr23/servernest.git}"

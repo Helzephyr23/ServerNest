@@ -9,7 +9,7 @@ export default function ErrorPage({
 }) {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-4">
-      <span className="text-6xl">🍛</span>
+      <span className="text-6xl">🪺</span>
       <h1 className="text-4xl font-bold">500</h1>
       <p className="text-muted-foreground">Something went wrong</p>
       <p className="max-w-md text-center text-sm text-muted-foreground">

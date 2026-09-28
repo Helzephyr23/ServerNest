@@ -87,8 +87,8 @@ await app.register(overviewRoutes);
 await app.register(cloudStorageRoutes);
 await app.register(googleDriveRoutes);
 await app.register(rateLimitRoutes);
-  await app.register(sessionRoutes);
-  await app.register(auditRoutes);
+await app.register(sessionRoutes);
+await app.register(auditRoutes);
 
 app.get("/api/health", async () => {
   let dockerOk = false;
